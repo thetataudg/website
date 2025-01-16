@@ -19,8 +19,7 @@ export default function Rush() {
             Recruitment
           </h1>
           <h2 className="text-black text-[3vw] md:text-[24px] ml-[5%] font-bold">
-            Rush for the Fall 2024 semester is over. Please fill out this form if you are interested in rushing next
-            semester!
+            Rush for the Spring 2025 semester is open. Fill out the interest form and show up to our rush events on campus!
           </h2>
           <a
               href="https://forms.gle/yNUJKf1JwkvvrbEJ6"
@@ -52,22 +51,22 @@ export default function Rush() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <h1 className="text-[#7a0104] text-[30px] lg:text-3xl font-bold mt-10 pl-10">
-                Fall 2024 Rush Events
+                Spring 2025 Rush Events
               </h1>
               <p className="text-[#171717] text-justify text-[15px] lg:text-xl p-10 border-l-4 border-[#7a0104] m-10">
-                Game Night - Wednesday August 28, 7:30PM - GWC487
+                Game Night - Thursday January 23, 7:30PM - GWC 487
                 <br />
                 <br />
-                Donuts and Dog Toys - Thursday August 29, 7:30PM - GWC487
+                Donuts and Dog Toys - Friday January 24, 7:30PM - ECG 101
                 <br />
                 <br />
-                Field Day - Friday August 30, 6:30PM - Tooker Lawn
+                Bob Ross Night - Wednesday January 29, 7:30PM - ECG 101
                 <br />
                 <br />
-                Engineering Challenge - Thursday September 5, 7:30PM - GWC487
+                Engineering Challenge - Thursday January 30, 7:30PM - GWC 487
                 <br />
                 <br />
-                Meet the House - Friday September 6, 6:30PM - GWC487
+                Meet the House - Friday January 31, 6:30PM - MU 241C
                 <br />
                 <br />
               </p>
@@ -78,7 +77,7 @@ export default function Rush() {
                 <div className="border-8 border-[#7a0104] m-[40px]">
                   <Image
                     alt=""
-                    src="/RushPoster.png"
+                    src="/rush/Spring2025_Rush.png"
                     width="400"
                     height="500"
                   />
