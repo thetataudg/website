@@ -5,7 +5,7 @@ export default function Socials() {
       <hr className="my-6 border-neutral-800 sm:mx-auto lg:my-8" />
       <div className="sm:flex sm:items-center sm:justify-between">
         <span className="text-sm text-neutral-500 sm:text-center">
-          © 2024{" "}
+          © 2025{" "}
           <Link href="/" className="hover:underline">
             Theta Tau - Delta Gamma Chapter
           </Link>
