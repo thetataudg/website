@@ -36,9 +36,9 @@ const Footer = () => {
               Contacts
             </h2>
             <ul className="text-neutral-400 space-y-2">
-              <li>Regent - Trevor Hunter</li>
-              <li>Vice Regent - Paridhy Mann</li>
-              <li>Rush Chair - Nicholas Horn</li>
+              <li>Regent - Cristian Holguin</li>
+              <li>Vice Regent - Robert Kuehler</li>
+              <li>Rush Chair - Sonny Diaz</li>
               <li>
                 <a
                   className="underline underline-offset-4 text-neutral-200"
