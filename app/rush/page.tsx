@@ -19,7 +19,7 @@ export default function Rush() {
             Recruitment
           </h1>
           <h2 className="text-black text-[3vw] md:text-[24px] ml-[5%] font-bold">
-            Rush for the Spring 2025 semester is open. Fill out the interest form and show up to our rush events on campus!
+            Rush for the Spring 2025 semester is now over. Please fill out the Rush Interest Form below if you are interested in rushing next semester!
           </h2>
           <a
               href="https://forms.gle/yNUJKf1JwkvvrbEJ6"
