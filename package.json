@@ -9,7 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/nextjs": "^6.14.2",
+    "mongoose": "^8.13.2",
     "next": "^14.2.4",
+    "pino": "^9.6.0",
     "react": "^18",
     "react-bootstrap": "^2.10.4",
     "react-dom": "^18",
