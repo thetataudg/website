@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import Head from 'next/head';
 import Script from 'next/script';
+import { ClerkProvider } from "@clerk/nextjs";
 
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <ClerkProvider>
     <html lang="en">
       <body className={inter.className}>
         {/* External Google Tag Manager script */}
@@ -57,5 +59,6 @@ export default function RootLayout({
         <Footer />
       </body>
     </html>
+    </ClerkProvider>
   );
 }
