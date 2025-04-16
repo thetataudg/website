@@ -78,11 +78,11 @@ export default function MemberOnboard() {
     return (
       <div className="relative w-screen h-[400px] bg-black bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l">
       <div className="text-white flex flex-col items-start justify-end gap-5 w-[100%] h-[100%] pb-10 font-sans">
-        <h1 className="text-red-500 text-[13vw] md:text-[95px] ml-[5%] font-bold">
-          401 Unauthorized
+        <h1 className="text-red-600 text-[13vw] md:text-[95px] ml-[5%] font-bold">
+          Please Sign In
         </h1>
         <h2 className="text-white text-[3vw] md:text-[24px] ml-[5%] font-bold">
-          You must be logged in to view this page. <br />
+          You must be logged in to view this page.
           <SignInButton />
         </h2>
       </div>
@@ -93,18 +93,20 @@ export default function MemberOnboard() {
   if (authError) {
       return (
         <div className="relative w-screen h-[400px] bg-black bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l">
-          <div className="text-white flex flex-col items-start justify-end gap-5 w-[100%] h-[100%] pb-10 font-sans">
-            <h1 className="text-red-500 text-[13vw] md:text-[95px] ml-[5%] font-bold">
-              401 Unauthorized
-            </h1>
-            <h2 className="text-white text-[3vw] md:text-[24px] ml-[5%] font-bold">
-              You must be logged in to view this page. <br />
-              <SignInButton />
-            </h2>
-          </div>
+        <div className="text-white flex flex-col items-start justify-end gap-5 w-[100%] h-[100%] pb-10 font-sans">
+          <h1 className="text-red-600 text-[13vw] md:text-[95px] ml-[5%] font-bold">
+            Please Sign In
+          </h1>
+          <h2 className="text-white text-[3vw] md:text-[24px] ml-[5%] font-bold">
+            You must be logged in to view this page.
+            <SignInButton />
+          </h2>
         </div>
+      </div>
     );
   } else {
+    const { user } = useUser();
+
     return (
       <>
         <div className="relative w-screen h-[400px] bg-black bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l">
@@ -118,6 +120,21 @@ export default function MemberOnboard() {
           </div>
         </div>
         <form className="p-10 space-y-6" onSubmit={handleSubmit}>
+
+          <div className="flex flex-col">
+            <label className="font-bold" htmlFor="fname">
+              First Name
+            </label>
+            <input type="text" id="fname" name="fname" value={user?.firstName || ""} readOnly className="p-2 border rounded" />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="font-bold" htmlFor="lname">
+              Last Name
+            </label>
+            <input type="text" id="lname" name="lname" value={user?.lastName || ""} readOnly className="p-2 border rounded" />
+          </div>
+
           <div className="flex flex-col">
             <label className="font-bold" htmlFor="fraternityStatus">
               Fraternity Status
@@ -248,7 +265,7 @@ export default function MemberOnboard() {
             <input type="url" id="githubLink" name="githubLink" className="p-2 border rounded" />
           </div>
   
-          <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
+          <button type="submit" className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded">
             Submit
           </button>
         </form>
