@@ -10,7 +10,7 @@ import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortaweso
 // Grab this information from the user's MongoDB entry (if there is one)
 const userData = {
   userHasProfile: true, // Create userData but set this to false if the user is not found in MongoDB
-  needsProfileReview: true,
+  needsProfileReview: false,
   needsPermissionReview: false,
   type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
   isECouncil: false,
@@ -56,7 +56,7 @@ export default function Dashboard() {
         <div className="row mt-4">
           <div className="col-md-8">
             <p>
-              Type:{" "}
+              User Type:{" "}
               <b className={userTypeColor}>
                 {type}
                 {userTypeDetails && <span> ({userTypeDetails})</span>}
@@ -81,14 +81,14 @@ export default function Dashboard() {
                   {(needsProfileReview && !needsPermissionReview) && (
                     <div className="alert alert-info d-flex align-items-center mt-2" role="alert">
                       <FontAwesomeIcon icon={faHourglass} className="me-2" />
-                      Your profile changes will be published after review. Please allow 1-2 days.
+                      Your profile changes are awaiting review.
                     </div>
                   )}
 
                   {(!needsPermissionReview) && (
                     <div className="alert alert-success d-flex align-items-center" role="alert">
                       <FontAwesomeIcon icon={faCheck} className="me-2" />
-                      You have an active profile, giving you regular privileges on the management tool.
+                      Your profile is active, giving you normal privileges on the chapter tool.
                     </div>
                   )}
                 </>

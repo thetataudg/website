@@ -14,14 +14,28 @@ import {
   faCalendar,
   faGear,
   faHome,
+  faShop,
 } from "@fortawesome/free-solid-svg-icons";
 
-// Make sure Bootstrap and Font Awesome CSS are globally loaded in your layout
+import { useEffect } from "react";
 
 export default function MemberNavbar() {
   const pathname = usePathname();
 
   const isActive = (href) => pathname === href;
+
+  useEffect(() => {
+    const loadBootstrap = async () => {
+      try {
+        await import("bootstrap/dist/js/bootstrap.bundle.min.js");
+        console.log("Bootstrap JS loaded successfully");
+      } catch (error) {
+        console.error("Failed to load Bootstrap JS", error);
+      }
+    };
+
+    loadBootstrap();
+  }, []); // Empty dependency array ensures it runs once when the component mounts
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -90,6 +104,11 @@ export default function MemberNavbar() {
                 <FontAwesomeIcon icon={faCalendar} className="me-1" /> Events
               </Link>
             </li>
+            <li className="nav-item">
+              <Link className="nav-link" target="_blank" href="https://thetatau-dg.org/2dg4u">
+                <FontAwesomeIcon icon={faShop} className="me-1" /> Merchandise
+              </Link>
+            </li>
           </ul>
           <ul className="navbar-nav ms-auto">
             <li className="nav-item me-2">
@@ -100,7 +119,7 @@ export default function MemberNavbar() {
                 <FontAwesomeIcon icon={faGear} className="me-1" /> Admin
               </Link>
             </li>
-            <li className="nav-item">
+            <li className="nav-item d-flex align-items-center">
               <UserButton />
             </li>
           </ul>
