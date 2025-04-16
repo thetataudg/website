@@ -22,11 +22,26 @@ export default function Dashboard() {
   const { user } = useUser();
 
   if (!isLoaded) {
-    return null;
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
   }
 
   if (!isSignedIn) {
-    return <RedirectToSignIn />;
+    return (
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
+        </div>
+    );
   }
 
   const { userHasProfile, type, isECouncil, isAdmin, needsPermissionReview, needsProfileReview } = userData;

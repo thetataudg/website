@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
-import { SignInButton, useAuth, useUser } from "@clerk/nextjs";
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { RedirectToSignIn, SignInButton, useAuth, useUser } from "@clerk/nextjs";
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 export default function MemberOnboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const [authError, setAuthError] = useState(false);
+  const [isElected, setIsElected] = useState(false);
 
   const engineeringMajors = [
     "Computer Science",
@@ -25,15 +28,12 @@ export default function MemberOnboard() {
   ];
   const fraternityStatuses = ["Active", "Alumni"];
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-
-    // Construct an object from the form data
-    const data: Record<string, any> = {};
+    const data = {};
     formData.forEach((value, key) => {
       if (key === "majors" || key === "little") {
-        // Handle multi-select inputs as arrays
         data[key] = formData.getAll(key);
       } else {
         data[key] = value;
@@ -43,231 +43,148 @@ export default function MemberOnboard() {
     try {
       const response = await fetch("/api/create-member", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log("Member created successfully:", result);
         alert("Profile created successfully!");
       } else {
-        console.error("Failed to create member:", await response.text());
         alert("Failed to create profile. Please try again.");
       }
     } catch (error) {
-      console.error("Error creating member:", error);
       alert("An error occurred. Please try again.");
     }
   };
 
-  useEffect(() => {
-    // Redirect if not logged in
-    if (isLoaded && !isSignedIn) {
-      setAuthError(true);
-    } else {
-      setAuthError(false);
-    }
-  }, [isLoaded, isSignedIn]);
-
   if (!isLoaded) {
     return (
-      <div className="relative w-screen h-[400px] bg-black bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l">
-      <div className="text-white flex flex-col items-start justify-end gap-5 w-[100%] h-[100%] pb-10 font-sans">
-        <h1 className="text-red-600 text-[13vw] md:text-[95px] ml-[5%] font-bold">
-          Please Sign In
-        </h1>
-        <h2 className="text-white text-[3vw] md:text-[24px] ml-[5%] font-bold">
-          You must be logged in to view this page.
-          <SignInButton />
-        </h2>
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
       </div>
-    </div>
     );
   }
 
-  if (authError) {
-      return (
-        <div className="relative w-screen h-[400px] bg-black bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l">
-        <div className="text-white flex flex-col items-start justify-end gap-5 w-[100%] h-[100%] pb-10 font-sans">
-          <h1 className="text-red-600 text-[13vw] md:text-[95px] ml-[5%] font-bold">
-            Please Sign In
-          </h1>
-          <h2 className="text-white text-[3vw] md:text-[24px] ml-[5%] font-bold">
-            You must be logged in to view this page.
-            <SignInButton />
-          </h2>
-        </div>
-      </div>
-    );
-  } else {
-    const { user } = useUser();
-
+  if (!isSignedIn) {
     return (
-      <>
-        <div className="relative w-screen h-[400px] bg-black bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l">
-          <div className="text-white flex flex-col items-start justify-end gap-5 w-[100%] h-[100%] pb-10 font-sans">
-            <h1 className="text-white text-[13vw] md:text-[95px] ml-[5%] font-bold">
-              User Onboarding
-            </h1>
-            <h2 className="text-white text-[3vw] md:text-[24px] ml-[5%] font-bold">
-              Thanks for setting up your account. Fill in the following information to complete your profile.
-            </h2>
-          </div>
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
         </div>
-        <form className="p-10 space-y-6" onSubmit={handleSubmit}>
+    );
+  }
 
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="fname">
-              First Name
-            </label>
-            <input type="text" id="fname" name="fname" value={user?.firstName || ""} readOnly className="p-2 border rounded" />
+  const { user } = useUser();
+
+  return (
+    <>
+      <div className="container">
+        <form className="p-4" onSubmit={handleSubmit}>
+          <h1>User Onboarding</h1>
+          <p>Thanks for setting up your account. Provide the following information to complete your profile.</p>
+
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="fname">First Name</label>
+            <input type="text" id="fname" name="fname" value={user?.firstName || ""} readOnly className="form-control" />
           </div>
-
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="lname">
-              Last Name
-            </label>
-            <input type="text" id="lname" name="lname" value={user?.lastName || ""} readOnly className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="lname">Last Name</label>
+            <input type="text" id="lname" name="lname" value={user?.lastName || ""} readOnly className="form-control" />
           </div>
-
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="fraternityStatus">
-              Fraternity Status
-            </label>
-            <select id="fraternityStatus" name="fraternityStatus" className="p-2 border rounded">
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="fraternityStatus">Fraternity Status</label>
+            <select id="fraternityStatus" name="fraternityStatus" className="form-select">
               {fraternityStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
+                <option key={status} value={status}>{status}</option>
               ))}
             </select>
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="rollNumber">
-              Roll Number
-            </label>
-            <input type="number" id="rollNumber" name="rollNumber" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="rollNumber">Roll Number</label>
+            <input type="number" id="rollNumber" name="rollNumber" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="majors">
-              Majors
-            </label>
-            <select multiple id="majors" name="majors" className="p-2 border rounded">
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="majors">Majors</label>
+            <select multiple id="majors" name="majors" className="form-select">
               {engineeringMajors.map((major) => (
-                <option key={major} value={major}>
-                  {major}
-                </option>
+                <option key={major} value={major}>{major}</option>
               ))}
             </select>
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="graduationYear">
-              Graduation Year
-            </label>
-            <input type="number" id="graduationYear" name="graduationYear" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="graduationYear">Graduation Year</label>
+            <input type="number" id="graduationYear" name="graduationYear" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="big">
-              Big
-            </label>
-            <input type="text" id="big" name="big" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="big">Big</label>
+            <input type="text" id="big" name="big" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="little">
-              Little
-            </label>
-            <select multiple id="little" name="little" className="p-2 border rounded">
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="little">Little</label>
+            <select multiple id="little" name="little" className="form-select">
               {littleOptions.map((little) => (
-                <option key={little} value={little}>
-                  {little}
-                </option>
+                <option key={little} value={little}>{little}</option>
               ))}
             </select>
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="familyLine">
-              Family Line
-            </label>
-            <input type="text" id="familyLine" name="familyLine" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="familyLine">Family Line</label>
+            <input type="text" id="familyLine" name="familyLine" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="resumeUrl">
-              Resume URL
-            </label>
-            <input type="url" id="resumeUrl" name="resumeUrl" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="resumeUrl">Resume URL</label>
+            <input type="url" id="resumeUrl" name="resumeUrl" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="pledgeClass">
-              Pledge Class
-            </label>
-            <input type="text" id="pledgeClass" name="pledgeClass" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="pledgeClass">Pledge Class</label>
+            <input type="text" id="pledgeClass" name="pledgeClass" className="form-control" />
           </div>
-  
-          <div className="flex items-center gap-2">
-            <label className="font-bold" htmlFor="isElected">
-              Current e-Council?
-            </label>
+          <div className="form-check mb-3">
             <input
               type="checkbox"
               id="isElected"
               name="isElected"
+              className="form-check-input"
               checked={isElected}
               onChange={(e) => setIsElected(e.target.checked)}
             />
+            <label className="form-check-label fw-bold" htmlFor="isElected">
+              Current e-Council?
+            </label>
           </div>
-  
           {isElected && (
-            <div className="flex flex-col">
-              <label className="font-bold" htmlFor="eCouncilPosition">
-                Current e-Council Position
-              </label>
-              <select id="eCouncilPosition" name="eCouncilPosition" className="p-2 border rounded">
+            <div className="mb-3">
+              <label className="form-label fw-bold" htmlFor="eCouncilPosition">Current e-Council Position</label>
+              <select id="eCouncilPosition" name="eCouncilPosition" className="form-select">
                 {eCouncilPositions.map((position) => (
-                  <option key={position} value={position}>
-                    {position}
-                  </option>
+                  <option key={position} value={position}>{position}</option>
                 ))}
               </select>
             </div>
           )}
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="committeePositions">
-              Committee Positions
-            </label>
-            <input type="text" id="committeePositions" name="committeePositions" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="committeePositions">Committee Positions</label>
+            <input type="text" id="committeePositions" name="committeePositions" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="linkedinLink">
-              LinkedIn Link
-            </label>
-            <input type="url" id="linkedinLink" name="linkedinLink" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="linkedinLink">LinkedIn Link</label>
+            <input type="url" id="linkedinLink" name="linkedinLink" className="form-control" />
           </div>
-  
-          <div className="flex flex-col">
-            <label className="font-bold" htmlFor="githubLink">
-              GitHub Link
-            </label>
-            <input type="url" id="githubLink" name="githubLink" className="p-2 border rounded" />
+          <div className="mb-3">
+            <label className="form-label fw-bold" htmlFor="githubLink">GitHub Link</label>
+            <input type="url" id="githubLink" name="githubLink" className="form-control" />
           </div>
-  
-          <button type="submit" className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded">
+          <button type="submit" className="btn btn-success">
             Submit
           </button>
         </form>
-      </>
-    );
-  }
+      </div>
+    </>
+  );
 }
