@@ -24,7 +24,7 @@ export default function MemberNavbar() {
   const isActive = (href) => pathname === href;
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container-fluid">
         <Link className="navbar-brand" href="/member">
           ΔΓ Chapter Tools

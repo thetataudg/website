@@ -10,7 +10,7 @@ import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortaweso
 // Grab this information from the user's MongoDB entry (if there is one)
 const userData = {
   userHasProfile: true, // Create userData but set this to false if the user is not found in MongoDB
-  needsProfileReview: false,
+  needsProfileReview: true,
   needsPermissionReview: false,
   type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
   isECouncil: false,
@@ -41,12 +41,12 @@ export default function Dashboard() {
     .join(", ");
 
   return (
-    <div>
+    <div className="container-xxl mt-4">
       {/* Dashboard Body */}
-      <div className="container mt-5">
+      <div>
         {user ? (
           <h1>
-            Welcome, {user.firstName} {user.lastName}
+            Welcome, {user.firstName}
           </h1>
         ) : (
           <h2>Welcome, please enter your name in your profile</h2>
@@ -54,7 +54,7 @@ export default function Dashboard() {
 
         {/* Split into Two Columns */}
         <div className="row mt-4">
-          <div className="col-md-6">
+          <div className="col-md-8">
             <p>
               Type:{" "}
               <b className={userTypeColor}>
@@ -81,14 +81,14 @@ export default function Dashboard() {
                   {(needsProfileReview && !needsPermissionReview) && (
                     <div className="alert alert-info d-flex align-items-center mt-2" role="alert">
                       <FontAwesomeIcon icon={faHourglass} className="me-2" />
-                      Your profile changes have been queued for review by an admin and will be reviewed within a couple of days.
+                      Your profile changes will be published after review. Please allow 1-2 days.
                     </div>
                   )}
 
                   {(!needsPermissionReview) && (
                     <div className="alert alert-success d-flex align-items-center" role="alert">
                       <FontAwesomeIcon icon={faCheck} className="me-2" />
-                      Your profile is set up! You have regular privileges on the management tool.
+                      You have an active profile, giving you regular privileges on the management tool.
                     </div>
                   )}
                 </>
@@ -96,10 +96,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="col-md-6">
+          <div className="col-md-4">
             <h4>My Accesses</h4>
             <table className="table">
-              <thead className="table-light">
+              <thead className="thead-dark">
                 <tr>
                   <th>Privilege</th>
                   <th className="text-center">Access</th>
