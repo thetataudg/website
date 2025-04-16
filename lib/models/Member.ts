@@ -41,6 +41,10 @@ const MemberSchema = new Schema(
     },
 
     isAdmin: { type: Boolean, required: true, default: false },
+
+    needsProfileReview: { type: Boolean, required: true, default: true },
+
+    needsPermissionReview: { type: Boolean, required: true, default: true },
   },
   { timestamps: true }
 );

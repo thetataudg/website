@@ -12,6 +12,8 @@
     "@clerk/clerk-sdk-node": "^4.13.23",
     "@clerk/nextjs": "^6.15.0",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
     "bootstrap": "^5.3.5",
     "mongoose": "^8.13.2",
     "next": "^14.2.4",

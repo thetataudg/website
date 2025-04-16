@@ -2,11 +2,27 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faUser,
+  faAddressCard,
+  faNoteSticky,
+  faCheckToSlot,
+  faCalendar,
+  faGear,
+  faHome,
+} from "@fortawesome/free-solid-svg-icons";
 
 // Make sure Bootstrap and Font Awesome CSS are globally loaded in your layout
 
 export default function MemberNavbar() {
+  const pathname = usePathname();
+
+  const isActive = (href) => pathname === href;
+
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
       <div className="container-fluid">
@@ -27,35 +43,61 @@ export default function MemberNavbar() {
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav me-auto mb-2 mb-lg-0">
             <li className="nav-item">
-              <Link className="nav-link" href="/member/profile">
-                <i className="fa fa-user me-1"></i> My Profile
+              <Link
+                className={`nav-link ${isActive("/member") ? "active" : ""}`}
+                href="/member"
+              >
+                <FontAwesomeIcon icon={faHome} className="me-1" /> Home
               </Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" href="/member/brothers">
-                <i className="fa fa-address-card me-1"></i> Brothers
+              <Link
+                className={`nav-link ${isActive("/member/profile") ? "active" : ""}`}
+                href="/member/profile"
+              >
+                <FontAwesomeIcon icon={faUser} className="me-1" /> My Profile
               </Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" href="/member/minutes">
-                <i className="fa fa-note-sticky me-1"></i> Minutes
+              <Link
+                className={`nav-link ${isActive("/member/brothers") ? "active" : ""}`}
+                href="/member/brothers"
+              >
+                <FontAwesomeIcon icon={faAddressCard} className="me-1" /> Brothers
               </Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" href="/member/vote">
-                <i className="fa fa-check-to-slot me-1"></i> Vote
+              <Link
+                className={`nav-link ${isActive("/member/minutes") ? "active" : ""}`}
+                href="/member/minutes"
+              >
+                <FontAwesomeIcon icon={faNoteSticky} className="me-1" /> Minutes
               </Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" href="/member/events">
-                <i className="fa fa-calendar me-1"></i> Events
+              <Link
+                className={`nav-link ${isActive("/member/vote") ? "active" : ""}`}
+                href="/member/vote"
+              >
+                <FontAwesomeIcon icon={faCheckToSlot} className="me-1" /> Vote
+              </Link>
+            </li>
+            <li className="nav-item">
+              <Link
+                className={`nav-link ${isActive("/member/events") ? "active" : ""}`}
+                href="/member/events"
+              >
+                <FontAwesomeIcon icon={faCalendar} className="me-1" /> Events
               </Link>
             </li>
           </ul>
           <ul className="navbar-nav ms-auto">
             <li className="nav-item me-2">
-              <Link className="nav-link" href="/member/admin">
-                <i className="fa fa-gear"></i> Admin
+              <Link
+                className={`nav-link ${isActive("/member/admin") ? "active" : ""}`}
+                href="/member/admin"
+              >
+                <FontAwesomeIcon icon={faGear} className="me-1" /> Admin
               </Link>
             </li>
             <li className="nav-item">
