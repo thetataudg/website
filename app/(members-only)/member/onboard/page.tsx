@@ -8,8 +8,6 @@ export default function MemberOnboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const [authError, setAuthError] = useState(false);
 
-  const [isElected, setIsElected] = useState(false);
-
   const engineeringMajors = [
     "Computer Science",
     "Mechanical Engineering",

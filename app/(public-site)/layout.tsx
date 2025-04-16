@@ -4,10 +4,10 @@ import Head from 'next/head';
 import Script from 'next/script';
 import { ClerkProvider } from "@clerk/nextjs";
 
-import "./globals.css";
+import "../(public-site)/globals.css";
 
-import Navbar from "../components/Navbar.js";
-import Footer from "../components/Footer.js";
+import Navbar from "../(public-site)/components/Navbar.js";
+import Footer from "../(public-site)/components/Footer.js";
 
 const inter = Inter({
   subsets: ["latin"],

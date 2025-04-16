@@ -2,25 +2,25 @@
 import React from "react";
 import { useEffect } from "react";
 import Image from "next/image";
-import mission from "./../../public/mission.png";
-import randPic1 from "./../../public/randPic1.jpg";
-import randPic2 from "./../../public/randPic2.jpg";
-import randPic3 from "./../../public/randPic3.jpg";
+import mission from "/public/mission.png";
+import randPic1 from "/public/randPic1.jpg";
+import randPic2 from "/public/randPic2.jpg";
+import randPic3 from "/public/randPic3.jpg";
 
-import AWS from "./../../public/company_carousel/amazon-web-services-2.svg";
-import Disney from "./../../public/company_carousel/disney.svg";
-import Ford from "./../../public/company_carousel/ford-1.svg";
-import DOD from "./../../public/company_carousel/us-department-of-defense.svg";
-import PS from "./../../public/company_carousel/playstation-6.svg";
-import MKB from "./../../public/company_carousel/milwaukee-brewers-1.svg";
-import NG from "./../../public/company_carousel/northrop-grumman-1.svg";
-import LHM from "./../../public/company_carousel/lockheed-martin.svg";
-import Intel from "./../../public/company_carousel/intel.svg";
-import HW from "./../../public/company_carousel/honeywell-logo.svg";
-import Boeing from "./../../public/company_carousel/boeing-3.svg";
-import Apple from "./../../public/company_carousel/apple-14.svg";
-import AllS from "./../../public/company_carousel/allstate-logo.svg";
-import Accent from "./../../public/company_carousel/accenture-7.svg";
+import AWS from "/public/company_carousel/amazon-web-services-2.svg";
+import Disney from "/public/company_carousel/disney.svg";
+import Ford from "/public/company_carousel/ford-1.svg";
+import DOD from "/public/company_carousel/us-department-of-defense.svg";
+import PS from "/public/company_carousel/playstation-6.svg";
+import MKB from "/public/company_carousel/milwaukee-brewers-1.svg";
+import NG from "/public/company_carousel/northrop-grumman-1.svg";
+import LHM from "/public/company_carousel/lockheed-martin.svg";
+import Intel from "/public/company_carousel/intel.svg";
+import HW from "/public/company_carousel/honeywell-logo.svg";
+import Boeing from "/public/company_carousel/boeing-3.svg";
+import Apple from "/public/company_carousel/apple-14.svg";
+import AllS from "/public/company_carousel/allstate-logo.svg";
+import Accent from "/public/company_carousel/accenture-7.svg";
 
 export default function About() {
   useEffect(() => {
