@@ -4,7 +4,10 @@ import React, { useState, useEffect } from "react";
 import { RedirectToSignIn, SignInButton, useAuth, useUser } from "@clerk/nextjs";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faWarning, faTimes, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
+// Check if user already has entry in MongoDB here
+const userHasEntryInDB = false;
 
 export default function MemberOnboard() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -72,9 +75,20 @@ export default function MemberOnboard() {
     return (
         <div className="container">
             <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <FontAwesomeIcon icon={faTimes} className="h3" />
             <h3>You must be logged into use this function.</h3>
             <RedirectToSignIn />
+            </div>
+        </div>
+    );
+  }
+
+  if (userHasEntryInDB) {
+    return (
+        <div className="container">
+            <div className="alert alert-warning d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faWarning} className="p" />
+            You already have a profile, use the My Profile function to adjust your profile instead.
             </div>
         </div>
     );

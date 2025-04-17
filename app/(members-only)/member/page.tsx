@@ -14,7 +14,7 @@ const userData = {
   needsPermissionReview: false,
   type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
   isECouncil: false,
-  isAdmin: false,
+  isAdmin: true,
 };
 
 export default function Dashboard() {
@@ -51,6 +51,7 @@ export default function Dashboard() {
   const userTypeDetails = [
     isAdmin && "Admin",
     isECouncil && "E-Council",
+    needsPermissionReview && "access pending",
   ]
     .filter(Boolean)
     .join(", ");
@@ -80,16 +81,22 @@ export default function Dashboard() {
 
             <div className="mt-3">
               {!userHasProfile ? (
-                <div className="alert alert-warning d-flex align-items-center" role="alert">
-                  <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
-                  Please set up your profile to gain privileges on the management tool.
-                </div>
+                <div>
+                  <div className="alert alert-warning d-flex align-items-center" role="alert">
+                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
+                    Please set up your profile to gain privileges on the management tool.
+                  </div>
+
+                    <a type="button" className="btn btn-success" href="/member/onboard">
+                      Setup Profile
+                    </a>
+                  </div>
               ) : (
                 <>
                   {needsPermissionReview && (
                     <div className="alert alert-info d-flex align-items-center mt-2" role="alert">
                       <FontAwesomeIcon icon={faHourglass} className="me-2" />
-                      Since you marked yourself as E-Council, your status and profile are awaiting review from an admin.
+                      Since you marked yourself as E-Council, your extended permissions are being verified.
                     </div>
                   )}
 
@@ -100,12 +107,10 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {(!needsPermissionReview) && (
-                    <div className="alert alert-success d-flex align-items-center" role="alert">
-                      <FontAwesomeIcon icon={faCheck} className="me-2" />
-                      Your profile is active, giving you normal privileges on the chapter tool.
-                    </div>
-                  )}
+                  <div className="alert alert-success d-flex align-items-center" role="alert">
+                    <FontAwesomeIcon icon={faCheck} className="me-2" />
+                    Your profile is active, giving you normal privileges on the chapter tool.
+                  </div>
                 </>
               )}
             </div>
@@ -158,8 +163,8 @@ export default function Dashboard() {
                   <td>Admin Voting</td>
                   <td className="text-center">
                     <FontAwesomeIcon
-                      icon={isECouncil ? faCheck : faTimes}
-                      className={isECouncil ? "text-success" : "text-danger"}
+                      icon={(isECouncil && !needsPermissionReview) ? faCheck : faTimes}
+                      className={(isECouncil && !needsPermissionReview) ? "text-success" : "text-danger"}
                     />
                   </td>
                 </tr>
