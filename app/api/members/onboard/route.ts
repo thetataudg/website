@@ -7,8 +7,8 @@ import logger from "@/lib/logger";
 export async function POST(req: NextRequest) {
   let clerkId: string;
   try {
-    // clerkId = await requireAuth(req);
-    clerkId = "user_2vxmTISqCX2tECCoGUvoLk4aLTb"; // This is a temp clerkid to test endpoint. Remove this line and uncomment the above in PRODUCTION
+    clerkId = await requireAuth(req); // To test this on postman comment this line and use the below code.
+    // clerkId = "user_2vxmTISqCX2tECCoGUvoLk4aLTb"; // This is a temp clerkid to test endpoint. Remove this line and uncomment the above in PRODUCTION
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message },

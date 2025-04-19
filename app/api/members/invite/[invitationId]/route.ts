@@ -17,7 +17,7 @@ export async function DELETE(
       { error: err.message },
       { status: err.statusCode }
     );
-  }
+  } // To test this on postman comment this try catch block and use the below code.
 
   // TEMPORARY FOR LOCAL TESTING:
   // const admin = { clerkId: "local-test", role: "superadmin" };
