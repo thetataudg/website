@@ -1,7 +1,6 @@
-// lib/models/Member.ts
 import mongoose, { Schema, model, models } from "mongoose";
 
-const MemberSchema = new Schema(
+const PendingMemberSchema = new Schema(
   {
     clerkId: { type: String, required: true, unique: true },
     rollNo: { type: String, required: true, unique: true },
@@ -21,21 +20,20 @@ const MemberSchema = new Schema(
     resumeUrl: { type: String },
     profilePicUrl: { type: String },
     socialLinks: { type: Map, of: String, default: {} },
+
     status: {
       type: String,
-      enum: ["Active", "Alumni", "Removed", "Deceased"],
-      default: "Active",
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
-    role: {
-      type: String,
-      enum: ["superadmin", "admin", "member"],
-      default: "member",
-    },
-    needsProfileReview: { type: Boolean, required: true, default: true },
-    needsPermissionReview: { type: Boolean, required: true, default: true },
+    submittedAt: { type: Date, default: () => new Date() },
+    reviewedBy: { type: String }, // clerkId of the admin
+    reviewedAt: { type: Date },
+    reviewComments: { type: String },
   },
   { timestamps: true }
 );
 
-const Member = models.Member || model("Member", MemberSchema);
-export default Member;
+const PendingMember =
+  models.PendingMember || model("PendingMember", PendingMemberSchema);
+export default PendingMember;

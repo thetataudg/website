@@ -17,6 +17,21 @@ export class ForbiddenError extends Error {
   }
 }
 
+export async function requireRole(
+  req: NextRequest,
+  roles: ("superadmin" | "admin" | "member")[]
+) {
+  const { userId } = await auth();
+  if (!userId) throw new UnauthorizedError();
+
+  const member = await Member.findOne({ clerkId: userId });
+  if (!member || !roles.includes(member.role as any)) {
+    throw new ForbiddenError();
+  }
+
+  return member;
+}
+
 export async function getUserIdFromRequest(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
