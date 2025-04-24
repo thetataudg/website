@@ -14,7 +14,7 @@ const userData = {
   needsPermissionReview: false,
   type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
   isECouncil: false,
-  isAdmin: true,
+  isAdmin: false,
 };
 
 export default function Dashboard() {

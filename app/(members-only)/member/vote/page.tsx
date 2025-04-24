@@ -60,6 +60,11 @@ export default function VotePage() {
             <h1>
                 Chapter Voting
             </h1>
+            
+            <div className="alert alert-primary d-flex align-items-center" role="alert">
+              <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
+              There are no currently no votes running.
+            </div>
         </div>
     </div>
   );
