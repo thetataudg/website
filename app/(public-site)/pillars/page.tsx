@@ -1,9 +1,9 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import Professional_ChiLine from "./../../public/Professional-ChiLine.jpg";
-import Service_BikeSaviors from "./../../public/Service-BikeSaviors.jpg";
-import Brotherhood_Cookout from "./../../public/Brotherhood-Cookout.jpg";
+import Professional_ChiLine from "/public/Professional-ChiLine.jpg";
+import Service_BikeSaviors from "/public/Service-BikeSaviors.jpg";
+import Brotherhood_Cookout from "/public/Brotherhood-Cookout.jpg";
 import { SlArrowLeft, SlArrowRight } from "react-icons/sl";
 import Carousel from "react-bootstrap/Carousel";
 

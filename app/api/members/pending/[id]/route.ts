@@ -20,7 +20,7 @@ export async function PATCH(
       { status: err.statusCode }
     );
   } // To test this on postman comment this try catch block and use the below code.
-  //   admin = { clerkId: "local-test", role: "superadmin" }; // This is just for testing the API. Uncomment the above try catch block in PRODUCTION and delete this line.
+  // admin = { clerkId: "local-test", role: "superadmin" }; // This is just for testing the API. Uncomment the above try catch block in PRODUCTION and delete this line.
 
   const { action, reviewComments } = await req.json();
   if (!["approve", "reject"].includes(action)) {

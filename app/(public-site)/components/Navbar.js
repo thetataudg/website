@@ -1,9 +1,9 @@
-"use client"; // ref: https://stackoverflow.com/questions/74965849/youre-importing-a-component-that-needs-usestate-it-only-works-in-a-client-comp
+"use client";
 
 import Link from "next/link";
 import React, { useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
-
+import { SignedIn } from "@clerk/nextjs";
 import Image from "next/image";
 
 const Navbar = () => {
@@ -34,7 +34,7 @@ const Navbar = () => {
       id: 5,
       linkname: "Merch",
       target: "/merch",
-    }
+    },
   ];
 
   return (
@@ -76,6 +76,14 @@ const Navbar = () => {
             <Link href={target}>{linkname}</Link>
           </li>
         ))}
+        <SignedIn>
+          <li
+            className="nav-links px-4 cursor-pointer capitalize font-medium text-white hover:scale-105 hover:text-slate-400 hover:underline duration-100 link-underline"
+            onClick={() => setNav(false)}
+          >
+            <Link href="/member">Profile</Link>
+          </li>
+        </SignedIn>
       </ul>
 
       <div
@@ -100,6 +108,14 @@ const Navbar = () => {
               </Link>
             </li>
           ))}
+          <SignedIn>
+            <li
+              className="px-4 cursor-pointer capitalize py-6 text-4xl"
+              onClick={() => setNav(false)}
+            >
+              <Link href="/member">Profile</Link>
+            </li>
+          </SignedIn>
         </ul>
       )}
     </div>

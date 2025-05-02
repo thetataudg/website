@@ -1,3 +1,4 @@
+// api/members/onboard
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, getClerkUser } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -8,7 +9,7 @@ export async function POST(req: NextRequest) {
   let clerkId: string;
   try {
     clerkId = await requireAuth(req); // To test this on postman comment this line and use the below code.
-    // clerkId = "user_2vxmTISqCX2tECCoGUvoLk4aLTb"; // This is a temp clerkid to test endpoint. Remove this line and uncomment the above in PRODUCTION
+    // clerkId = "user_2wCfjfKbNJhzDCEsWAt4RPhxgMd"; // This is a temp clerkid to test endpoint. Remove this line and uncomment the above in PRODUCTION
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message },
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     committees = [],
     familyLine = "",
     pledgeClass = "",
-    isECouncil,
+    isECouncil = false,
     ecouncilPosition = "",
     hometown = "",
     resumeUrl = "",
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     socialLinks = {},
   } = await req.json();
 
-  if (!rollNo || !gradYear || typeof isECouncil !== "boolean") {
+  if (!rollNo || !gradYear) {
     return NextResponse.json(
       { error: "Missing required fields: rollNo, gradYear, isECouncil" },
       { status: 400 }

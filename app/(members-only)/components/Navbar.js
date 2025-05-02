@@ -1,41 +1,47 @@
+// app/(members-only)/components/Navbar.js
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faHome,
   faUser,
   faAddressCard,
   faNoteSticky,
   faCheckToSlot,
   faCalendar,
   faGear,
-  faHome,
   faShop,
 } from "@fortawesome/free-solid-svg-icons";
 
-import { useEffect } from "react";
-
 export default function MemberNavbar() {
   const pathname = usePathname();
-
-  const isActive = (href) => pathname === href;
-
+  const [rollNo, setRollNo] = useState(null);
+  const [role, setRole] = useState(null);
+  // fetch current user’s rollNo & role
   useEffect(() => {
-    const loadBootstrap = async () => {
-      try {
-        await import("bootstrap/dist/js/bootstrap.bundle.min.js");
-        console.log("Bootstrap JS loaded successfully");
-      } catch (error) {
-        console.error("Failed to load Bootstrap JS", error);
-      }
-    };
+    fetch("/api/members/me")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        setRollNo(data.rollNo);
+        setRole(data.role);
+      })
+      .catch(() => {
+        setRollNo(null);
+        setRole(null);
+      });
+  }, []);
 
-    loadBootstrap();
-  }, []); // Empty dependency array ensures it runs once when the component mounts
+  // load Bootstrap's JS for mobile toggler
+  useEffect(() => {
+    import("bootstrap/dist/js/bootstrap.bundle.min.js").catch(console.error);
+  }, []);
+
+  const isActive = (href) =>
+    href === pathname || (href !== "/" && pathname.startsWith(href));
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -54,6 +60,7 @@ export default function MemberNavbar() {
         >
           <span className="navbar-toggler-icon"></span>
         </button>
+
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav me-auto mb-2 mb-lg-0">
             <li className="nav-item">
@@ -64,61 +71,105 @@ export default function MemberNavbar() {
                 <FontAwesomeIcon icon={faHome} className="me-1" /> Home
               </Link>
             </li>
+
             <li className="nav-item">
               <Link
-                className={`nav-link ${isActive("/member/profile") ? "active" : ""}`}
-                href="/member/profile"
+                className={`nav-link ${
+                  isActive("/member/profile") ? "active" : ""
+                }`}
+                href={rollNo ? `/member/profile/${rollNo}` : "#"}
               >
                 <FontAwesomeIcon icon={faUser} className="me-1" /> My Profile
               </Link>
             </li>
+
+            {(role === "admin" || role === "superadmin") && (
+              <li className="nav-item">
+                <Link
+                  className={`nav-link ${
+                    isActive("/member/admin") ? "active" : ""
+                  }`}
+                  href="/member/admin"
+                >
+                  <FontAwesomeIcon icon={faGear} className="me-1" /> Admin
+                </Link>
+              </li>
+            )}
+
             <li className="nav-item">
               <Link
-                className={`nav-link ${isActive("/member/brothers") ? "active" : ""}`}
+                className={`nav-link ${
+                  isActive("/member/brothers") ? "active" : ""
+                }`}
                 href="/member/brothers"
               >
-                <FontAwesomeIcon icon={faAddressCard} className="me-1" /> Brothers
+                <FontAwesomeIcon icon={faAddressCard} className="me-1" />{" "}
+                Brothers
               </Link>
             </li>
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${isActive("/member/minutes") ? "active" : ""}`}
-                href="/member/minutes"
+
+            <li className="nav-item dropdown">
+              <a
+                className="nav-link dropdown-toggle"
+                href="#"
+                id="moreDropdown"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
               >
-                <FontAwesomeIcon icon={faNoteSticky} className="me-1" /> Minutes
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${isActive("/member/vote") ? "active" : ""}`}
-                href="/member/vote"
+                More
+              </a>
+              <ul
+                className="dropdown-menu dropdown-menu-dark"
+                aria-labelledby="moreDropdown"
               >
-                <FontAwesomeIcon icon={faCheckToSlot} className="me-1" /> Vote
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${isActive("/member/events") ? "active" : ""}`}
-                href="/member/events"
-              >
-                <FontAwesomeIcon icon={faCalendar} className="me-1" /> Events
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" target="_blank" href="https://thetatau-dg.org/2dg4u">
-                <FontAwesomeIcon icon={faShop} className="me-1" /> Merchandise
-              </Link>
+                <li>
+                  <Link
+                    className={`dropdown-item ${
+                      isActive("/member/minutes") ? "active" : ""
+                    }`}
+                    href="/member/minutes"
+                  >
+                    Minutes
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    className={`dropdown-item ${
+                      isActive("/member/vote") ? "active" : ""
+                    }`}
+                    href="/member/vote"
+                  >
+                    Voting
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    className={`dropdown-item ${
+                      isActive("/member/events") ? "active" : ""
+                    }`}
+                    href="/member/events"
+                  >
+                    Events
+                  </Link>
+                </li>
+                <li>
+                  <hr className="dropdown-divider" />
+                </li>
+                <li>
+                  <Link
+                    className="dropdown-item"
+                    target="_blank"
+                    href="https://thetatau-dg.org/2dg4u"
+                  >
+                    Merchandise
+                  </Link>
+                </li>
+              </ul>
             </li>
           </ul>
+
           <ul className="navbar-nav ms-auto">
-            <li className="nav-item me-2">
-              <Link
-                className={`nav-link ${isActive("/member/admin") ? "active" : ""}`}
-                href="/member/admin"
-              >
-                <FontAwesomeIcon icon={faGear} className="me-1" /> Admin
-              </Link>
-            </li>
             <li className="nav-item d-flex align-items-center">
               <UserButton />
             </li>

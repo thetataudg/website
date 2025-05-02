@@ -1,66 +1,34 @@
-"use client";
+// app/(members-only)/member/brothers/page.tsx
+export const dynamic = "force-dynamic";
 
-import React from "react";
-import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
+import { headers } from "next/headers";
+import MembersList, { MemberData } from "./MembersList";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+export default async function BrothersPage() {
+  // build absolute URL for SSR
+  const host = headers().get("host")!;
+  const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
+  const base = `${proto}://${host}`;
 
-// Grab this information from the user's MongoDB entry (if there is one)
-const userData = {
-  userHasProfile: true, // Create userData but set this to false if the user is not found in MongoDB
-  needsProfileReview: false,
-  needsPermissionReview: false,
-  type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
-  isECouncil: false,
-  isAdmin: false,
-};
-
-export default function BrothersPage() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
-
-  if (!isLoaded) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+  // fetch the entire list of members
+  const res = await fetch(`${base}/api/members`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Failed to fetch members");
   }
+  const allMembers = (await res.json()) as any[];
 
-  if (!isSignedIn) {
-    return (
-        <div className="container">
-            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-            <FontAwesomeIcon icon={faTimes} className="h2" />
-            <h3>You must be logged into use this function.</h3>
-            <RedirectToSignIn />
-            </div>
-        </div>
-    );
-  }
+  // drop the super-admin and shape into your MemberData
+  const members: MemberData[] = allMembers
+    .filter((m) => m.rollNo !== "000-ADMIN")
+    .map((m) => ({
+      rollNo: m.rollNo,
+      fName: m.fName,
+      lName: m.lName,
+      majors: m.majors,
+      profilePicUrl: m.profilePicUrl ?? undefined,
+      socialLinks: m.socialLinks ?? undefined,
+      status: m.status,
+    }));
 
-  const { userHasProfile, type, isECouncil, isAdmin, needsPermissionReview, needsProfileReview } = userData;
-
-  // Determine display text and color
-  const userTypeColor = type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
-  const userTypeDetails = [
-    isAdmin && "Admin",
-    isECouncil && "E-Council",
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  return (
-    <div className="container-xxl mt-4">
-      <div>
-            <h1>
-                Brothers Directory
-            </h1>
-        </div>
-    </div>
-  );
+  return <MembersList initialMembers={members} />;
 }
