@@ -1,3 +1,5 @@
+// api/members/[rollNo]/route.ts
+
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";

@@ -1,30 +1,71 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { RedirectToSignIn } from "@clerk/nextjs";
-
+import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
-
-// Grab this information from the user's MongoDB entry (if there is one)
-const userData = {
-  userHasProfile: true, // Create userData but set this to false if the user is not found in MongoDB
-  needsProfileReview: false,
-  needsPermissionReview: false,
-  type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
-  isECouncil: false,
-  isAdmin: false,
-};
+import {
+  faCheck,
+  faTimes,
+  faTriangleExclamation,
+  faHourglass,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
-  if (!isLoaded) {
+  const [userData, setUserData] = useState({
+    userHasProfile: false,
+    needsProfileReview: false,
+    needsPermissionReview: false,
+    type: "Active",
+    isECouncil: false,
+    isAdmin: false,
+  });
+
+  const [loadingUserData, setLoadingUserData] = useState(true);
+
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        const response = await axios.get("/api/members/me");
+        const data = response.data;
+
+        setUserData({
+          userHasProfile: true,
+          needsProfileReview: false,
+          needsPermissionReview: false,
+          type: "Active",
+          isECouncil: false,
+          isAdmin: data.role === "admin" || data.role === "superadmin",
+        });
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        setUserData({
+          userHasProfile: false,
+          needsProfileReview: false,
+          needsPermissionReview: false,
+          type: "Active",
+          isECouncil: false,
+          isAdmin: false,
+        });
+      } finally {
+        setLoadingUserData(false);
+      }
+    }
+
+    if (isSignedIn) fetchUserData();
+  }, [isSignedIn]);
+
+  if (!isLoaded || loadingUserData) {
     return (
       <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+        <div
+          className="alert alert-info d-flex align-items-center mt-5"
+          role="alert"
+        >
           <FontAwesomeIcon icon={faHourglass} className="h2" />
           <h2>Loading...</h2>
         </div>
@@ -34,20 +75,30 @@ export default function Dashboard() {
 
   if (!isSignedIn) {
     return (
-        <div className="container">
-            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-            <FontAwesomeIcon icon={faTimes} className="h2" />
-            <h3>You must be logged into use this function.</h3>
-            <RedirectToSignIn />
-            </div>
+      <div className="container">
+        <div
+          className="alert alert-danger d-flex align-items-center mt-5"
+          role="alert"
+        >
+          <FontAwesomeIcon icon={faTimes} className="h2" />
+          <h3>You must be logged in to use this function.</h3>
+          <RedirectToSignIn />
         </div>
+      </div>
     );
   }
 
-  const { userHasProfile, type, isECouncil, isAdmin, needsPermissionReview, needsProfileReview } = userData;
+  const {
+    userHasProfile,
+    type,
+    isECouncil,
+    isAdmin,
+    needsPermissionReview,
+    needsProfileReview,
+  } = userData;
 
-  // Determine display text and color
-  const userTypeColor = type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
+  const userTypeColor =
+    type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
   const userTypeDetails = [
     isAdmin && "Admin",
     isECouncil && "E-Council",
@@ -56,19 +107,25 @@ export default function Dashboard() {
     .filter(Boolean)
     .join(", ");
 
+  const privileges = [
+    { label: "Edit Profile", access: userHasProfile },
+    { label: "Brother Directory", access: userHasProfile },
+    { label: "Minutes", access: userHasProfile },
+    { label: "Vote", access: userHasProfile && type === "Active" },
+    { label: "Admin Voting", access: isAdmin },
+    { label: "Events", access: userHasProfile },
+    { label: "Admin Users", access: isAdmin },
+  ];
+
   return (
     <div className="container-xxl mt-4">
-      {/* Dashboard Body */}
       <div>
         {user ? (
-          <h1>
-            Welcome, {user.firstName}
-          </h1>
+          <h1>Welcome, {user.firstName}</h1>
         ) : (
           <h2>Welcome, please enter your name in your profile</h2>
         )}
 
-        {/* Split into Two Columns */}
         <div className="row mt-4">
           <div className="col-md-8">
             <p>
@@ -82,34 +139,55 @@ export default function Dashboard() {
             <div className="mt-3">
               {!userHasProfile ? (
                 <div>
-                  <div className="alert alert-warning d-flex align-items-center" role="alert">
-                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
-                    Please set up your profile to gain privileges on the management tool.
+                  <div
+                    className="alert alert-warning d-flex align-items-center"
+                    role="alert"
+                  >
+                    <FontAwesomeIcon
+                      icon={faTriangleExclamation}
+                      className="me-2"
+                    />
+                    You do not have access to this tool yet. Please contact an
+                    admin if you believe this is an error.
                   </div>
-
-                    <a type="button" className="btn btn-success" href="/member/onboard">
-                      Setup Profile
-                    </a>
-                  </div>
+                </div>
               ) : (
                 <>
                   {needsPermissionReview && (
-                    <div className="alert alert-info d-flex align-items-center mt-2" role="alert">
+                    <div
+                      className="alert alert-info d-flex align-items-center mt-2"
+                      role="alert"
+                    >
                       <FontAwesomeIcon icon={faHourglass} className="me-2" />
-                      Since you marked yourself as E-Council, your extended permissions are being verified.
+                      Since you marked yourself as E-Council, your extended
+                      permissions are being verified.
                     </div>
                   )}
 
-                  {(needsProfileReview && !needsPermissionReview) && (
-                    <div className="alert alert-info d-flex align-items-center mt-2" role="alert">
+                  {needsProfileReview && !needsPermissionReview && (
+                    <div
+                      className="alert alert-info d-flex align-items-center mt-2"
+                      role="alert"
+                    >
                       <FontAwesomeIcon icon={faHourglass} className="me-2" />
                       Your profile changes are awaiting review.
                     </div>
                   )}
 
-                  <div className="alert alert-success d-flex align-items-center" role="alert">
+                  <div
+                    className="alert alert-success d-flex align-items-center"
+                    role="alert"
+                  >
                     <FontAwesomeIcon icon={faCheck} className="me-2" />
-                    Your profile is active, giving you normal privileges on the chapter tool.
+                    {`Your profile is ${
+                      type === "Active" ? "active" : type.toLowerCase()
+                    }, granting ${
+                      isAdmin
+                        ? "admin privileges"
+                        : isECouncil
+                        ? "extended privileges"
+                        : "normal privileges"
+                    } on the chapter tool.`}
                   </div>
                 </>
               )}
@@ -126,63 +204,17 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Edit Profile</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon
-                      icon={userHasProfile ? faCheck : faTimes}
-                      className={userHasProfile ? "text-success" : "text-danger"}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Brother Directory</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon
-                      icon={userHasProfile ? faCheck : faTimes}
-                      className={userHasProfile ? "text-success" : "text-danger"}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Minutes</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon icon={faCheck} className="text-success" />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Vote</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon
-                      icon={(userHasProfile && type === "Active") ? faCheck : faTimes}
-                      className={(userHasProfile && type === "Active") ? "text-success" : "text-danger"}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Admin Voting</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon
-                      icon={(isECouncil && !needsPermissionReview) ? faCheck : faTimes}
-                      className={(isECouncil && !needsPermissionReview) ? "text-success" : "text-danger"}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Events</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon icon={faCheck} className="text-success" />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Admin Users</td>
-                  <td className="text-center">
-                    <FontAwesomeIcon
-                      icon={isAdmin ? faCheck : faTimes}
-                      className={isAdmin ? "text-success" : "text-danger"}
-                    />
-                  </td>
-                </tr>
+                {privileges.map((priv, index) => (
+                  <tr key={index}>
+                    <td>{priv.label}</td>
+                    <td className="text-center">
+                      <FontAwesomeIcon
+                        icon={priv.access ? faCheck : faTimes}
+                        className={priv.access ? "text-success" : "text-danger"}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

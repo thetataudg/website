@@ -1,4 +1,5 @@
-// app/(members-only)/member/admin/members/MembersList.tsx
+// // app/(members-only)/member/admin/members/MembersList.tsx
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -25,6 +26,8 @@ export default function MembersList({
   const [me, setMe] = useState<{ role: string; rollNo: string } | null>(null);
   const [members, setMembers] = useState<MemberData[]>(initialMembers);
   const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
+  const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/members/me")
@@ -58,6 +61,26 @@ export default function MembersList({
     );
   }
 
+  async function confirmDelete() {
+    if (!deletingRollNo) return;
+
+    setDeleteLoading(true);
+
+    const res = await fetch(`/api/members/${deletingRollNo}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setMembers((ms) => ms.filter((m) => m.rollNo !== deletingRollNo));
+      setDeletingRollNo(null);
+    } else {
+      const { error } = await res.json();
+      alert(`Failed to delete member: ${error}`);
+    }
+
+    setDeleteLoading(false);
+  }
+
   return (
     <>
       <h2>Manage Members</h2>
@@ -80,11 +103,20 @@ export default function MembersList({
               <td>{m.role}</td>
               <td>
                 <button
-                  className="btn btn-sm btn-outline-primary"
+                  className="btn btn-sm btn-outline-primary me-2"
                   onClick={() => setEditingRollNo(m.rollNo)}
                 >
                   Edit
                 </button>
+
+                {me?.role === "superadmin" && m.role !== "superadmin" && (
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={() => setDeletingRollNo(m.rollNo)}
+                  >
+                    Delete
+                  </button>
+                )}
               </td>
             </tr>
           ))}
@@ -98,6 +130,49 @@ export default function MembersList({
           onClose={() => setEditingRollNo(null)}
           onSave={handleSave}
         />
+      )}
+
+      {/* Simple confirmation modal */}
+      {deletingRollNo && (
+        <div
+          className="modal show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Confirm Delete</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setDeletingRollNo(null)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>
+                  Are you sure you want to delete member #{deletingRollNo}? This
+                  action cannot be undone.
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setDeletingRollNo(null)}
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={confirmDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

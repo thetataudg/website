@@ -14,7 +14,7 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         /* customise if you like – `rootBox` is fine */
-        elements: { rootBox: "container py-5" },
+        elements: { rootBox: "container" },
       }}
     >
       <html lang="en">

@@ -34,40 +34,6 @@ export async function GET(req: Request) {
   }
 }
 
-// export async function POST(req: NextRequest) {
-//   // Enforce only admins / superadmins may invite
-//   const admin = await requireRole(req as any, ["superadmin", "admin"]);
-
-//   const { email } = await req.json();
-//   if (!email) {
-//     return NextResponse.json({ error: "Missing email" }, { status: 400 });
-//   }
-
-//   try {
-//     const invitation = await clerkClient.invitations.createInvitation({
-//       emailAddress: email,
-//       redirectUrl: process.env.CLERK_ONBOARD_REDIRECT!,
-//       publicMetadata: { invitedBy: admin.clerkId },
-//       notify: true,
-//     });
-//     logger.info("Invitation sent", {
-//       email,
-//       invitedBy: admin.clerkId,
-//       invitationId: invitation.id,
-//     });
-//     return NextResponse.json({ invitationId: invitation.id }, { status: 201 });
-//   } catch (err: any) {
-//     logger.error({ err }, "Failed to send invite");
-
-//     // Clerk returns a 422 with aggregateErrors[].longMessage
-//     const first = err.aggregateErrors?.[0];
-//     const message = first?.longMessage || err.message || "Invite failed";
-//     const status = err.status || 500;
-
-//     return NextResponse.json({ error: message }, { status });
-//   }
-// }
-
 export async function POST(req: NextRequest) {
   // ── 1) Only admins may invite ──────────────────────────
   let admin;
