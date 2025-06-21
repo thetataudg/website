@@ -1,5 +1,16 @@
 "use client"; // ref: https://stackoverflow.com/questions/74965849/youre-importing-a-component-that-needs-usestate-it-only-works-in-a-client-comp
 
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs'
+
+
+
 import Link from "next/link";
 import React, { useState } from "react";
 import Image from "next/image";
@@ -69,6 +80,17 @@ const Footer = () => {
                   Regionals
                 </Link>
               </li>
+              <li>
+              <h2 className="mb-2 mt-5 text-sm font-semibold text-neutral-100 uppercase">
+                Members Only{" "}
+              </h2>
+                <SignedOut>
+                  <SignInButton /> <br />
+                </SignedOut>
+                <SignedIn>
+                  <UserButton />
+                </SignedIn>
+            </li>
             </ul>
           </div>
           <div>
