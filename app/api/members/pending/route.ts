@@ -1,23 +1,29 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/clerk";
+import { getAuth } from "@clerk/nextjs/server"; // or "@clerk/nextjs/api" for API routes
 import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
+import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 
 export async function GET(req: Request) {
-  // PRODUCTION:
   try {
-    await requireRole(req as any, ["superadmin", "admin"]);
+    const { userId, sessionId, getToken } = getAuth(req as any);
+    if (!userId) {
+      throw { message: "Not authenticated", statusCode: 401 };
+    }
+
+    // Fetch user from the DB or Clerk and check role
+    const user = await Member.findOne({ clerkId: userId });
+    if (!user || !["superadmin", "admin"].includes(user.role)) {
+      throw { message: "Not authorized", statusCode: 403 };
+    }
   } catch (err: any) {
     logger.warn({ err }, "Unauthorized pending list attempt");
     return NextResponse.json(
       { error: err.message },
-      { status: err.statusCode }
+      { status: err.statusCode || 401 }
     );
-  } // To test this on postman comment this try catch block and use the below code.
-
-  // TESTING: This is just for testing the API. Uncomment the above try catch block in PRODUCTION and delete this line.
-  // const admin = { clerkId: "local-test", role: "superadmin" };
+  }
 
   await connectDB();
   const list = await PendingMember.find({ status: "pending" }).lean();
