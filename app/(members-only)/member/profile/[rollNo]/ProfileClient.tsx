@@ -8,6 +8,10 @@ import ProfileInfoEditor from "./ProfileInfoEditor";
 import PhotoUploader from "./PhotoUploader";
 import ResumeUploader from "./ResumeUploader";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
+import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
 import {
   faUserCircle,
   faEye,
@@ -25,6 +29,31 @@ export default function ProfileClient({ member }: ProfileClientProps) {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const router = useRouter();
 
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
+        </div>
+    );
+  }
+  
   return (
     <>
       {/* ── HEADER ── */}
