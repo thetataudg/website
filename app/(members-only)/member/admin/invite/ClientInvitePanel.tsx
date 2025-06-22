@@ -14,6 +14,14 @@ export default function ClientInvitePanel() {
 
   const { isLoaded, isSignedIn } = useAuth();
 
+  // initial load
+  useEffect(() => {
+    loadInvites();
+  }, []);
+
+  const [invites, setInvites] = useState<Invitation[]>([]);
+  const [loading, setLoading] = useState(true);
+
   if (!isLoaded) {
     return (
       <div className="container">
@@ -36,9 +44,6 @@ export default function ClientInvitePanel() {
         </div>
     );
   }
-
-  const [invites, setInvites] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // load pending invites from our API
   async function loadInvites() {
@@ -63,11 +68,6 @@ export default function ClientInvitePanel() {
   async function handleInviteSuccess() {
     await loadInvites();
   }
-
-  // initial load
-  useEffect(() => {
-    loadInvites();
-  }, []);
 
   return (
     <>
