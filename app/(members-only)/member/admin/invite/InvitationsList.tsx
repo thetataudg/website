@@ -4,7 +4,7 @@
 import type { Invitation } from "@clerk/clerk-sdk-node";
 
 interface Props {
-  invites: (Invitation & { status?: "pending" | "accepted" })[];
+  invites: (Invitation & { status?: string })[];
   onRevoke: (id: string) => void;
 }
 
