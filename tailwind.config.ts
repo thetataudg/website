@@ -26,11 +26,11 @@ const config: Config = {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        "pillars-parallax": "url('/public/Pillars.jpg')",
-        "grey-parallax": "url('/public/RushBackground.png')",
-        "red-parallax": "url('/public/RedBackground.png')",
-        "yellow-parallax": "url('/public/AboutBackground.png')",
-        "orange-parallax": "url('/public/OrangeBackground.png')",
+        "pillars-parallax": "url('/Pillars.jpg')",
+        "grey-parallax": "url('/RushBackground.png')",
+        "red-parallax": "url('/RedBackground.png')",
+        "yellow-parallax": "url('/AboutBackground.png')",
+        "orange-parallax": "url('/OrangeBackground.png')",
       },
       zIndex: {
         "100": "100",

@@ -40,8 +40,12 @@ export default function MemberNavbar() {
     import("bootstrap/dist/js/bootstrap.bundle.min.js").catch(console.error);
   }, []);
 
-  const isActive = (href) =>
-    href === pathname || (href !== "/" && pathname.startsWith(href));
+  const isActive = (href) => {
+    if (href === "/member") {
+      return pathname === "/member";
+    }
+    return href !== "/" && pathname.startsWith(href);
+  };
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
