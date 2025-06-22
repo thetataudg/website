@@ -17,6 +17,7 @@ export interface MemberData {
   familyLine: string;
   bigs: string[];
   littles: string[];
+  status?: "Active" | "Alumni" | "Removed" | "Deceased";
 }
 
 interface MemberShort {
@@ -36,6 +37,7 @@ interface Props {
     bigs: string[];
     littles: string[];
     role?: "admin" | "member";
+    status?: "Active" | "Alumni" | "Removed" | "Deceased";
   }) => Promise<void>;
   editorRole: "superadmin" | "admin";
 }
@@ -54,7 +56,9 @@ export default function MemberEditorModal({
     big: member.bigs[0] || "",
     little: member.littles[0] || "",
     role: member.role,
+    status: member.status || "Active",
   });
+
   const [allMembers, setAllMembers] = useState<MemberShort[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -68,7 +72,9 @@ export default function MemberEditorModal({
         big: member.bigs[0] || "",
         little: member.littles[0] || "",
         role: member.role,
+        status: member.status || "Active", // Default to "Active"
       });
+      
       fetch("/api/members")
         .then((r) => r.json())
         .then((list: MemberData[]) => {
@@ -97,6 +103,7 @@ export default function MemberEditorModal({
       await onSave({
         isECouncil: form.isECouncil,
         ecouncilPosition: form.ecouncilPosition,
+        status: form.status,
         familyLine: form.familyLine,
         bigs: form.big ? [form.big] : [],
         littles: form.little ? [form.little] : [],
@@ -183,6 +190,22 @@ export default function MemberEditorModal({
                 />
               </div>
             )}
+
+            {/* Status */}
+            <div className="mb-3">
+              <label className="form-label">Status</label>
+              <select
+                className="form-select"
+                value={form.status || "Active"}
+                onChange={e => update("status", e.target.value)}
+                disabled={editorRole !== "superadmin" && editorRole !== "admin"}
+              >
+                <option value="Active">Active</option>
+                <option value="Alumni">Alumni</option>
+                <option value="Removed">Removed</option>
+                <option value="Deceased">Deceased</option>
+              </select>
+            </div>
 
             {/* Family Line */}
             <div className="mb-3">

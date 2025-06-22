@@ -15,12 +15,12 @@ export interface MemberData {
   fName: string;
   lName: string;
   role: "superadmin" | "admin" | "member";
+  status?: "Active" | "Alumni" | "Removed" | "Deceased";
   isECouncil: boolean;
   ecouncilPosition: string;
   familyLine: string;
   bigs: string[];
   littles: string[];
-  status?: string; // Optional status to silence TypeScript error
 }
 
 export default function MembersList({

@@ -87,6 +87,26 @@ export async function PATCH(
     delete updates.role;
   }
 
+  // Only allow status update for admin/superadmin, and only to valid values
+  if ("status" in updates) {
+    if (
+      adminRole !== "admin" &&
+      adminRole !== "superadmin"
+    ) {
+      logger.warn(
+        { adminId, rollNo: params.rollNo, attemptedStatus: updates.status, adminRole },
+        "Denied: Non-admin attempted to change status"
+      );
+      delete updates.status;
+    } else if (updates.status !== "Active" && updates.status !== "Alumni") {
+      logger.warn(
+        { adminId, rollNo: params.rollNo, attemptedStatus: updates.status },
+        "Denied: Invalid status attempted"
+      );
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+  }
+
   const updatedMember = await Member.findOneAndUpdate(
     { rollNo: params.rollNo },
     updates,
