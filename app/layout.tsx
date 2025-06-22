@@ -1,7 +1,6 @@
 /* app/layout.tsx --------------------------------------------------------- */
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
-// import "bootstrap/dist/css/bootstrap.min.css";
 
 // export const metadata: Metadata = { title: "ΔΓ Chapter Tools" };
 

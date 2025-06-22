@@ -18,7 +18,6 @@ const userData = {
 
 export default function VotePage() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
 
   if (!isLoaded) {
     return (
@@ -44,15 +43,6 @@ export default function VotePage() {
   }
 
   const { userHasProfile, type, isECouncil, isAdmin, needsPermissionReview, needsProfileReview } = userData;
-
-  // Determine display text and color
-  const userTypeColor = type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
-  const userTypeDetails = [
-    isAdmin && "Admin",
-    isECouncil && "E-Council",
-  ]
-    .filter(Boolean)
-    .join(", ");
 
   return (
     <div className="container-xxl mt-4">
