@@ -6,6 +6,8 @@ import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 
 export async function GET(req: Request) {
+  await connectDB();
+
   try {
     const { userId, sessionId, getToken } = getAuth(req as any);
     if (!userId) {
@@ -25,7 +27,6 @@ export async function GET(req: Request) {
     );
   }
 
-  await connectDB();
   const list = await PendingMember.find({ status: "pending" }).lean();
   return NextResponse.json(list);
 }

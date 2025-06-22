@@ -13,7 +13,11 @@ export async function GET() {
 
     logger.info(`Fetched ${members.length} members from database`);
 
-    return NextResponse.json(members, { status: 200 });
+    return NextResponse.json(members, {
+      status: 200,
+      headers: { "Cache-Control": "no-store" } // Disable caching
+    });
+
   } catch (error: any) {
     logger.error({ error }, "Failed to fetch members");
     return NextResponse.json(
