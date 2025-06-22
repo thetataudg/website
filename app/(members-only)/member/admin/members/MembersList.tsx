@@ -5,12 +5,17 @@
 import React, { useState, useEffect } from "react";
 import MemberEditorModal from "./MemberEditorModal";
 
+import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faKey, faGavel, faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
 export interface MemberData {
   _id: string;
   rollNo: string;
   fName: string;
   lName: string;
   role: "superadmin" | "admin" | "member";
+  status?: "Active" | "Alumni" | "Removed" | "Deceased";
   isECouncil: boolean;
   ecouncilPosition: string;
   familyLine: string;
@@ -36,14 +41,33 @@ export default function MembersList({
       .catch(() => setMe(null));
   }, []);
 
-  // filter out superadmins, plus other-admins if I'm an admin
-  const visible = members.filter((m) => {
-    if (m.role === "superadmin") return false;
-    if (!me) return false;
-    if (me.role === "superadmin") return true;
-    if (m.role === "admin" && m.rollNo !== me.rollNo) return false;
-    return true;
-  });
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="container">
+        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faTimes} className="h2" />
+          <h3>You must be logged into use this function.</h3>
+          <RedirectToSignIn />
+        </div>
+      </div>
+    );
+  }
+
+  // filter out superadmins only
+  const visible = members.filter((m) => m.role !== "superadmin");
 
   const editing = editingRollNo
     ? members.find((m) => m.rollNo === editingRollNo) || null
@@ -89,7 +113,7 @@ export default function MembersList({
           <tr>
             <th>Roll No</th>
             <th>Name</th>
-            <th>Role</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -98,9 +122,28 @@ export default function MembersList({
             <tr key={m._id}>
               <td>#{m.rollNo}</td>
               <td>
-                {m.fName} {m.lName}
+                {m.fName} {m.lName}{" "}
+                {me && m.rollNo === me.rollNo && (
+                  <span className="badge bg-primary ms-1">You</span>
+                )}
               </td>
-              <td>{m.role}</td>
+              <td>
+                {m.status || "Unknown"}
+                {m.role === "admin" && (
+                  <FontAwesomeIcon
+                    icon={faKey}
+                    className="ms-2 text-warning"
+                    title="This user has admin privileges"
+                  />
+                )}
+                  {m.isECouncil && (
+                    <FontAwesomeIcon
+                      icon={faGavel}
+                      className="ms-2 text-secondary"
+                      title="E-Council Member"
+                    />
+                  )}
+              </td>
               <td>
                 <button
                   className="btn btn-sm btn-outline-primary me-2"
@@ -129,6 +172,7 @@ export default function MembersList({
           show={true}
           onClose={() => setEditingRollNo(null)}
           onSave={handleSave}
+          editorRole={me?.role === "superadmin" ? "superadmin" : "admin"}
         />
       )}
 

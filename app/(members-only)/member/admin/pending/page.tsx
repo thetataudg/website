@@ -21,12 +21,12 @@ interface PendingRequest {
 
 export default async function PendingPage() {
   const { userId } = await auth();
-  if (!userId) throw new Error("Not authenticated");
+  if (!userId) throw new Error("Unauthenticated");
 
   await connectDB();
   const user = await Member.findOne({ clerkId: userId });
   if (!user || !["superadmin", "admin"].includes(user.role)) {
-    throw new Error("Not authorized");
+    throw new Error("Unauthorized");
   }
 
   const rawRequests = await PendingMember.find({ status: "pending" }).lean();

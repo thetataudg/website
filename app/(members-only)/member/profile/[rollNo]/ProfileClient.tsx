@@ -8,10 +8,15 @@ import ProfileInfoEditor from "./ProfileInfoEditor";
 import PhotoUploader from "./PhotoUploader";
 import ResumeUploader from "./ResumeUploader";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
+
 import {
   faUserCircle,
   faEye,
   faDownload,
+  faTimes,
+  faHourglass,
 } from "@fortawesome/free-solid-svg-icons";
 
 interface ProfileClientProps {
@@ -24,6 +29,35 @@ export default function ProfileClient({ member }: ProfileClientProps) {
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const router = useRouter();
+
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="container">
+        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faTimes} className="h2" />
+          <h3>You must be logged into use this function.</h3>
+          <RedirectToSignIn />
+        </div>
+      </div>
+    );
+  }
+
+  // Only allow editing if this is the logged-in user's profile
+  const canEdit = isSignedIn && user && user.id === member.clerkId;
 
   return (
     <>
@@ -53,12 +87,14 @@ export default function ProfileClient({ member }: ProfileClientProps) {
                 </div>
               )}
               <div className="mt-2 d-flex justify-content-center gap-2 flex-wrap">
-                <button
-                  className="btn btn-outline-secondary btn-sm"
-                  onClick={() => setShowPicModal(true)}
-                >
-                  Edit Photo
-                </button>
+                {canEdit && (
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => setShowPicModal(true)}
+                  >
+                    Edit Photo
+                  </button>
+                )}
               </div>
             </div>
 
@@ -149,12 +185,14 @@ export default function ProfileClient({ member }: ProfileClientProps) {
             </section>
 
             <div className="mt-4">
-              <button
-                className="btn btn-outline-secondary"
-                onClick={() => setEditing((v) => !v)}
-              >
-                {editing ? "Cancel" : "Edit Profile"}
-              </button>
+              {canEdit && (
+                <button
+                  className="btn btn-outline-secondary"
+                  onClick={() => setEditing((v) => !v)}
+                >
+                  {editing ? "Cancel" : "Edit Profile"}
+                </button>
+              )}
 
               {/* résumé area */}
               {member.resumeUrl ? (
@@ -167,34 +205,40 @@ export default function ProfileClient({ member }: ProfileClientProps) {
                     <FontAwesomeIcon icon={faDownload} className="me-1" />
                     Download Résumé
                   </a>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => setShowResumeModal(true)}
-                  >
-                    Upload New Résumé
-                  </button>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => setShowPreviewModal(true)}
-                  >
-                    <FontAwesomeIcon icon={faEye} className="me-1" />
-                    Preview Résumé
-                  </button>
+                  {canEdit && (
+                    <>
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={() => setShowResumeModal(true)}
+                      >
+                        Upload New Résumé
+                      </button>
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={() => setShowPreviewModal(true)}
+                      >
+                        <FontAwesomeIcon icon={faEye} className="me-1" />
+                        Preview Résumé
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : (
-                <div>
-                  <div className="alert alert-warning mt-3" role="alert">
-                    You haven’t uploaded a résumé yet.
+                canEdit && (
+                  <div>
+                    <div className="alert alert-warning mt-3" role="alert">
+                      You haven’t uploaded a résumé yet.
+                    </div>
+                    <div className="d-flex flex-wrap gap-2 mt-3">
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={() => setShowResumeModal(true)}
+                      >
+                        Upload Résumé
+                      </button>
+                    </div>
                   </div>
-                  <div className="d-flex flex-wrap gap-2 mt-3">
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => setShowResumeModal(true)}
-                    >
-                      Upload Résumé
-                    </button>
-                  </div>
-                </div>
+                )
               )}
             </div>
           </div>
@@ -251,7 +295,7 @@ export default function ProfileClient({ member }: ProfileClientProps) {
         </div>
       )}
 
-      {editing && (
+      {editing && canEdit && (
         <ProfileInfoEditor
           member={member}
           onDone={() => {
@@ -260,6 +304,6 @@ export default function ProfileClient({ member }: ProfileClientProps) {
           }}
         />
       )}
-    </>
+      </>
   );
 }

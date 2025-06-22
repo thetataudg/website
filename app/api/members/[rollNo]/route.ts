@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: { rollNo: string } }
 ) {
   await connectDB();
-  const member = await Member.findOne({ rollNo: params.rollNo }).lean();
+  const member = await Member.findOne({ rollNo: params.rollNo }).lean<{ role?: string }>();
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
@@ -26,8 +26,14 @@ export async function PATCH(
   { params }: { params: { rollNo: string } }
 ) {
   let adminId: string;
+  let adminRole: string | null = null;
   try {
-    adminId = await requireRole(req as any, ["superadmin", "admin"]);
+    const adminObj = await requireRole(req as any, ["superadmin", "admin"]);
+    adminId = typeof adminObj === "string" ? adminObj : adminObj.clerkId;
+    await connectDB();
+    const admin = await Member.findOne({ clerkId: adminId }).lean<{ role?: string }>();
+    adminRole = admin?.role || null;
+    logger.info({ admin, adminId, adminRole }, "Fetched admin for PATCH");
   } catch (err: any) {
     logger.warn({ err }, "Unauthorized admin PATCH attempt");
     return NextResponse.json(
@@ -39,15 +45,11 @@ export async function PATCH(
   const updates = await req.json();
   logger.info(
     { adminId, rollNo: params.rollNo, updates },
-    "Admin profile update"
+    "Admin profile update attempt"
   );
 
   await connectDB();
-  const member = await Member.findOneAndUpdate(
-    { rollNo: params.rollNo },
-    updates,
-    { new: true }
-  ).lean();
+  const member = await Member.findOne({ rollNo: params.rollNo }).lean<{ role?: string }>();
 
   if (!member) {
     logger.error(
@@ -57,8 +59,73 @@ export async function PATCH(
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  logger.info({ adminId, rollNo: params.rollNo }, "Admin PATCH successful");
-  return NextResponse.json(member, { status: 200 });
+  // Only superadmin can change role, and not for superadmin users
+  if (
+    "role" in updates &&
+    adminRole === "superadmin" &&
+    member.role !== "superadmin"
+  ) {
+    // Only allow "admin" or "member"
+    if (updates.role !== "admin" && updates.role !== "member") {
+      logger.warn(
+        { adminId, rollNo: params.rollNo, attemptedRole: updates.role },
+        "Denied: Invalid role attempted by superadmin"
+      );
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    logger.info(
+      { adminId, rollNo: params.rollNo, newRole: updates.role },
+      "Superadmin changed member role"
+    );
+    // Allow role update
+  } else if ("role" in updates) {
+    logger.warn(
+      { adminId, rollNo: params.rollNo, attemptedRole: updates.role, adminRole },
+      "Denied: Non-superadmin attempted to change role or tried to change superadmin"
+    );
+    // Remove role update if not allowed
+    delete updates.role;
+  }
+
+  // Only allow status update for admin/superadmin, and only to valid values
+  if ("status" in updates) {
+    if (
+      adminRole !== "admin" &&
+      adminRole !== "superadmin"
+    ) {
+      logger.warn(
+        { adminId, rollNo: params.rollNo, attemptedStatus: updates.status, adminRole },
+        "Denied: Non-admin attempted to change status"
+      );
+      delete updates.status;
+    } else if (updates.status !== "Active" && updates.status !== "Alumni") {
+      logger.warn(
+        { adminId, rollNo: params.rollNo, attemptedStatus: updates.status },
+        "Denied: Invalid status attempted"
+      );
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+  }
+
+  const updatedMember = await Member.findOneAndUpdate(
+    { rollNo: params.rollNo },
+    updates,
+    { new: true }
+  ).lean();
+
+  if (!updatedMember) {
+    logger.error(
+      { adminId, rollNo: params.rollNo },
+      "Admin PATCH failed: member not found after update"
+    );
+    return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  logger.info(
+    { adminId, rollNo: params.rollNo, updates },
+    "Admin PATCH successful"
+  );
+  return NextResponse.json(updatedMember, { status: 200 });
 }
 
 export async function DELETE(

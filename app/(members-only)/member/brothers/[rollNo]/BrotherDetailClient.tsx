@@ -1,5 +1,9 @@
 // app/(members-only)/member/brothers/[rollNo]/BrotherDetailClient.tsx
 "use client";
+
+import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -18,6 +22,31 @@ export default function BrotherDetailClient({
   member,
 }: BrotherDetailClientProps) {
   const [showPreview, setShowPreview] = useState(false);
+
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
+        </div>
+    );
+  }
 
   return (
     <>

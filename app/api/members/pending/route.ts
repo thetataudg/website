@@ -11,13 +11,13 @@ export async function GET(req: Request) {
   try {
     const { userId, sessionId, getToken } = getAuth(req as any);
     if (!userId) {
-      throw { message: "Not authenticated", statusCode: 401 };
+      throw { message: "Unauthorized", statusCode: 401 };
     }
 
     // Fetch user from the DB or Clerk and check role
     const user = await Member.findOne({ clerkId: userId });
     if (!user || !["superadmin", "admin"].includes(user.role)) {
-      throw { message: "Not authorized", statusCode: 403 };
+      throw { message: "Unauthorized", statusCode: 403 };
     }
   } catch (err: any) {
     logger.warn({ err }, "Unauthorized pending list attempt");

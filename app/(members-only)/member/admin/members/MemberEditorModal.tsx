@@ -3,6 +3,9 @@
 
 import React, { useState, useEffect } from "react";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
+
 export interface MemberData {
   _id: string;
   rollNo: string;
@@ -14,6 +17,7 @@ export interface MemberData {
   familyLine: string;
   bigs: string[];
   littles: string[];
+  status?: "Active" | "Alumni" | "Removed" | "Deceased";
 }
 
 interface MemberShort {
@@ -32,7 +36,10 @@ interface Props {
     familyLine: string;
     bigs: string[];
     littles: string[];
+    role?: "admin" | "member";
+    status?: "Active" | "Alumni" | "Removed" | "Deceased";
   }) => Promise<void>;
+  editorRole: "superadmin" | "admin";
 }
 
 export default function MemberEditorModal({
@@ -40,6 +47,7 @@ export default function MemberEditorModal({
   show,
   onClose,
   onSave,
+  editorRole,
 }: Props) {
   const [form, setForm] = useState({
     isECouncil: member.isECouncil,
@@ -47,12 +55,14 @@ export default function MemberEditorModal({
     familyLine: member.familyLine,
     big: member.bigs[0] || "",
     little: member.littles[0] || "",
+    role: member.role,
+    status: member.status || "Active",
   });
+
   const [allMembers, setAllMembers] = useState<MemberShort[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // reset form when modal opens
   useEffect(() => {
     if (show) {
       setForm({
@@ -61,8 +71,10 @@ export default function MemberEditorModal({
         familyLine: member.familyLine,
         big: member.bigs[0] || "",
         little: member.littles[0] || "",
+        role: member.role,
+        status: member.status || "Active", // Default to "Active"
       });
-      // fetch other members for dropdowns
+      
       fetch("/api/members")
         .then((r) => r.json())
         .then((list: MemberData[]) => {
@@ -91,13 +103,17 @@ export default function MemberEditorModal({
       await onSave({
         isECouncil: form.isECouncil,
         ecouncilPosition: form.ecouncilPosition,
+        status: form.status,
         familyLine: form.familyLine,
         bigs: form.big ? [form.big] : [],
         littles: form.little ? [form.little] : [],
+        ...(editorRole === "superadmin" &&
+          member.role !== "superadmin" &&
+          (form.role === "admin" || form.role === "member")
+            ? { role: form.role }
+            : {}),
       });
-      // show success alert
       setSaved(true);
-      // after 1.5s, hide alert and close modal
       setTimeout(() => {
         setSaved(false);
         onClose();
@@ -122,12 +138,34 @@ export default function MemberEditorModal({
             <button className="btn-close" onClick={onClose} />
           </div>
 
-          {/* success alert */}
           {saved && (
             <div className="alert alert-success m-3">✔ Changes saved!</div>
           )}
 
           <div className="modal-body">
+            {/* Admin status (only for superadmin, disabled for admin) */}
+            <div className="form-check mb-3">
+              <input
+                id="isAdmin"
+                type="checkbox"
+                className="form-check-input"
+                checked={form.role === "admin"}
+                disabled={
+                  editorRole !== "superadmin" ||
+                  member.role === "superadmin"
+                }
+                onChange={(e) =>
+                  update("role", e.target.checked ? "admin" : "member")
+                }
+              />
+              <label htmlFor="isAdmin" className="form-check-label">
+                Admin
+              </label>
+              {editorRole !== "superadmin" && (
+                <FontAwesomeIcon icon={faLock} className="ms-2 text-muted" title="Only superadmins can change" />
+              )}
+            </div>
+
             {/* E-Council */}
             <div className="form-check mb-3">
               <input
@@ -152,6 +190,22 @@ export default function MemberEditorModal({
                 />
               </div>
             )}
+
+            {/* Status */}
+            <div className="mb-3">
+              <label className="form-label">Status</label>
+              <select
+                className="form-select"
+                value={form.status || "Active"}
+                onChange={e => update("status", e.target.value)}
+                disabled={editorRole !== "superadmin" && editorRole !== "admin"}
+              >
+                <option value="Active">Active</option>
+                <option value="Alumni">Alumni</option>
+                <option value="Removed">Removed</option>
+                <option value="Deceased">Deceased</option>
+              </select>
+            </div>
 
             {/* Family Line */}
             <div className="mb-3">

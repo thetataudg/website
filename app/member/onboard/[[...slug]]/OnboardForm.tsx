@@ -202,13 +202,12 @@ export default function OnboardForm({
               <div className="modal-body">
                 <p>
                   Thanks for completing your profile. An officer will review it
-                  shortly—once approved you’ll be able to access all member
-                  tools.
+                  shortly - once approved you’ll have access to member tools.
                 </p>
               </div>
               <div className="modal-footer">
                 <a href="/" className="btn btn-primary">
-                  Go&nbsp;to&nbsp;Home
+                  Done
                 </a>
               </div>
             </div>

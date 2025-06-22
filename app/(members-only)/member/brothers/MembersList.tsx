@@ -5,7 +5,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGithub, faLinkedin } from "@fortawesome/free-brands-svg-icons";
-import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import { faUserCircle, faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
+import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
 
 export interface MemberData {
   rollNo: string;
@@ -25,6 +27,8 @@ export default function MembersList({
   const [filter, setFilter] = useState<"All" | "Active" | "Alumni">("All");
   const [myRollNo, setMyRollNo] = useState<string | null>(null);
 
+  const { isLoaded, isSignedIn } = useAuth();
+
   // 1) fetch current user's rollNo
   useEffect(() => {
     fetch("/api/members/me")
@@ -32,6 +36,29 @@ export default function MembersList({
       .then((data: { rollNo: string }) => setMyRollNo(data.rollNo))
       .catch(() => setMyRollNo(null));
   }, []);
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
+        </div>
+    );
+  }
 
   const filtered = initialMembers.filter((m) =>
     filter === "All" ? true : m.status === filter
