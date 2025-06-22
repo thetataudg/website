@@ -7,7 +7,7 @@ import MemberEditorModal from "./MemberEditorModal";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+import { faKey, faGavel, faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
 
 export interface MemberData {
   _id: string;
@@ -20,6 +20,7 @@ export interface MemberData {
   familyLine: string;
   bigs: string[];
   littles: string[];
+  status?: string; // Optional status to silence TypeScript error
 }
 
 export default function MembersList({
@@ -27,6 +28,18 @@ export default function MembersList({
 }: {
   initialMembers: MemberData[];
 }) {
+  const [me, setMe] = useState<{ role: string; rollNo: string } | null>(null);
+  const [members, setMembers] = useState<MemberData[]>(initialMembers);
+  const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
+  const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/members/me")
+      .then((r) => r.json())
+      .then((d) => setMe({ role: d.role, rollNo: d.rollNo }))
+      .catch(() => setMe(null));
+  }, []);
 
   const { isLoaded, isSignedIn } = useAuth();
 
@@ -43,37 +56,18 @@ export default function MembersList({
 
   if (!isSignedIn) {
     return (
-        <div className="container">
-            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-            <FontAwesomeIcon icon={faTimes} className="h2" />
-            <h3>You must be logged into use this function.</h3>
-            <RedirectToSignIn />
-            </div>
+      <div className="container">
+        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faTimes} className="h2" />
+          <h3>You must be logged into use this function.</h3>
+          <RedirectToSignIn />
         </div>
+      </div>
     );
   }
 
-  const [me, setMe] = useState<{ role: string; rollNo: string } | null>(null);
-  const [members, setMembers] = useState<MemberData[]>(initialMembers);
-  const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
-  const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/members/me")
-      .then((r) => r.json())
-      .then((d) => setMe({ role: d.role, rollNo: d.rollNo }))
-      .catch(() => setMe(null));
-  }, []);
-
-  // filter out superadmins, plus other-admins if I'm an admin
-  const visible = members.filter((m) => {
-    if (m.role === "superadmin") return false;
-    if (!me) return false;
-    if (me.role === "superadmin") return true;
-    if (m.role === "admin" && m.rollNo !== me.rollNo) return false;
-    return true;
-  });
+  // filter out superadmins only
+  const visible = members.filter((m) => m.role !== "superadmin");
 
   const editing = editingRollNo
     ? members.find((m) => m.rollNo === editingRollNo) || null
@@ -119,7 +113,7 @@ export default function MembersList({
           <tr>
             <th>Roll No</th>
             <th>Name</th>
-            <th>Role</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -128,9 +122,28 @@ export default function MembersList({
             <tr key={m._id}>
               <td>#{m.rollNo}</td>
               <td>
-                {m.fName} {m.lName}
+                {m.fName} {m.lName}{" "}
+                {me && m.rollNo === me.rollNo && (
+                  <span className="badge bg-primary ms-1">You</span>
+                )}
               </td>
-              <td>{m.role}</td>
+              <td>
+                {m.status || "Unknown"}
+                {m.role === "admin" && (
+                  <FontAwesomeIcon
+                    icon={faKey}
+                    className="ms-2 text-warning"
+                    title="This user has admin privileges"
+                  />
+                )}
+                  {m.isECouncil && (
+                    <FontAwesomeIcon
+                      icon={faGavel}
+                      className="ms-2 text-secondary"
+                      title="E-Council Member"
+                    />
+                  )}
+              </td>
               <td>
                 <button
                   className="btn btn-sm btn-outline-primary me-2"
