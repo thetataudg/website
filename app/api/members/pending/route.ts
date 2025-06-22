@@ -29,3 +29,4 @@ export async function GET(req: Request) {
   const list = await PendingMember.find({ status: "pending" }).lean();
   return NextResponse.json(list);
 }
+

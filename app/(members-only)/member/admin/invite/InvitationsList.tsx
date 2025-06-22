@@ -4,7 +4,7 @@
 import type { Invitation } from "@clerk/clerk-sdk-node";
 
 interface Props {
-  invites: Invitation[];
+  invites: (Invitation & { status?: "pending" | "accepted" })[];
   onRevoke: (id: string) => void;
 }
 
@@ -23,14 +23,21 @@ export default function InvitationsList({ invites, onRevoke }: Props) {
             key={inv.id}
           >
             <span>
-              {inv.emailAddress} — <em>{inv.status}</em>
+              {inv.emailAddress}{" "}
+              {inv.status === "accepted" ? (
+                <span className="badge bg-success ms-2">Accepted</span>
+              ) : (
+                <span className="badge bg-secondary ms-2">Pending</span>
+              )}
             </span>
-            <button
-              className="btn btn-sm btn-danger"
-              onClick={() => onRevoke(inv.id)}
-            >
-              Revoke
-            </button>
+            {inv.status !== "accepted" && (
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={() => onRevoke(inv.id)}
+              >
+                Revoke
+              </button>
+            )}
           </li>
         ))}
       </ul>

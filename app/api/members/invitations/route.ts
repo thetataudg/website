@@ -5,6 +5,7 @@ import { clerkClient } from "@clerk/clerk-sdk-node";
 import logger from "@/lib/logger";
 import { connectDB } from "@/lib/db";
 import { emailToSlug } from "@/utils/email-to-slug";
+import Member from "@/lib/models/Member";
 
 export async function GET(req: Request) {
   await connectDB();
@@ -19,12 +20,42 @@ export async function GET(req: Request) {
     );
   }
 
-  // 2) fetch from Clerk
   try {
+    // 1. Fetch all pending invitations from Clerk
     const allInvitations = await clerkClient.invitations.getInvitationList();
-    const pending = allInvitations.filter((inv) => inv.status === "pending");
-    logger.info("Fetched pending invitations", { count: pending.length });
-    return NextResponse.json(pending, { status: 200 });
+    const pendingInvitations = allInvitations.filter((inv) => inv.status === "pending");
+
+    // 2. Fetch all Members' Clerk IDs
+    const members = await Member.find({}, { clerkId: 1 }).lean();
+    const memberClerkIds = new Set(members.map((m: any) => m.clerkId));
+
+    // 3. For each invitation, get the Clerk user for the email
+    //    and filter out if their Clerk ID is in the Member DB
+    const filteredInvitations = [];
+    for (const inv of pendingInvitations) {
+      try {
+        const users = await clerkClient.users.getUserList({ emailAddress: [inv.emailAddress] });
+        if (users.length > 0) {
+          const clerkId = users[0].id;
+          if (memberClerkIds.has(clerkId)) {
+            // Already accepted: mark as accepted
+            filteredInvitations.push({ ...inv, status: "accepted" });
+          } else {
+            // Not yet accepted: keep as pending
+            filteredInvitations.push({ ...inv, status: "pending" });
+          }
+        } else {
+          // No Clerk user yet: keep as pending
+          filteredInvitations.push({ ...inv, status: "pending" });
+        }
+      } catch (e) {
+        // On error, keep as pending
+        filteredInvitations.push({ ...inv, status: "pending" });
+      }
+    }
+
+    logger.info("Fetched filtered pending invitations", { count: filteredInvitations.length });
+    return NextResponse.json(filteredInvitations, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to fetch invitations");
     return NextResponse.json(
@@ -33,6 +64,7 @@ export async function GET(req: Request) {
     );
   }
 }
+
 
 export async function POST(req: NextRequest) {
   // ── 1) Only admins may invite ──────────────────────────

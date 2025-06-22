@@ -1,10 +1,11 @@
-// app/(members-only)/member/admin/pending/page.tsx
 export const dynamic = "force-dynamic";
 
-import { headers } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
+import { connectDB } from "@/lib/db";
+import PendingMember from "@/lib/models/PendingMember";
+import Member from "@/lib/models/Member";
 import PendingList from "./PendingList";
 
-// ← use our own PendingRequest
 interface PendingRequest {
   _id: string;
   clerkId: string;
@@ -19,18 +20,28 @@ interface PendingRequest {
 }
 
 export default async function PendingPage() {
-  const host = headers().get("host")!;
-  const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
-  const cookie = headers().get("cookie") ?? "";
-  const res = await fetch(`${proto}://${host}/api/members/pending`, {
-    cache: "no-store",
-    headers: {
-      cookie,
-    },
-  });
-  if (!res.ok) throw new Error("Unable to fetch pending requests");
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not authenticated");
 
-  // cast to our interface
-  const requests = (await res.json()) as PendingRequest[];
+  await connectDB();
+  const user = await Member.findOne({ clerkId: userId });
+  if (!user || !["superadmin", "admin"].includes(user.role)) {
+    throw new Error("Not authorized");
+  }
+
+  const rawRequests = await PendingMember.find({ status: "pending" }).lean();
+  const requests: PendingRequest[] = rawRequests.map((r: any) => ({
+    _id: r._id.toString(),
+    clerkId: r.clerkId,
+    rollNo: r.rollNo,
+    fName: r.fName,
+    lName: r.lName,
+    status: r.status,
+    submittedAt: r.submittedAt,
+    reviewedBy: r.reviewedBy,
+    reviewedAt: r.reviewedAt,
+    reviewComments: r.reviewComments,
+  }));
+
   return <PendingList initialRequests={requests} />;
 }
