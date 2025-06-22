@@ -5,6 +5,10 @@
 import React, { useState, useEffect } from "react";
 import MemberEditorModal from "./MemberEditorModal";
 
+import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
 export interface MemberData {
   _id: string;
   rollNo: string;
@@ -23,6 +27,32 @@ export default function MembersList({
 }: {
   initialMembers: MemberData[];
 }) {
+
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
+        </div>
+    );
+  }
+
   const [me, setMe] = useState<{ role: string; rollNo: string } | null>(null);
   const [members, setMembers] = useState<MemberData[]>(initialMembers);
   const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
@@ -129,6 +159,7 @@ export default function MembersList({
           show={true}
           onClose={() => setEditingRollNo(null)}
           onSave={handleSave}
+          editorRole={me?.role === "superadmin" ? "superadmin" : "admin"}
         />
       )}
 

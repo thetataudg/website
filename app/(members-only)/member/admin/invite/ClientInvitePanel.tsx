@@ -6,7 +6,37 @@ import InviteForm from "./InviteForm";
 import InvitationsList from "./InvitationsList";
 import type { Invitation } from "@clerk/clerk-sdk-node";
 
+import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+
 export default function ClientInvitePanel() {
+
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faHourglass} className="h2" />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+        <div className="container">
+            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged into use this function.</h3>
+            <RedirectToSignIn />
+            </div>
+        </div>
+    );
+  }
+
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 

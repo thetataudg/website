@@ -3,6 +3,9 @@
 
 import React, { useState, useEffect } from "react";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
+
 export interface MemberData {
   _id: string;
   rollNo: string;
@@ -32,7 +35,9 @@ interface Props {
     familyLine: string;
     bigs: string[];
     littles: string[];
+    role?: "admin" | "member";
   }) => Promise<void>;
+  editorRole: "superadmin" | "admin";
 }
 
 export default function MemberEditorModal({
@@ -40,6 +45,7 @@ export default function MemberEditorModal({
   show,
   onClose,
   onSave,
+  editorRole,
 }: Props) {
   const [form, setForm] = useState({
     isECouncil: member.isECouncil,
@@ -47,12 +53,12 @@ export default function MemberEditorModal({
     familyLine: member.familyLine,
     big: member.bigs[0] || "",
     little: member.littles[0] || "",
+    role: member.role,
   });
   const [allMembers, setAllMembers] = useState<MemberShort[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // reset form when modal opens
   useEffect(() => {
     if (show) {
       setForm({
@@ -61,8 +67,8 @@ export default function MemberEditorModal({
         familyLine: member.familyLine,
         big: member.bigs[0] || "",
         little: member.littles[0] || "",
+        role: member.role,
       });
-      // fetch other members for dropdowns
       fetch("/api/members")
         .then((r) => r.json())
         .then((list: MemberData[]) => {
@@ -94,10 +100,13 @@ export default function MemberEditorModal({
         familyLine: form.familyLine,
         bigs: form.big ? [form.big] : [],
         littles: form.little ? [form.little] : [],
+        ...(editorRole === "superadmin" &&
+          member.role !== "superadmin" &&
+          (form.role === "admin" || form.role === "member")
+            ? { role: form.role }
+            : {}),
       });
-      // show success alert
       setSaved(true);
-      // after 1.5s, hide alert and close modal
       setTimeout(() => {
         setSaved(false);
         onClose();
@@ -122,12 +131,34 @@ export default function MemberEditorModal({
             <button className="btn-close" onClick={onClose} />
           </div>
 
-          {/* success alert */}
           {saved && (
             <div className="alert alert-success m-3">✔ Changes saved!</div>
           )}
 
           <div className="modal-body">
+            {/* Admin status (only for superadmin, disabled for admin) */}
+            <div className="form-check mb-3">
+              <input
+                id="isAdmin"
+                type="checkbox"
+                className="form-check-input"
+                checked={form.role === "admin"}
+                disabled={
+                  editorRole !== "superadmin" ||
+                  member.role === "superadmin"
+                }
+                onChange={(e) =>
+                  update("role", e.target.checked ? "admin" : "member")
+                }
+              />
+              <label htmlFor="isAdmin" className="form-check-label">
+                Admin
+              </label>
+              {editorRole !== "superadmin" && (
+                <FontAwesomeIcon icon={faLock} className="ms-2 text-muted" title="Only superadmins can change" />
+              )}
+            </div>
+
             {/* E-Council */}
             <div className="form-check mb-3">
               <input

@@ -14,33 +14,33 @@ export default function InvitationsList({ invites, onRevoke }: Props) {
   }
 
   return (
-    <div>
-      <h2>Pending Invitations</h2>
-      <ul className="list-group">
-        {invites.map((inv) => (
-          <li
-            className="list-group-item d-flex justify-content-between align-items-center"
-            key={inv.id}
-          >
-            <span>
-              {inv.emailAddress}{" "}
-              {inv.status === "accepted" ? (
-                <span className="badge bg-success ms-2">Accepted</span>
-              ) : (
-                <span className="badge bg-secondary ms-2">Pending</span>
+      <div>
+        <h2>Pending Invitations</h2>
+        <ul className="list-group">
+          {invites.map((inv) => (
+            <li
+              className="list-group-item d-flex justify-content-between align-items-center"
+              key={inv.id}
+            >
+              <span>
+                {inv.emailAddress}{" "}
+                {inv.status === "accepted" ? (
+                  <span className="badge bg-success ms-2">Accepted</span>
+                ) : (
+                  <span className="badge bg-secondary ms-2">Pending</span>
+                )}
+              </span>
+              {inv.status !== "accepted" && (
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => onRevoke(inv.id)}
+                >
+                  Revoke
+                </button>
               )}
-            </span>
-            {inv.status !== "accepted" && (
-              <button
-                className="btn btn-sm btn-danger"
-                onClick={() => onRevoke(inv.id)}
-              >
-                Revoke
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
+            </li>
+          ))}
+        </ul>
+      </div>
   );
 }
