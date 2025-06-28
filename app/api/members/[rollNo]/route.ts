@@ -107,6 +107,19 @@ export async function PATCH(
     }
   }
 
+  // --- Keep isECouncil and ecouncilPosition in sync ---
+  if ("isECouncil" in updates) {
+    if (!updates.isECouncil) {
+      // If isECouncil is false, clear the position
+      updates.ecouncilPosition = "";
+    }
+  }
+  if ("ecouncilPosition" in updates) {
+    if (updates.ecouncilPosition && updates.ecouncilPosition.trim() !== "") {
+      updates.isECouncil = true;
+    }
+  }
+
   const updatedMember = await Member.findOneAndUpdate(
     { rollNo: params.rollNo },
     updates,
