@@ -11,14 +11,14 @@ export async function GET() {
     logger.info("MongoDB connected successfully");
 
     return NextResponse.json(
-      { message: "MongoDB connected successfully" },
+      { result: "success" },
       { status: 200 }
     );
   } catch (error: any) {
     logger.error("MongoDB connection failed", error);
 
     return NextResponse.json(
-      { error: "Failed to connect to MongoDB" },
+      { result: "Failed to connect to MongoDB" },
       { status: 500 }
     );
   }
