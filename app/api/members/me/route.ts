@@ -34,10 +34,12 @@ export async function GET(req: Request) {
 
   await connectDB();
   const member = await Member.findOne({ clerkId })
-    .select("rollNo profilePicUrl resumeUrl role")
-    .lean<MeGetResult>();
+    .select(
+      "rollNo profilePicUrl resumeUrl role status isECouncil needsProfileReview needsPermissionReview"
+    )
+    .lean() as any;
 
-  if (!member) {
+  if (!member || Array.isArray(member)) {
     logger.error({ clerkId }, "Member not found for /api/members/me GET");
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
@@ -49,6 +51,10 @@ export async function GET(req: Request) {
       profilePicUrl: member.profilePicUrl,
       resumeUrl: member.resumeUrl,
       role: member.role,
+      status: member.status,
+      isECouncil: member.isECouncil,
+      needsProfileReview: member.needsProfileReview,
+      needsPermissionReview: member.needsPermissionReview,
     },
     { status: 200 }
   );
