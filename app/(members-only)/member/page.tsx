@@ -16,45 +16,33 @@ export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
-  const [userData, setUserData] = useState({
-    userHasProfile: false,
-    needsProfileReview: false,
-    needsPermissionReview: false,
-    type: "Active",
-    isECouncil: false,
-    isAdmin: false,
-  });
+  const [userData, setUserData] = useState<any>(null);
 
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
-    async function fetchUserData() {
-      try {
-        const response = await axios.get("/api/members/me");
-        const data = response.data;
+  async function fetchUserData() {
+    try {
+      const response = await axios.get("/api/members/me");
+      const data = response.data;
 
-        setUserData({
-          userHasProfile: true,
-          needsProfileReview: false,
-          needsPermissionReview: false,
-          type: "Active",
-          isECouncil: false,
-          isAdmin: data.role === "admin" || data.role === "superadmin",
-        });
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        setUserData({
-          userHasProfile: false,
-          needsProfileReview: false,
-          needsPermissionReview: false,
-          type: "Active",
-          isECouncil: false,
-          isAdmin: false,
-        });
-      } finally {
-        setLoadingUserData(false);
-      }
+      console.log("API /api/members/me response:", data);
+
+      setUserData({
+        userHasProfile: true,
+        needsProfileReview: data.needsProfileReview,
+        needsPermissionReview: data.needsPermissionReview,
+        type: data.status, // Use the real status from API
+        isECouncil: data.isECouncil,
+        isAdmin: data.role === "admin" || data.role === "superadmin",
+      });
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      setUserData(null);
+    } finally {
+      setLoadingUserData(false);
     }
+  }
 
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
@@ -96,6 +84,18 @@ export default function Dashboard() {
     needsPermissionReview,
     needsProfileReview,
   } = userData;
+
+
+  if (!userData || !type) {
+    return (
+      <div className="container">
+        <div className="alert alert-warning d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faTriangleExclamation} className="h2" />
+          <h3>Could not load your profile data.</h3>
+        </div>
+      </div>
+    );
+  }
 
   const userTypeColor =
     type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
