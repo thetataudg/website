@@ -1,6 +1,8 @@
 // GET /api/members
 // Returns all members (TEMP: no auth yet)
 
+export const dynamic = "force-dynamic"; // Absolutely no caching for this route, disable if it causes billing problems with Netlify
+
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import { NextResponse } from "next/server";
