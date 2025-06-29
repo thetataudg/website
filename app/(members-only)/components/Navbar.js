@@ -48,7 +48,7 @@ export default function MemberNavbar() {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav style={{backgroundColor: "rgb(173, 40, 49)"}} className="navbar navbar-expand-lg navbar-dark">
       <div className="container-fluid">
         <Link className="navbar-brand" href="/member">
           ΔΓ Chapter Tools
