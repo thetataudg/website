@@ -19,7 +19,7 @@ export default function Rush() {
             Recruitment
           </h1>
           <h2 className="text-black text-[3vw] md:text-[24px] ml-[5%] font-bold">
-            Rush for the Spring 2025 semester is now over. Please fill out the Rush Interest Form below if you are interested in rushing next semester!
+            Rush for the Fall 2025 semester is open. Fill out the interest form and show up to our rush events on campus!
           </h2>
           <a
               href="https://forms.gle/yNUJKf1JwkvvrbEJ6"
@@ -54,19 +54,19 @@ export default function Rush() {
                 Spring 2025 Rush Events
               </h1>
               <p className="text-[#171717] text-justify text-[15px] lg:text-xl p-10 border-l-4 border-[#7a0104] m-10">
-                Game Night - Thursday January 23, 7:30PM - GWC 487
+                Game Night - August 27, 7:30PM - Location TBD
                 <br />
                 <br />
-                Donuts and Dog Toys - Friday January 24, 7:30PM - ECG 101
+                Sonoran Prevention Works - August 28, 7:30PM - Location TBD
                 <br />
                 <br />
-                Bob Ross Night - Wednesday January 29, 7:30PM - ECG 101
+                Engineering Challenge - September 3, 6:30PM - Location TBD
                 <br />
                 <br />
-                Engineering Challenge - Thursday January 30, 7:30PM - GWC 487
+                Squid Games - September 4, 7:30PM - Location TBD
                 <br />
                 <br />
-                Meet the House - Friday January 31, 6:30PM - MU 241C
+                Meet the House - September 5, 7:30PM - Location TBD
                 <br />
                 <br />
               </p>
@@ -77,7 +77,7 @@ export default function Rush() {
                 <div className="border-8 border-[#7a0104] m-[40px]">
                   <Image
                     alt=""
-                    src="/rush/Spring2025_Rush.png"
+                    src="/rush/RushFlyer_Fall2025.jpg"
                     width="400"
                     height="500"
                   />
