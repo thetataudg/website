@@ -54,10 +54,10 @@ export default function Rush() {
                 Spring 2025 Rush Events
               </h1>
               <p className="text-[#171717] text-justify text-[15px] lg:text-xl p-10 border-l-4 border-[#7a0104] m-10">
-                Game Night - August 27, 7:30PM - Location TBD
+                Game Night - August 27, 7:30PM - GWC 487
                 <br />
                 <br />
-                Sonoran Prevention Works - August 28, 7:30PM - Location TBD
+                Sonoran Prevention Works - August 28, 7:30PM - GWC 487
                 <br />
                 <br />
                 Engineering Challenge - September 3, 6:30PM - Location TBD
