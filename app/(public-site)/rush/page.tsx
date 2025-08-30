@@ -51,22 +51,16 @@ export default function Rush() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <h1 className="text-[#7a0104] text-[30px] lg:text-3xl font-bold mt-10 pl-10">
-                Spring 2025 Rush Events
+                Remaining Spring 2025 Rush Events Week 2/2
               </h1>
               <p className="text-[#171717] text-justify text-[15px] lg:text-xl p-10 border-l-4 border-[#7a0104] m-10">
-                Game Night - August 27, 7:30PM - Location TBD
+                Sonoran Prevention Works - September 3, 7:30PM - TKRHD 101
                 <br />
                 <br />
-                Sonoran Prevention Works - August 28, 7:30PM - Location TBD
+                Bob Ross Night - September 4, 7:30PM - GWC 487
                 <br />
                 <br />
-                Engineering Challenge - September 3, 6:30PM - Location TBD
-                <br />
-                <br />
-                Squid Games - September 4, 7:30PM - Location TBD
-                <br />
-                <br />
-                Meet the House - September 5, 7:30PM - Location TBD
+                Meet The House - September 5, 6:30PM - TKRHD 101
                 <br />
                 <br />
               </p>
@@ -77,7 +71,7 @@ export default function Rush() {
                 <div className="border-8 border-[#7a0104] m-[40px]">
                   <Image
                     alt=""
-                    src="/rush/RushFlyer_Fall2025.jpg"
+                    src="/rush/F25RushWeek2.png"
                     width="400"
                     height="500"
                   />
