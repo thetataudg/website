@@ -71,7 +71,7 @@ export default function Rush() {
                 <div className="border-8 border-[#7a0104] m-[40px]">
                   <Image
                     alt=""
-                    src="/rush/RushFlyer_Fall2025.jpg"
+                    src="/rush/F25RushWeek2.png"
                     width="400"
                     height="500"
                   />
