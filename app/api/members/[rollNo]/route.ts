@@ -98,7 +98,7 @@ export async function PATCH(
         "Denied: Non-admin attempted to change status"
       );
       delete updates.status;
-    } else if (updates.status !== "Active" && updates.status !== "Alumni") {
+    } else if (updates.status !== "Active" && updates.status !== "Alumni" && updates.status !== "Removed" && updates.status !== "Deceased") {
       logger.warn(
         { adminId, rollNo: params.rollNo, attemptedStatus: updates.status },
         "Denied: Invalid status attempted"
