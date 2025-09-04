@@ -244,7 +244,7 @@ export default function Home() {
             </div>
             <div className="ml-auto mr-auto mb-6 lg:my-10 lg:col-span-1">
               <FaGraduationCap className="ml-auto mr-auto" color={"#e2ab16ff"} size={80} />
-              <h2 className={`${bungee.className} text-center`}>200+</h2>
+              <h2 className={`${bungee.className} text-center`}>400+</h2>
               <h3 className="text-center">ALUMNI</h3>
             </div>
             <div className="ml-auto mr-auto mb-6 lg:my-10 lg:col-span-1">

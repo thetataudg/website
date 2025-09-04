@@ -76,6 +76,84 @@ export default function Dashboard() {
     );
   }
 
+
+  if (!userData || !userData.type) {
+    // All accesses are false for unapproved users
+    const privileges = [
+      { label: "Edit Profile", access: false },
+      { label: "Brother Directory", access: false },
+      { label: "Minutes", access: false },
+      { label: "Vote", access: false },
+      { label: "Admin Voting", access: false },
+      { label: "Events", access: false },
+      { label: "Admin Users", access: false },
+    ];
+
+    return (
+      <div className="container-xxl mt-4">
+        <div>
+          {user ? (
+            <h1>Welcome, {user.firstName}</h1>
+          ) : (
+            <h2>Welcome, please enter your name in your profile</h2>
+          )}
+
+          <div className="row mt-4">
+            <div className="col-md-8">
+              <p>
+                User Type:{" "}
+                <b className="text-dark">
+                  Pending
+                </b>
+              </p>
+
+              <div className="mt-3">
+                  <div>
+                    <div
+                      className="alert alert-primary d-flex align-items-center"
+                      role="alert"
+                    >
+                      <FontAwesomeIcon
+                        icon={faHourglass}
+                        className="me-2"
+                      />
+                      You do not have access to this tool yet. Please contact an
+                      admin if you believe this is an error.
+                    </div>
+                  </div>
+              </div>
+            </div>
+
+            <div className="col-md-4">
+              <h4>My Accesses</h4>
+              <table className="table">
+                <thead className="thead-dark">
+                  <tr>
+                    <th>Privilege</th>
+                    <th className="text-center">Access</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {privileges.map((priv, index) => (
+                    <tr key={index}>
+                      <td>{priv.label}</td>
+                      <td className="text-center">
+                        <FontAwesomeIcon
+                          icon={priv.access ? faCheck : faTimes}
+                          className={priv.access ? "text-success" : "text-danger"}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const {
     userHasProfile,
     type,
@@ -84,18 +162,6 @@ export default function Dashboard() {
     needsPermissionReview,
     needsProfileReview,
   } = userData;
-
-
-  if (!userData || !type) {
-    return (
-      <div className="container">
-        <div className="alert alert-warning d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="h2" />
-          <h3>Could not load your profile data.</h3>
-        </div>
-      </div>
-    );
-  }
 
   const userTypeColor =
     type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
