@@ -65,21 +65,40 @@ export async function GET(req: Request) {
   }
 }
 
-
 export async function POST(req: NextRequest) {
-  // ── 1) Only admins may invite ──────────────────────────
-  let admin;
+  // 1. Check for secret in body or query
+  let secret: string | undefined;
+  let body: any = {};
   try {
-    admin = await requireRole(req as any, ["superadmin", "admin"]);
-  } catch (err: any) {
-    logger.warn({ err }, "Unauthorized invite attempt");
-    return NextResponse.json(
-      { error: err.message },
-      { status: err.statusCode }
-    );
+    body = await req.json();
+    secret = body.secret;
+  } catch {
+    // fallback: try to get from query string
+    secret = req.nextUrl.searchParams.get("secret") || undefined;
   }
 
-  const { email } = await req.json();
+  // 2. If secret is valid, allow; else require admin
+  const ENV_SECRET = process.env.INVITE_SECRET;
+  let admin;
+
+  console.log("Secret:", secret, "ENV Secret:", ENV_SECRET);
+
+  if (secret && ENV_SECRET && secret === ENV_SECRET) {
+    // Bypass admin check
+    admin = { clerkId: "secret-invite" };
+  } else {
+    try {
+      admin = await requireRole(req as any, ["superadmin", "admin"]);
+    } catch (err: any) {
+      logger.warn({ err }, "Unauthorized invite attempt");
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.statusCode }
+      );
+    }
+  }
+
+  const { email } = body;
 
   if (!email || typeof email !== "string") {
     return NextResponse.json({ error: "Missing email" }, { status: 400 });
