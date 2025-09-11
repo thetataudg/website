@@ -11,18 +11,37 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   let admin;
-  try {
-    admin = await requireRole(req, ["superadmin", "admin"]);
-  } catch (err: any) {
-    logger.warn({ err }, "Unauthorized review attempt");
-    return NextResponse.json(
-      { error: err.message },
-      { status: err.statusCode }
-    );
-  } // To test this on postman comment this try catch block and use the below code.
-  // admin = { clerkId: "local-test", role: "superadmin" }; // This is just for testing the API. Uncomment the above try catch block in PRODUCTION and delete this line.
+  let secret: string | undefined;
+  let body: any = {};
 
-  const { action, reviewComments } = await req.json();
+  // Try to parse secret from JSON body
+  try {
+    body = await req.json();
+    secret = body.secret;
+  } catch {
+    body = {};
+    secret = undefined;
+  }
+
+  const ENV_SECRET = process.env.INVITE_SECRET;
+
+  if (secret && ENV_SECRET && secret === ENV_SECRET) {
+    // Bypass admin check
+    admin = { clerkId: "secret-approval", role: "superadmin" };
+  } else {
+    try {
+      admin = await requireRole(req, ["superadmin", "admin"]);
+    } catch (err: any) {
+      logger.warn({ err }, "Unauthorized review attempt");
+      console.log("PATCH body:", body, "secret:", secret, "ENV_SECRET:", ENV_SECRET);
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.statusCode }
+      );
+    }
+  }
+
+  const { action, reviewComments } = body;
   if (!["approve", "reject"].includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
