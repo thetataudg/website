@@ -314,7 +314,6 @@ export default function VotePage() {
 
   // Show results
   const handleShowResults = async () => {
-    if (!voteInfo?.ended) return; // Only fetch results if vote is ended
     setResultsLoading(true);
     setShowResults(true);
     try {
@@ -372,26 +371,34 @@ export default function VotePage() {
   }
 
   // Helper for pledge status
-  function getPledgeStatus(pledge: string, boardResults?: any, blackballResults?: any) {
+  function getPledgeStatus(
+    pledge: string,
+    boardResults?: any,
+    blackballResults?: any
+  ) {
     // Blackball round: check blackball
     if (blackballResults && blackballResults[pledge]) {
       if (blackballResults[pledge].blackball > 0) {
-        return { color: "bg-danger text-white", icon: faTimes, label: "" };
+        return { color: "bg-danger text-white", icon: faTimes, show: true };
       }
       if (blackballResults[pledge].continue > 0) {
-        return { color: "bg-success text-white", icon: faCheck, label: "" };
+        return { color: "bg-success text-white", icon: faCheck, show: true };
       }
+      // If no continue and no blackball, treat as failed (X)
+      return { color: "bg-danger text-white", icon: faTimes, show: true };
     }
     // Board round: check board
     if (boardResults && boardResults[pledge]) {
       if (boardResults[pledge].board > 0) {
-        return { color: "bg-warning text-dark", icon: faExclamationTriangle, label: "" };
+        return { color: "bg-warning text-dark", icon: faExclamationTriangle, show: true };
       }
       if (boardResults[pledge].continue > 0) {
-        return { color: "bg-success text-white", icon: faCheck, label: "" };
+        return { color: "bg-success text-white", icon: faCheck, show: true };
       }
+      // If no continue and no board, treat as warning
+      return { color: "bg-warning text-dark", icon: faExclamationTriangle, show: true };
     }
-    return { color: "", icon: null, label: "" };
+    return { color: "", icon: null, show: false };
   }
 
   // Main voting UI
@@ -576,7 +583,7 @@ export default function VotePage() {
         {voteInfo && voteInfo.type === "Election" && voteInfo.started && !voteInfo.ended && voted && (
           <div className="alert alert-info d-flex align-items-center mt-3" role="alert">
             <FontAwesomeIcon icon={faCheck} className="me-2" />
-            You have voted.
+            Your vote has been counted.
           </div>
         )}
 
@@ -715,7 +722,8 @@ export default function VotePage() {
                           <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
                           {res.board}
                         </span>
-                        {status.icon && (
+                        {/* Only show icon if not a check for passed */}
+                        {status.show && (
                           <span className="ms-2">
                             <FontAwesomeIcon icon={status.icon} />
                           </span>
@@ -748,7 +756,8 @@ export default function VotePage() {
                           <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
                           {res.blackball}
                         </span>
-                        {status.icon && (
+                        {/* Only show icon if not a check for passed */}
+                        {status.show && (
                           <span className="ms-2">
                             <FontAwesomeIcon icon={status.icon} />
                           </span>
@@ -830,7 +839,7 @@ export default function VotePage() {
                               <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
                               {res.board}
                             </span>
-                            {status.icon && (
+                            {status.show && (
                               <span className="ms-2">
                                 <FontAwesomeIcon icon={status.icon} />
                               </span>
@@ -858,7 +867,7 @@ export default function VotePage() {
                               <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
                               {res.blackball}
                             </span>
-                            {status.icon && (
+                            {status.show && (
                               <span className="ms-2">
                                 <FontAwesomeIcon icon={status.icon} />
                               </span>
