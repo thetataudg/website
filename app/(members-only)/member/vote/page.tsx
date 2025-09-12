@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -57,6 +57,9 @@ export default function VotePage() {
   const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
 
+  // Polling
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     async function fetchUserData() {
       try {
@@ -77,27 +80,42 @@ export default function VotePage() {
 
   // Fetch vote info
   const fetchVoteInfo = async () => {
-    setVoteLoading(true);
     setVoteError(null);
     try {
       const res = await axios.get("/api/vote");
-      setVoteInfo(res.data);
-      setSelectedOption(""); // Reset selection
+      setVoteInfo(prev => {
+        // If options changed (e.g. new vote), reset selection
+        if (
+          !prev ||
+          prev.options.join("|") !== res.data.options.join("|") ||
+          prev.started !== res.data.started ||
+          prev.ended !== res.data.ended
+        ) {
+          setSelectedOption("");
+        }
+        return res.data;
+      });
       setVoted(res.data.hasVoted || false);
     } catch (err: any) {
-      setVoteInfo(null);
       if (err.response && err.response.data && err.response.data.error) {
         setVoteError(err.response.data.error);
       } else {
         setVoteError("Failed to fetch vote info.");
       }
+      // Don't clear voteInfo here; keep showing the last known state
     } finally {
       setVoteLoading(false);
     }
   };
 
+  // Live update: poll every 3 seconds when signed in
   useEffect(() => {
-    if (isSignedIn) fetchVoteInfo();
+    if (!isSignedIn) return;
+    fetchVoteInfo();
+    pollingRef.current = setInterval(fetchVoteInfo, 3000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
     // eslint-disable-next-line
   }, [isSignedIn]);
 
@@ -203,6 +221,7 @@ export default function VotePage() {
       try {
         await axios.delete("/api/vote/manage");
         await fetchVoteInfo();
+        window.location.reload(); // Refresh to clear state
       } catch (err: any) {
         alert(err?.response?.data?.error || "Failed to delete vote.");
       } finally {
@@ -213,6 +232,7 @@ export default function VotePage() {
 
   // Show results
   const handleShowResults = async () => {
+    if (!voteInfo?.ended) return; // Only fetch results if vote is ended
     setResultsLoading(true);
     setShowResults(true);
     try {
@@ -325,6 +345,7 @@ export default function VotePage() {
                       <FontAwesomeIcon icon={faStop} className="me-1" /> End
                     </Button>
                   )}
+                  {/* Only show Results button if vote is ended */}
                   {voteInfo.ended && (
                     <Button size="sm" variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
                       <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
