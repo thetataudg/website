@@ -723,7 +723,7 @@ export default function VotePage() {
                           {res.board}
                         </span>
                         {/* Only show icon if not a check for passed */}
-                        {status.show && (
+                        {status.show && status.icon && (
                           <span className="ms-2">
                             <FontAwesomeIcon icon={status.icon} />
                           </span>
@@ -757,7 +757,7 @@ export default function VotePage() {
                           {res.blackball}
                         </span>
                         {/* Only show icon if not a check for passed */}
-                        {status.show && (
+                        {status.show && status.icon && (
                           <span className="ms-2">
                             <FontAwesomeIcon icon={status.icon} />
                           </span>
@@ -839,7 +839,7 @@ export default function VotePage() {
                               <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
                               {res.board}
                             </span>
-                            {status.show && (
+                            {status.show && status.icon && (
                               <span className="ms-2">
                                 <FontAwesomeIcon icon={status.icon} />
                               </span>
@@ -867,7 +867,7 @@ export default function VotePage() {
                               <FontAwesomeIcon icon={faTimes} className="me-1" />
                               {res.blackball}
                             </span>
-                            {status.show && (
+                            {status.show && status.icon && (
                               <span className="ms-2">
                                 <FontAwesomeIcon icon={status.icon} />
                               </span>
