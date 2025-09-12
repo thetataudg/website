@@ -22,6 +22,7 @@ type VoteInfo = {
   started: boolean;
   ended: boolean;
   hasVoted?: boolean;
+  totalVotes?: number;
 };
 
 type VoteResults = {
@@ -332,6 +333,16 @@ export default function VotePage() {
                     : "created, not started"}
                   .
                 </b>
+                {typeof voteInfo.totalVotes === "number" && (
+                  <span className="ms-3 badge bg-info text-dark text-right">
+                    {voteInfo.totalVotes} vote{voteInfo.totalVotes === 1 ? "" : "s"} received
+                  </span>
+                )}
+                {voteLoading && (
+                  <span className="ms-2 text-muted">
+                    <FontAwesomeIcon icon={faHourglass} spin />
+                  </span>
+                )}
               </div>
               {userData.isECouncil && (
                 <div className="ms-3 d-flex gap-2">

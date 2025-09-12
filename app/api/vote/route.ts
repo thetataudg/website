@@ -57,6 +57,7 @@ export async function GET(req: Request) {
       started: vote.started,
       ended: vote.ended,
       hasVoted,
+      totalVotes: vote.votes.length,
     });
   } catch (err: any) {
     logger.error({ err }, "Failed to get vote info");
