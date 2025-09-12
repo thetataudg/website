@@ -832,11 +832,11 @@ export default function VotePage() {
                           >
                             <b className="flex-grow-1">{pledge}</b>
                             <span className="me-3">
-                              <FontAwesomeIcon icon={faCheck} className="text-success me-1" />
+                              <FontAwesomeIcon icon={faCheck} className="me-1" />
                               {res.continue}
                             </span>
                             <span className="me-3">
-                              <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
+                              <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
                               {res.board}
                             </span>
                             {status.show && (
@@ -860,11 +860,11 @@ export default function VotePage() {
                           >
                             <b className="flex-grow-1">{pledge}</b>
                             <span className="me-3">
-                              <FontAwesomeIcon icon={faCheck} className="text-success me-1" />
+                              <FontAwesomeIcon icon={faCheck} className="me-1" />
                               {res.continue}
                             </span>
                             <span className="me-3">
-                              <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
+                              <FontAwesomeIcon icon={faTimes} className="me-1" />
                               {res.blackball}
                             </span>
                             {status.show && (
