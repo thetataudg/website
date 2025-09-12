@@ -112,7 +112,22 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "No vote found" }, { status: 404 });
     }
     if (vote.type === "Election") {
-      // ...existing code...
+      // Tally results
+      const tally: Record<string, number> = {};
+      for (const opt of vote.options) tally[opt] = 0;
+      for (const v of vote.votes) {
+        if (typeof v.choice === "string" && tally.hasOwnProperty(v.choice)) {
+          tally[v.choice]++;
+        }
+      }
+      return NextResponse.json({
+        type: vote.type,
+        options: vote.options,
+        started: vote.started,
+        ended: vote.ended,
+        results: tally,
+        totalVotes: vote.votes.length,
+      });
     } else if (vote.type === "Pledge") {
       // Board round results
       const boardResults: Record<string, { continue: number; board: number }> = {};
