@@ -12,25 +12,36 @@ import {
   faPlay,
   faStop,
   faChartBar,
+  faArrowRight,
+  faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
 
 type VoteInfo = {
   type: string;
-  options: string[];
+  options?: string[];
+  pledges?: string[];
   started: boolean;
   ended: boolean;
+  round?: "board" | "blackball";
   hasVoted?: boolean;
+  votedPledges?: Record<string, boolean>;
   totalVotes?: number;
+  boardResults?: Record<string, { continue: number; board: number }>;
+  blackballResults?: Record<string, { continue: number; blackball: number }>;
 };
 
 type VoteResults = {
   type: string;
-  options: string[];
+  options?: string[];
+  pledges?: string[];
   started: boolean;
   ended: boolean;
-  results: Record<string, number>;
+  round?: "board" | "blackball";
+  results?: Record<string, number>;
+  boardResults?: Record<string, { continue: number; board: number }>;
+  blackballResults?: Record<string, { continue: number; blackball: number }>;
   totalVotes: number;
 };
 
@@ -44,6 +55,7 @@ export default function VotePage() {
   const [showModal, setShowModal] = useState(false);
   const [voteType, setVoteType] = useState<null | "Election" | "Pledge Vote">(null);
   const [names, setNames] = useState<string[]>([""]);
+  const [pledgeNames, setPledgeNames] = useState<string[]>([""]);
   const [submitting, setSubmitting] = useState(false);
 
   // Voting state
@@ -51,6 +63,7 @@ export default function VotePage() {
   const [voteLoading, setVoteLoading] = useState(true);
   const [voteError, setVoteError] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string>("");
+  const [pledgeSelections, setPledgeSelections] = useState<Record<string, string>>({});
   const [voted, setVoted] = useState(false);
 
   // Results
@@ -85,14 +98,30 @@ export default function VotePage() {
     try {
       const res = await axios.get("/api/vote");
       setVoteInfo(prev => {
-        // If options changed (e.g. new vote), reset selection
+        // Election: reset if options or status change
         if (
-          !prev ||
-          prev.options.join("|") !== res.data.options.join("|") ||
-          prev.started !== res.data.started ||
-          prev.ended !== res.data.ended
+          res.data.type === "Election" &&
+          (
+            !prev ||
+            prev.options?.join("|") !== res.data.options?.join("|") ||
+            prev.started !== res.data.started ||
+            prev.ended !== res.data.ended
+          )
         ) {
           setSelectedOption("");
+        }
+        // Pledge: reset if pledges or round change
+        if (
+          res.data.type === "Pledge" &&
+          (
+            !prev ||
+            prev.pledges?.join("|") !== res.data.pledges?.join("|") ||
+            prev.round !== res.data.round ||
+            prev.started !== res.data.started ||
+            prev.ended !== res.data.ended
+          )
+        ) {
+          setPledgeSelections({});
         }
         return res.data;
       });
@@ -126,6 +155,7 @@ export default function VotePage() {
     setShowModal(false);
     setVoteType(null);
     setNames([""]);
+    setPledgeNames([""]);
   };
 
   const handleVoteTypeSelect = (type: "Election" | "Pledge Vote") => setVoteType(type);
@@ -138,20 +168,40 @@ export default function VotePage() {
     });
   };
 
+  const handlePledgeNameChange = (idx: number, value: string) => {
+    setPledgeNames((prev) => {
+      const updated = [...prev];
+      updated[idx] = value;
+      return updated;
+    });
+  };
+
   const handleAddName = () => setNames((prev) => [...prev, ""]);
   const handleRemoveName = (idx: number) => {
     setNames((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
   };
 
-  // Create vote (Election only)
+  const handleAddPledge = () => setPledgeNames((prev) => [...prev, ""]);
+  const handleRemovePledge = (idx: number) => {
+    setPledgeNames((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+  };
+
+  // Create vote (Election or Pledge)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await axios.post("/api/vote/manage", {
-        type: "Election",
-        options: names.filter((n) => n.trim()),
-      });
+      if (voteType === "Election") {
+        await axios.post("/api/vote/manage", {
+          type: "Election",
+          options: names.filter((n) => n.trim()),
+        });
+      } else if (voteType === "Pledge Vote") {
+        await axios.post("/api/vote/manage", {
+          type: "Pledge",
+          pledges: pledgeNames.filter((n) => n.trim()),
+        });
+      }
       handleCloseModal();
       fetchVoteInfo();
     } catch (err: any) {
@@ -161,7 +211,7 @@ export default function VotePage() {
     }
   };
 
-  // Vote for an option
+  // Vote for an option (Election)
   const handleVote = async () => {
     if (!selectedOption) return;
     setSubmitting(true);
@@ -171,6 +221,25 @@ export default function VotePage() {
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to submit vote.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Vote for pledges (Pledge) - submit all at once
+  const handlePledgeBallot = async () => {
+    if (!voteInfo?.pledges) return;
+    setSubmitting(true);
+    try {
+      await axios.post("/api/vote", {
+        ballot: voteInfo.pledges.map((pledge) => ({
+          pledge,
+          choice: pledgeSelections[pledge],
+        })),
+      });
+      fetchVoteInfo();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || "Failed to submit ballot.");
     } finally {
       setSubmitting(false);
     }
@@ -197,6 +266,18 @@ export default function VotePage() {
       handleShowResults(); // Show results after ending
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to end vote.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleNextRound = async () => {
+    setSubmitting(true);
+    try {
+      await axios.patch("/api/vote/manage", { action: "nextRound" });
+      fetchVoteInfo();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || "Failed to move to next round.");
     } finally {
       setSubmitting(false);
     }
@@ -290,6 +371,29 @@ export default function VotePage() {
     );
   }
 
+  // Helper for pledge status
+  function getPledgeStatus(pledge: string, boardResults?: any, blackballResults?: any) {
+    // Blackball round: check blackball
+    if (blackballResults && blackballResults[pledge]) {
+      if (blackballResults[pledge].blackball > 0) {
+        return { color: "bg-danger text-white", icon: faTimes, label: "" };
+      }
+      if (blackballResults[pledge].continue > 0) {
+        return { color: "bg-success text-white", icon: faCheck, label: "" };
+      }
+    }
+    // Board round: check board
+    if (boardResults && boardResults[pledge]) {
+      if (boardResults[pledge].board > 0) {
+        return { color: "bg-warning text-dark", icon: faExclamationTriangle, label: "" };
+      }
+      if (boardResults[pledge].continue > 0) {
+        return { color: "bg-success text-white", icon: faCheck, label: "" };
+      }
+    }
+    return { color: "", icon: null, label: "" };
+  }
+
   // Main voting UI
   return (
     <div className="container-xxl mt-4">
@@ -301,12 +405,31 @@ export default function VotePage() {
             style={{
               backgroundColor: "#AD2831",
               color: "#fff",
-              pointerEvents: userData.isECouncil ? "auto" : "none",
-              opacity: userData.isECouncil ? 1 : 0.5,
+              pointerEvents:
+                userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
+                  ? "auto"
+                  : "none",
+              opacity:
+                userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
+                  ? 1
+                  : 0.5,
             }}
-            disabled={!userData.isECouncil}
-            title={userData.isECouncil ? "Start a new vote" : "Only E-Council may start a vote"}
-            onClick={userData.isECouncil ? handleOpenModal : undefined}
+            disabled={
+              !userData.isECouncil ||
+              !!(voteInfo && voteInfo.started && !voteInfo.ended)
+            }
+            title={
+              !userData.isECouncil
+                ? "Only E-Council may start a vote"
+                : voteInfo && voteInfo.started && !voteInfo.ended
+                ? "A vote is already running"
+                : "Start a new vote"
+            }
+            onClick={
+              userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
+                ? handleOpenModal
+                : undefined
+            }
           >
             <FontAwesomeIcon icon={faPlay} className="me-2" />
             Start Vote
@@ -334,8 +457,8 @@ export default function VotePage() {
                   .
                 </b>
                 {typeof voteInfo.totalVotes === "number" && (
-                  <span className="ms-3 badge bg-info text-dark text-right">
-                    {voteInfo.totalVotes} vote{voteInfo.totalVotes === 1 ? "" : "s"} received
+                  <span className="badge bg-info text-dark ms-auto">
+                    {voteInfo.totalVotes} ballot{voteInfo.totalVotes === 1 ? "" : "s"} received
                   </span>
                 )}
                 {voteLoading && (
@@ -356,7 +479,80 @@ export default function VotePage() {
                       <FontAwesomeIcon icon={faStop} className="me-1" /> End
                     </Button>
                   )}
-                  {/* Only show Results button if vote is ended */}
+                  {voteInfo.ended && (
+                    <Button size="sm" variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
+                      <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
+                    <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : voteInfo && voteInfo.type === "Pledge" ? (
+            <div className="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+              <div>
+                <FontAwesomeIcon icon={faCheck} className="me-2" />
+                <b>
+                  Pledge vote is{" "}
+                  {voteInfo.started
+                    ? voteInfo.ended
+                      ? "ended"
+                      : voteInfo.round === "blackball"
+                      ? "blackball round"
+                      : "board round"
+                    : "created, not started"}
+                  .
+                </b>
+                {typeof voteInfo.totalVotes === "number" && (
+                  <span className="badge bg-info text-dark ms-auto">
+                    {voteInfo.totalVotes} ballot{voteInfo.totalVotes === 1 ? "" : "s"} received
+                  </span>
+                )}
+                {voteLoading && (
+                  <span className="ms-2 text-muted">
+                    <FontAwesomeIcon icon={faHourglass} spin />
+                  </span>
+                )}
+              </div>
+              {userData.isECouncil && (
+                <div className="ms-3 d-flex gap-2">
+                  {!voteInfo.started && !voteInfo.ended && (
+                    <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
+                      <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+                    </Button>
+                  )}
+                  {userData.isECouncil && voteInfo.round === "blackball" && !voteInfo.ended && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="info"
+                        onClick={handleShowResults}
+                        disabled={resultsLoading}
+                      >
+                        <FontAwesomeIcon icon={faChartBar} className="me-1" /> Board Results
+                      </Button>
+                    </>
+                  )}
+                  {voteInfo.started && !voteInfo.ended && (
+                    <>
+                      <Button size="sm" variant="danger" onClick={handleEndVote} disabled={submitting}>
+                        <FontAwesomeIcon icon={faStop} className="me-1" /> End
+                      </Button>
+                      {voteInfo.round === "board" && (
+                        <Button size="sm" variant="warning" onClick={handleNextRound} disabled={submitting}>
+                          <FontAwesomeIcon icon={faArrowRight} className="me-1" /> Next Round
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {/* Show board results to ECouncil between rounds */}
+                  {userData.isECouncil && voteInfo.round === "blackball" && voteInfo.boardResults && (
+                    <Button size="sm" variant="info" onClick={() => setShowResults(true)} disabled={resultsLoading}>
+                      <FontAwesomeIcon icon={faChartBar} className="me-1" /> Board Results
+                    </Button>
+                  )}
                   {voteInfo.ended && (
                     <Button size="sm" variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
                       <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
@@ -384,7 +580,7 @@ export default function VotePage() {
           </div>
         )}
 
-        {/* Voting options */}
+        {/* Voting options: Election */}
         {voteInfo && voteInfo.type === "Election" && voteInfo.started && !voteInfo.ended && !voted && (
           <div className="mt-4">
             <h4>Vote for a Candidate</h4>
@@ -395,7 +591,7 @@ export default function VotePage() {
               }}
             >
               <div className="list-group mb-3">
-                {voteInfo.options.map((option) => (
+                {voteInfo.options?.map((option) => (
                   <label key={option} className="list-group-item d-flex align-items-center" style={{ cursor: "pointer" }}>
                     <input
                       type="radio"
@@ -421,10 +617,163 @@ export default function VotePage() {
           </div>
         )}
 
+        {/* Voting options: Pledge */}
+        {voteInfo && voteInfo.type === "Pledge" && voteInfo.started && !voteInfo.ended && voteInfo.pledges && (
+          <div className="mt-4">
+            <h4>
+              {voteInfo.round === "board"
+                ? "Board Round: Vote for Each Pledge"
+                : "Blackball Round: Vote for Each Pledge"}
+            </h4>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handlePledgeBallot();
+              }}
+            >
+              <div className="list-group mb-3">
+                {voteInfo.pledges.map((pledge) => {
+                  const votedForThis = voteInfo.votedPledges?.[pledge];
+                  const options =
+                    voteInfo.round === "board"
+                      ? ["Continue", "Board"]
+                      : ["Continue", "Blackball"];
+                  return (
+                    <div
+                      key={pledge}
+                      className="list-group-item d-flex align-items-center"
+                    >
+                      <div className="flex-grow-1">
+                        <b>{pledge}</b>
+                      </div>
+                      {votedForThis ? (
+                        <span className="badge bg-success ms-2">
+                          Voted
+                        </span>
+                      ) : (
+                        options.map((opt) => (
+                          <label key={opt} className="me-2 mb-0">
+                            <input
+                              type="radio"
+                              name={`pledge-${pledge}`}
+                              value={opt}
+                              checked={pledgeSelections[pledge] === opt}
+                              onChange={() =>
+                                setPledgeSelections((prev) => ({
+                                  ...prev,
+                                  [pledge]: opt,
+                                }))
+                              }
+                              disabled={submitting}
+                              className="form-check-input me-1"
+                            />
+                            {opt}
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Only show the submit button if not all pledges have been voted for */}
+              {voteInfo.pledges.some((pledge) => !voteInfo.votedPledges?.[pledge]) && (
+                <Button
+                  variant="success"
+                  type="submit"
+                  disabled={
+                    submitting ||
+                    voteInfo.pledges.some(
+                      (pledge) =>
+                        voteInfo.votedPledges?.[pledge] ||
+                        !pledgeSelections[pledge]
+                    )
+                  }
+                >
+                  Submit Ballot
+                </Button>
+              )}
+            </form>
+            {/* Board round results (live, ECouncil only, between rounds) */}
+            {userData.isECouncil && voteInfo.round === "board" && voteInfo.boardResults && (
+              <div className="mt-4">
+                <h5>Board Round Results</h5>
+                <ul className="list-group">
+                  {voteInfo.pledges.map((pledge) => {
+                    const res = voteInfo.boardResults?.[pledge] || { continue: 0, board: 0 };
+                    const status = getPledgeStatus(pledge, voteInfo.boardResults, undefined);
+                    return (
+                      <li
+                        key={pledge}
+                        className={`list-group-item d-flex align-items-center ${status.color}`}
+                      >
+                        <b className="flex-grow-1">{pledge}</b>
+                        <span className="me-3">
+                          <FontAwesomeIcon icon={faCheck} className="text-success me-1" />
+                          {res.continue}
+                        </span>
+                        <span className="me-3">
+                          <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
+                          {res.board}
+                        </span>
+                        {status.icon && (
+                          <span className="ms-2">
+                            <FontAwesomeIcon icon={status.icon} />
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {/* Blackball round results (live, ECouncil only, between rounds) */}
+            {userData.isECouncil && voteInfo.round === "blackball" && voteInfo.blackballResults && (
+              <div className="mt-4">
+                <h5>Blackball Round Results</h5>
+                <ul className="list-group">
+                  {voteInfo.pledges.map((pledge) => {
+                    const res = voteInfo.blackballResults?.[pledge] || { continue: 0, blackball: 0 };
+                    const status = getPledgeStatus(pledge, undefined, voteInfo.blackballResults);
+                    return (
+                      <li
+                        key={pledge}
+                        className={`list-group-item d-flex align-items-center ${status.color}`}
+                      >
+                        <b className="flex-grow-1">{pledge}</b>
+                        <span className="me-3">
+                          <FontAwesomeIcon icon={faCheck} className="text-success me-1" />
+                          {res.continue}
+                        </span>
+                        <span className="me-3">
+                          <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
+                          {res.blackball}
+                        </span>
+                        {status.icon && (
+                          <span className="ms-2">
+                            <FontAwesomeIcon icon={status.icon} />
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Results after vote ended */}
         {userData.isECouncil && voteInfo && voteInfo.type === "Election" && voteInfo.ended && (
           <div className="mt-4">
             <h4>Election Results</h4>
+            <Button variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
+              <FontAwesomeIcon icon={faChartBar} className="me-1" /> Show Results
+            </Button>
+          </div>
+        )}
+        {userData.isECouncil && voteInfo && voteInfo.type === "Pledge" && voteInfo.ended && (
+          <div className="mt-4">
+            <h4>Pledge Vote Results</h4>
             <Button variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
               <FontAwesomeIcon icon={faChartBar} className="me-1" /> Show Results
             </Button>
@@ -444,18 +793,85 @@ export default function VotePage() {
               </div>
             ) : voteResults ? (
               <div>
-                <h5>Results</h5>
-                <ul className="list-group mb-3">
-                  {voteResults.options.map((opt) => (
-                    <li className="list-group-item d-flex justify-content-between align-items-center" key={opt}>
-                      {opt}
-                      <span className="badge bg-primary rounded-pill">{voteResults.results[opt] || 0}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div>
-                  <b>Total Votes:</b> {voteResults.totalVotes}
-                </div>
+                {voteResults.type === "Election" && (
+                  <>
+                    <h5>Results</h5>
+                    <ul className="list-group mb-3">
+                      {voteResults.options?.map((opt) => (
+                        <li className="list-group-item d-flex justify-content-between align-items-center" key={opt}>
+                          {opt}
+                          <span className="badge bg-primary rounded-pill">{voteResults.results?.[opt] || 0}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div>
+                      <b>Total Ballots:</b> {voteResults.totalVotes}
+                    </div>
+                  </>
+                )}
+                {voteResults.type === "Pledge" && (
+                  <>
+                    <h5>Board Round Results</h5>
+                    <ul className="list-group mb-3">
+                      {voteResults.pledges?.map((pledge) => {
+                        const res = voteResults.boardResults?.[pledge] || { continue: 0, board: 0 };
+                        const status = getPledgeStatus(pledge, voteResults.boardResults, undefined);
+                        return (
+                          <li
+                            key={pledge}
+                            className={`list-group-item d-flex align-items-center ${status.color}`}
+                          >
+                            <b className="flex-grow-1">{pledge}</b>
+                            <span className="me-3">
+                              <FontAwesomeIcon icon={faCheck} className="text-success me-1" />
+                              {res.continue}
+                            </span>
+                            <span className="me-3">
+                              <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
+                              {res.board}
+                            </span>
+                            {status.icon && (
+                              <span className="ms-2">
+                                <FontAwesomeIcon icon={status.icon} />
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <h5>Blackball Round Results</h5>
+                    <ul className="list-group mb-3">
+                      {voteResults.pledges?.map((pledge) => {
+                        const res = voteResults.blackballResults?.[pledge] || { continue: 0, blackball: 0 };
+                        const status = getPledgeStatus(pledge, undefined, voteResults.blackballResults);
+                        return (
+                          <li
+                            key={pledge}
+                            className={`list-group-item d-flex align-items-center ${status.color}`}
+                          >
+                            <b className="flex-grow-1">{pledge}</b>
+                            <span className="me-3">
+                              <FontAwesomeIcon icon={faCheck} className="text-success me-1" />
+                              {res.continue}
+                            </span>
+                            <span className="me-3">
+                              <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
+                              {res.blackball}
+                            </span>
+                            {status.icon && (
+                              <span className="ms-2">
+                                <FontAwesomeIcon icon={status.icon} />
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div>
+                      <b>Total Ballots:</b> {voteResults.totalVotes}
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="text-danger">No results available.</div>
@@ -479,12 +895,11 @@ export default function VotePage() {
                   Election
                 </Button>
                 <Button
-                  variant="outline-info"
+                  variant="outline-success"
                   className="w-100 mb-2"
-                  disabled
-                  // onClick={() => handleVoteTypeSelect("Pledge Vote")}
+                  onClick={() => handleVoteTypeSelect("Pledge Vote")}
                 >
-                  Pledge Vote (coming soon)
+                  Pledge Vote
                 </Button>
               </div>
             )}
@@ -525,6 +940,49 @@ export default function VotePage() {
                     variant="success"
                     type="submit"
                     disabled={submitting || names.some((c) => !c.trim())}
+                  >
+                    {submitting ? "Submitting..." : "Submit"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {voteType === "Pledge Vote" && (
+              <form onSubmit={handleSubmit}>
+                <h5>Enter Pledge Names</h5>
+                {pledgeNames.map((name, idx) => (
+                  <div className="input-group mb-2" key={idx}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder={`Pledge ${idx + 1}`}
+                      value={name}
+                      onChange={(e) => handlePledgeNameChange(idx, e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      onClick={() => handleRemovePledge(idx)}
+                      disabled={pledgeNames.length === 1}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="mb-3"
+                  onClick={handleAddPledge}
+                >
+                  Add Pledge
+                </Button>
+                <div className="d-flex justify-content-end">
+                  <Button
+                    variant="success"
+                    type="submit"
+                    disabled={submitting || pledgeNames.some((c) => !c.trim())}
                   >
                     {submitting ? "Submitting..." : "Submit"}
                   </Button>
