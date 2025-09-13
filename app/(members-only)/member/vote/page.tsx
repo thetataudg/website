@@ -453,7 +453,6 @@ export default function VotePage() {
           ) : voteInfo && voteInfo.type === "Election" ? (
             <div className="alert alert-success d-flex align-items-center justify-content-between" role="alert">
               <div>
-                <FontAwesomeIcon icon={faCheck} className="me-2" />
                 <b>
                   Election vote is{" "}
                   {voteInfo.started
@@ -464,7 +463,7 @@ export default function VotePage() {
                   .
                 </b>
                 {typeof voteInfo.totalVotes === "number" && (
-                  <span className="badge bg-info text-dark ms-auto">
+                  <span className="badge bg-primary text-white ms-auto">
                     {voteInfo.totalVotes} ballot{voteInfo.totalVotes === 1 ? "" : "s"} received
                   </span>
                 )}
@@ -590,7 +589,7 @@ export default function VotePage() {
         {/* Voting options: Election */}
         {voteInfo && voteInfo.type === "Election" && voteInfo.started && !voteInfo.ended && !voted && (
           <div className="mt-4">
-            <h4>Vote for a Candidate</h4>
+            <h4>Vote for an option</h4>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -771,24 +770,6 @@ export default function VotePage() {
           </div>
         )}
 
-        {/* Results after vote ended */}
-        {userData.isECouncil && voteInfo && voteInfo.type === "Election" && voteInfo.ended && (
-          <div className="mt-4">
-            <h4>Election Results</h4>
-            <Button variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
-              <FontAwesomeIcon icon={faChartBar} className="me-1" /> Show Results
-            </Button>
-          </div>
-        )}
-        {userData.isECouncil && voteInfo && voteInfo.type === "Pledge" && voteInfo.ended && (
-          <div className="mt-4">
-            <h4>Pledge Vote Results</h4>
-            <Button variant="secondary" onClick={handleShowResults} disabled={resultsLoading}>
-              <FontAwesomeIcon icon={faChartBar} className="me-1" /> Show Results
-            </Button>
-          </div>
-        )}
-
         {/* Results Modal */}
         <Modal show={showResults} onHide={handleCloseResults} centered>
           <Modal.Header closeButton>
@@ -915,7 +896,7 @@ export default function VotePage() {
 
             {voteType === "Election" && (
               <form onSubmit={handleSubmit}>
-                <h5>Enter Candidate Names</h5>
+                <h5>Enter Options</h5>
                 {names.map((name, idx) => (
                   <div className="input-group mb-2" key={idx}>
                     <input
