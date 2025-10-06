@@ -41,12 +41,12 @@ export default async function OnboardPage({ params }: { params: Params }) {
       i.emailAddress.toLowerCase() === invitedEmail.toLowerCase() &&
       i.status === "pending"
   );
-  if (!pending) return (
-    <div className="d-flex justify-content-center mt-5">
-        <h1>401 Unauthorized</h1>
-        <p>Invitation is not found or already used.</p>
-    </div>
-  )
+  // if (!pending) return (
+  //   <div className="d-flex justify-content-center mt-5">
+  //       <h1>401 Unauthorized</h1>
+  //       <p>Invitation is not found or already used.</p>
+  //   </div>
+  // )
 
   return <OnboardForm invitedEmail={invitedEmail} />;
 }
