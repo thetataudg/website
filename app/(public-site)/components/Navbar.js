@@ -37,6 +37,10 @@ const Navbar = () => {
     },
   ];
 
+  const handleMemberNavigation = () => {
+    window.location.href = "/member";
+  };
+
   return (
     <div className="flex justify-between items-center w-full h-20 px-4 text-white bg-black/100 fixed z-100">
       <div>
@@ -79,9 +83,9 @@ const Navbar = () => {
         <SignedIn>
           <li
             className="nav-links px-4 cursor-pointer capitalize font-medium text-white hover:scale-105 hover:text-slate-400 hover:underline duration-100 link-underline"
-            onClick={() => setNav(false)}
+            onClick={handleMemberNavigation}
           >
-            <Link href="/member">Profile</Link>
+            Profile
           </li>
         </SignedIn>
       </ul>
@@ -111,9 +115,12 @@ const Navbar = () => {
           <SignedIn>
             <li
               className="px-4 cursor-pointer capitalize py-6 text-4xl"
-              onClick={() => setNav(false)}
+              onClick={() => {
+                setNav(false);
+                handleMemberNavigation();
+              }}
             >
-              <Link href="/member">Profile</Link>
+              Member
             </li>
           </SignedIn>
         </ul>

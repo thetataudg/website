@@ -1,4 +1,3 @@
-// app/(members-only)/components/Navbar.js
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -19,26 +18,57 @@ import {
 
 export default function MemberNavbar() {
   const pathname = usePathname();
-  const [rollNo, setRollNo] = useState(null);
-  const [role, setRole] = useState(null);
-  // fetch current user’s rollNo & role
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  // Force client-side mounting
   useEffect(() => {
-    fetch("/api/members/me")
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => {
-        setRollNo(data.rollNo);
-        setRole(data.role);
-      })
-      .catch(() => {
-        setRollNo(null);
-        setRole(null);
-      });
+    setMounted(true);
+    console.log("Navbar: Component mounted");
   }, []);
+
+  // fetch current user's rollNo & role
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch("/api/members/me");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const data = await res.json();
+        console.log("Navbar: Fetch success:", data);
+        
+        setUserData({
+          rollNo: data.rollNo,
+          role: data.role
+        });
+      } catch (error) {
+        console.error("Navbar: Fetch error:", error);
+        setUserData({ rollNo: null, role: null });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, [mounted]);
 
   // load Bootstrap's JS for mobile toggler
   useEffect(() => {
-    import("bootstrap/dist/js/bootstrap.bundle.min.js").catch(console.error);
-  }, []);
+    if (!mounted) return;
+    
+    const loadBootstrap = async () => {
+      try {
+        await import("bootstrap/dist/js/bootstrap.bundle.min.js");
+        console.log("Navbar: Bootstrap loaded");
+      } catch (error) {
+        console.error("Navbar: Failed to load Bootstrap JS:", error);
+      }
+    };
+    loadBootstrap();
+  }, [mounted]);
 
   const isActive = (href) => {
     if (href === "/member") {
@@ -47,8 +77,41 @@ export default function MemberNavbar() {
     return href !== "/" && pathname.startsWith(href);
   };
 
+  console.log("Navbar: Rendering - mounted:", mounted, "pathname:", pathname);
+
+  // Don't render nav items until mounted (prevents hydration mismatch)
+  if (!mounted) {
+    return (
+      <nav 
+        style={{backgroundColor: "rgb(173, 40, 49)"}} 
+        className="navbar navbar-expand-lg navbar-dark"
+      >
+        <div className="container-fluid">
+          <Link className="navbar-brand" href="/member">
+            ΔΓ Chapter Tools
+          </Link>
+          <div className="collapse navbar-collapse">
+            <ul className="navbar-nav me-auto">
+              <li className="nav-item">
+                <span className="nav-link text-light">Initializing...</span>
+              </li>
+            </ul>
+            <ul className="navbar-nav ms-auto">
+              <li className="nav-item d-flex align-items-center">
+                <UserButton />
+              </li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
   return (
-    <nav style={{backgroundColor: "rgb(173, 40, 49)"}} className="navbar navbar-expand-lg navbar-dark">
+    <nav 
+      style={{backgroundColor: "rgb(173, 40, 49)"}} 
+      className="navbar navbar-expand-lg navbar-dark"
+    >
       <div className="container-fluid">
         <Link className="navbar-brand" href="/member">
           ΔΓ Chapter Tools
@@ -76,18 +139,20 @@ export default function MemberNavbar() {
               </Link>
             </li>
 
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${
-                  isActive("/member/profile") ? "active" : ""
-                }`}
-                href={rollNo ? `/member/profile/${rollNo}` : "#"}
-              >
-                <FontAwesomeIcon icon={faUser} className="me-1" /> My Profile
-              </Link>
-            </li>
+            {userData && (
+              <li className="nav-item">
+                <Link
+                  className={`nav-link ${
+                    isActive("/member/profile") ? "active" : ""
+                  }`}
+                  href={userData.rollNo ? `/member/profile/${userData.rollNo}` : "/member/profile"}
+                >
+                  <FontAwesomeIcon icon={faUser} className="me-1" /> My Profile
+                </Link>
+              </li>
+            )}
 
-            {(role === "admin" || role === "superadmin") && (
+            {userData && (userData.role === "admin" || userData.role === "superadmin") && (
               <li className="nav-item">
                 <Link
                   className={`nav-link ${
@@ -107,8 +172,7 @@ export default function MemberNavbar() {
                 }`}
                 href="/member/brothers"
               >
-                <FontAwesomeIcon icon={faAddressCard} className="me-1" />{" "}
-                Brothers
+                <FontAwesomeIcon icon={faAddressCard} className="me-1" /> Brothers
               </Link>
             </li>
 

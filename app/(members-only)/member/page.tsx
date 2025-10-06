@@ -4,12 +4,20 @@ import React, { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { RedirectToSignIn } from "@clerk/nextjs";
 import axios from "axios";
+import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheck,
   faTimes,
   faTriangleExclamation,
   faHourglass,
+  faUser,
+  faAddressCard,
+  faNoteSticky,
+  faCheckToSlot,
+  faCalendar,
+  faGear,
+  faUsersCog,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function Dashboard() {
@@ -21,28 +29,30 @@ export default function Dashboard() {
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
-  async function fetchUserData() {
-    try {
-      const response = await axios.get("/api/members/me");
-      const data = response.data;
+    async function fetchUserData() {
+      try {
+        const response = await axios.get("/api/members/me");
+        const data = response.data;
 
-      console.log("API /api/members/me response:", data);
+        console.log("API /api/members/me response:", data);
 
-      setUserData({
-        userHasProfile: true,
-        needsProfileReview: data.needsProfileReview,
-        needsPermissionReview: data.needsPermissionReview,
-        type: data.status, // Use the real status from API
-        isECouncil: data.isECouncil,
-        isAdmin: data.role === "admin" || data.role === "superadmin",
-      });
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      setUserData(null);
-    } finally {
-      setLoadingUserData(false);
+        setUserData({
+          userHasProfile: true,
+          needsProfileReview: data.needsProfileReview,
+          needsPermissionReview: data.needsPermissionReview,
+          type: data.status, // Use the real status from API
+          isECouncil: data.isECouncil,
+          isAdmin: data.role === "admin" || data.role === "superadmin",
+          rollNo: data.rollNo,
+        });
+
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        setUserData(null);
+      } finally {
+        setLoadingUserData(false);
+      }
     }
-  }
 
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
@@ -81,7 +91,7 @@ export default function Dashboard() {
     // All accesses are false for unapproved users
     const privileges = [
       { label: "Edit Profile", access: false },
-      { label: "Brother Directory", access: false },
+      { label: "Directory", access: true },
       { label: "Minutes", access: false },
       { label: "Vote", access: false },
       { label: "Admin Voting", access: false },
@@ -117,15 +127,15 @@ export default function Dashboard() {
                         icon={faHourglass}
                         className="me-2"
                       />
-                      You do not have access to this tool yet. Please contact an
-                      admin if you believe this is an error.
+                      Your profile is not yet approved. Please contact an
+                      officer if you believe this is an error.
                     </div>
                   </div>
               </div>
             </div>
 
             <div className="col-md-4">
-              <h4>My Accesses</h4>
+              <h4>My Permissions</h4>
               <table className="table">
                 <thead className="thead-dark">
                   <tr>
@@ -161,6 +171,7 @@ export default function Dashboard() {
     isAdmin,
     needsPermissionReview,
     needsProfileReview,
+    rollNo,
   } = userData;
 
   const userTypeColor =
@@ -175,12 +186,58 @@ export default function Dashboard() {
 
   const privileges = [
     { label: "Edit Profile", access: userHasProfile },
-    { label: "Brother Directory", access: userHasProfile },
+    { label: "Directory", access: true },
     { label: "Minutes", access: userHasProfile },
     { label: "Vote", access: userHasProfile && type === "Active" },
-    { label: "Admin Voting", access: isAdmin },
+    { label: "Admin Voting", access: isECouncil },
     { label: "Events", access: userHasProfile },
     { label: "Admin Users", access: isAdmin },
+  ];
+
+  // Quick access buttons
+  const quickAccessButtons = [
+    {
+      label: "My Profile",
+      href: rollNo ? `/member/profile/${rollNo}` : "#",
+      icon: faUser,
+      enabled: userHasProfile,
+      variant: "primary",
+    },
+    {
+      label: "Brothers",
+      href: "/member/brothers",
+      icon: faAddressCard,
+      enabled: userHasProfile,
+      variant: "success",
+    },
+    // {
+    //   label: "Minutes",
+    //   href: "/member/minutes",
+    //   icon: faNoteSticky,
+    //   enabled: userHasProfile,
+    //   variant: "info",
+    // },
+    {
+      label: "Vote",
+      href: "/member/vote",
+      icon: faCheckToSlot,
+      enabled: userHasProfile && type === "Active",
+      variant: "warning",
+    },
+    // {
+    //   label: "Events",
+    //   href: "/member/events",
+    //   icon: faCalendar,
+    //   enabled: userHasProfile,
+    //   variant: "secondary",
+    // },
+    {
+      label: "Admin",
+      href: "/member/admin",
+      icon: faGear,
+      enabled: isAdmin,
+      variant: "danger",
+    },
   ];
 
   return (
@@ -255,13 +312,34 @@ export default function Dashboard() {
                         : "normal privileges"
                     } on the chapter tool.`}
                   </div>
+
+                  {/* Instant Access Buttons */}
+                  <div className="mt-4">
+                    <h4>Quick Access</h4>
+                    <div className="row g-3">
+                      {quickAccessButtons
+                        .filter(button => button.enabled)
+                        .map((button, index) => (
+                          <div className="col-sm-6 col-md-4" key={index}>
+                            <Link
+                              href={button.href}
+                              className={`btn btn-${button.variant} w-100 d-flex align-items-center justify-content-center`}
+                              style={{ minHeight: "50px" }}
+                            >
+                              <FontAwesomeIcon icon={button.icon} className="me-2" />
+                              {button.label}
+                            </Link>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>
           </div>
 
           <div className="col-md-4">
-            <h4>My Accesses</h4>
+            <h4>Permissions</h4>
             <table className="table">
               <thead className="thead-dark">
                 <tr>
