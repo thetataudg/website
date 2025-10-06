@@ -142,7 +142,7 @@ export default function VotePage() {
   useEffect(() => {
     if (!isSignedIn) return;
     fetchVoteInfo();
-    pollingRef.current = setInterval(fetchVoteInfo, 3000);
+    pollingRef.current = setInterval(fetchVoteInfo, 8000);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
