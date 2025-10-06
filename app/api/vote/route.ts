@@ -27,7 +27,8 @@ export async function POST(req: Request) {
     }
     if (vote.type === "Election") {
       const { choice } = body;
-      if (!vote.options.includes(choice)) {
+      // Allow "Abstain" as a valid choice in addition to the defined options
+      if (!vote.options.includes(choice) && choice !== "Abstain") {
         return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
       }
       if (vote.votes.some((v: any) => v.clerkId === clerkId)) {
@@ -92,6 +93,7 @@ export async function GET(req: Request) {
       const hasVoted = vote.votes.some((v: any) => v.clerkId === clerkId);
       return NextResponse.json({
         type: vote.type,
+        title: vote.title,
         options: vote.options,
         started: vote.started,
         ended: vote.ended,
