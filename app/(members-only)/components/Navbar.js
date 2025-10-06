@@ -14,6 +14,7 @@ import {
   faCalendar,
   faGear,
   faShop,
+  faVoteYea,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function MemberNavbar() {
@@ -83,8 +84,8 @@ export default function MemberNavbar() {
   if (!mounted) {
     return (
       <nav 
-        style={{backgroundColor: "rgb(173, 40, 49)"}} 
-        className="navbar navbar-expand-lg navbar-dark"
+        // style={{backgroundColor: "rgb(173, 40, 49)"}} 
+        className="navbar navbar-expand-lg navbar-dark bg-dark"
       >
         <div className="container-fluid">
           <Link className="navbar-brand" href="/member">
@@ -109,8 +110,8 @@ export default function MemberNavbar() {
 
   return (
     <nav 
-      style={{backgroundColor: "rgb(173, 40, 49)"}} 
-      className="navbar navbar-expand-lg navbar-dark"
+      // style={{backgroundColor: "rgb(173, 40, 49)"}} 
+      className="navbar navbar-expand-lg navbar-dark bg-dark"
     >
       <div className="container-fluid">
         <Link className="navbar-brand" href="/member">
@@ -176,6 +177,17 @@ export default function MemberNavbar() {
               </Link>
             </li>
 
+            <li className="nav-item">
+              <Link
+                className={`nav-link ${
+                  isActive("/member/vote") ? "active" : ""
+                }`}
+                href="/member/vote"
+              >
+                <FontAwesomeIcon icon={faVoteYea} className="me-1" /> Vote
+              </Link>
+            </li>
+
             <li className="nav-item dropdown">
               <a
                 className="nav-link dropdown-toggle"
@@ -199,16 +211,6 @@ export default function MemberNavbar() {
                     href="/member/minutes"
                   >
                     Minutes
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    className={`dropdown-item ${
-                      isActive("/member/vote") ? "active" : ""
-                    }`}
-                    href="/member/vote"
-                  >
-                    Voting
                   </Link>
                 </li>
                 <li>

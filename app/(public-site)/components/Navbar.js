@@ -85,7 +85,7 @@ const Navbar = () => {
             className="nav-links px-4 cursor-pointer capitalize font-medium text-white hover:scale-105 hover:text-slate-400 hover:underline duration-100 link-underline"
             onClick={handleMemberNavigation}
           >
-            Profile
+            Member
           </li>
         </SignedIn>
       </ul>

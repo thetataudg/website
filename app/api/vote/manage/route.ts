@@ -20,7 +20,7 @@ async function requireECouncil(req: Request) {
 export async function POST(req: Request) {
   try {
     await requireECouncil(req);
-    const { type, options, pledges } = await req.json();
+    const { type, options, pledges, title } = await req.json();
     if (type === "Election") {
       if (!Array.isArray(options) || options.length < 1) {
         return NextResponse.json({ error: "Invalid vote type or options" }, { status: 400 });
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     }
     const vote = await Vote.create({
       type,
+      title: type === "Election" ? title : undefined,
       options: type === "Election" ? options : [],
       pledges: type === "Pledge" ? pledges : [],
       round: type === "Pledge" ? "board" : undefined,
@@ -112,21 +113,23 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "No vote found" }, { status: 404 });
     }
     if (vote.type === "Election") {
-      // Tally results
+      // Tally results - exclude abstentions from option tallies
       const tally: Record<string, number> = {};
       for (const opt of vote.options) tally[opt] = 0;
       for (const v of vote.votes) {
         if (typeof v.choice === "string" && tally.hasOwnProperty(v.choice)) {
           tally[v.choice]++;
         }
+        // Note: Abstain votes are ignored in tallying but still count toward totalVotes
       }
       return NextResponse.json({
         type: vote.type,
+        title: vote.title,
         options: vote.options,
         started: vote.started,
         ended: vote.ended,
         results: tally,
-        totalVotes: vote.votes.length,
+        totalVotes: vote.votes.length, // This includes abstentions
       });
     } else if (vote.type === "Pledge") {
       // Board round results
