@@ -349,9 +349,6 @@ export default function VotePage() {
       setShowCountdown(false);
       setCountdownSeconds(30);
       fetchVoteInfo();
-      if (!immediate) {
-        handleShowResults(); // Show results after countdown starts
-      }
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to end vote.");
     } finally {
