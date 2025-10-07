@@ -25,6 +25,25 @@ export async function POST(req: Request) {
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "No active vote" }, { status: 404 });
     }
+    
+    // Check if vote should be auto-ended
+    if (vote.endTime && new Date() >= vote.endTime) {
+      if (vote.type === "Pledge" && vote.round === "board") {
+        // Auto-transition to next round
+        vote.round = "blackball";
+        vote.started = false;
+        vote.endTime = null;
+        await vote.save();
+        return NextResponse.json({ error: "Vote round has ended and moved to blackball round" }, { status: 400 });
+      } else {
+        // Auto-end vote
+        vote.ended = true;
+        vote.endTime = null;
+        await vote.save();
+        return NextResponse.json({ error: "Vote has ended" }, { status: 400 });
+      }
+    }
+    
     if (vote.type === "Election") {
       const { choice } = body;
       // Allow "Abstain" as a valid choice in addition to the defined options
@@ -98,6 +117,23 @@ export async function GET(req: Request) {
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "No vote found" }, { status: 404 });
     }
+    
+    // Check if vote should be auto-ended
+    if (vote.endTime && new Date() >= vote.endTime && !vote.ended) {
+      if (vote.type === "Pledge" && vote.round === "board") {
+        // Auto-transition to next round
+        vote.round = "blackball";
+        vote.started = false;
+        vote.endTime = null;
+        await vote.save();
+      } else {
+        // Auto-end vote
+        vote.ended = true;
+        vote.endTime = null;
+        await vote.save();
+      }
+    }
+    
     if (vote.type === "Election") {
       const hasVoted = vote.votes.some((v: any) => v.clerkId === clerkId);
       return NextResponse.json({
@@ -106,6 +142,7 @@ export async function GET(req: Request) {
         options: vote.options,
         started: vote.started,
         ended: vote.ended,
+        endTime: vote.endTime?.toISOString() || null,
         hasVoted,
         totalVotes: vote.votes.length,
       });
@@ -126,6 +163,7 @@ export async function GET(req: Request) {
         started: vote.started,
         ended: vote.ended,
         round: vote.round,
+        endTime: vote.endTime?.toISOString() || null,
         votedPledges,
         abstainedPledges,
         totalVotes: vote.votes.filter((v: any) => v.round === vote.round).length,

@@ -16,6 +16,7 @@ import {
   faExclamationTriangle,
   faPause,
   faPlus,
+  faClock,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
@@ -32,6 +33,7 @@ type VoteInfo = {
   votedPledges?: Record<string, boolean>;
   abstainedPledges?: Record<string, boolean>;
   totalVotes?: number;
+  endTime?: string | null;
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
 };
@@ -78,8 +80,16 @@ export default function VotePage() {
   const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
 
+  // Countdown state
+  const [showCountdown, setShowCountdown] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(30);
+  const [countdownAction, setCountdownAction] = useState<"end" | "nextRound">("end");
+  const [currentCountdown, setCurrentCountdown] = useState<number | null>(null);
+  const [countdownTarget, setCountdownTarget] = useState<string | null>(null);
+
   // Polling
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -98,6 +108,49 @@ export default function VotePage() {
     }
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (voteInfo?.endTime && !voteInfo.ended) {
+      const endTime = new Date(voteInfo.endTime).getTime();
+      
+      const updateCountdown = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+        setCurrentCountdown(remaining);
+        
+        if (remaining === 0) {
+          setCurrentCountdown(null);
+          setCountdownTarget(null);
+          fetchVoteInfo(); // Refresh to get updated state
+        }
+      };
+      
+      updateCountdown(); // Initial update
+      countdownRef.current = setInterval(updateCountdown, 1000);
+      
+      // Set the countdown target message
+      if (voteInfo.type === "Pledge" && voteInfo.round === "board") {
+        setCountdownTarget("Moving to blackball round");
+      } else {
+        setCountdownTarget("Vote ending");
+      }
+    } else {
+      setCurrentCountdown(null);
+      setCountdownTarget(null);
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [voteInfo?.endTime, voteInfo?.ended]);
 
   // Fetch vote info
   const fetchVoteInfo = async () => {
@@ -267,11 +320,38 @@ export default function VotePage() {
     }
   };
 
-  const handleEndVote = async () => {
+  // Show countdown box for end vote
+  const handleShowEndCountdown = () => {
+    setCountdownAction("end");
+    setShowCountdown(true);
+  };
+
+  // Show countdown box for next round
+  const handleShowNextRoundCountdown = () => {
+    setCountdownAction("nextRound");
+    setShowCountdown(true);
+  };
+
+  // Close countdown box
+  const handleCloseCountdown = () => {
+    setShowCountdown(false);
+    setCountdownSeconds(30);
+  };
+
+  // Execute end vote with countdown
+  const handleExecuteEnd = async (immediate = false) => {
     setSubmitting(true);
     try {
-      await axios.patch("/api/vote/manage", { action: "end" });
+      await axios.patch("/api/vote/manage", { 
+        action: "end",
+        countdown: immediate ? 0 : countdownSeconds
+      });
+      setShowCountdown(false);
+      setCountdownSeconds(30);
       fetchVoteInfo();
+      if (!immediate) {
+        handleShowResults(); // Show results after countdown starts
+      }
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to end vote.");
     } finally {
@@ -279,10 +359,16 @@ export default function VotePage() {
     }
   };
 
-  const handleNextRound = async () => {
+  // Execute next round with countdown
+  const handleExecuteNextRound = async (immediate = false) => {
     setSubmitting(true);
     try {
-      await axios.patch("/api/vote/manage", { action: "nextRound" });
+      await axios.patch("/api/vote/manage", { 
+        action: "nextRound", 
+        countdown: immediate ? 0 : countdownSeconds
+      });
+      setShowCountdown(false);
+      setCountdownSeconds(30);
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to move to next round.");
@@ -459,6 +545,16 @@ export default function VotePage() {
           </button>
         </div>
 
+        {/* Countdown Alert */}
+        {currentCountdown !== null && countdownTarget && (
+          <div className="alert alert-danger d-flex align-items-center mt-3" role="alert">
+            <FontAwesomeIcon icon={faClock} className="me-2" />
+            <div className="flex-grow-1">
+              <b>{countdownTarget} in {currentCountdown} second{currentCountdown !== 1 ? 's' : ''}...</b>
+            </div>
+          </div>
+        )}
+
         {/* Vote status and options */}
         <div className="mt-3">
           {voteLoading ? (
@@ -508,7 +604,7 @@ export default function VotePage() {
                       </Button>
                     )}
                     {voteInfo.started && !voteInfo.ended && (
-                      <Button size="sm" variant="danger" onClick={handleEndVote} disabled={submitting}>
+                      <Button size="sm" variant="danger" onClick={handleShowEndCountdown} disabled={submitting}>
                         <FontAwesomeIcon icon={faStop} className="me-1" /> End
                       </Button>
                     )}
@@ -568,14 +664,14 @@ export default function VotePage() {
                         <Button 
                           size="sm" 
                           variant={voteInfo.round === "board" ? "secondary" : "danger"}
-                          onClick={handleEndVote} 
+                          onClick={handleShowEndCountdown} 
                           disabled={submitting || voteInfo.round === "board"}
                           title={voteInfo.round === "board" ? "Cannot end during board round - use Next Round instead" : "End vote"}
                         >
                           <FontAwesomeIcon icon={faStop} className="me-1" /> End
                         </Button>
                         {voteInfo.round === "board" && (
-                          <Button size="sm" variant="warning" onClick={handleNextRound} disabled={submitting}>
+                          <Button size="sm" variant="warning" onClick={handleShowNextRoundCountdown} disabled={submitting}>
                             <FontAwesomeIcon icon={faArrowRight} className="me-1" /> Next Round
                           </Button>
                         )}
@@ -617,6 +713,57 @@ export default function VotePage() {
             <Button size="sm" variant="info" onClick={() => handleShowResults(true)} disabled={resultsLoading}>
               <FontAwesomeIcon icon={faChartBar} className="me-1" /> View Board Results
             </Button>
+          </div>
+        )}
+
+        {/* Countdown Control Container */}
+        {showCountdown && (
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#fff3cd" }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                <FontAwesomeIcon icon={faClock} className="me-2" />
+                {countdownAction === "end" ? "End Vote" : "Move to Blackball Round"}
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseCountdown}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Cancel
+              </Button>
+            </div>
+            
+            <div className="mb-3">
+              <label htmlFor="countdownInput" className="form-label">
+                Countdown time (seconds):
+              </label>
+              <input
+                type="number"
+                className="form-control"
+                id="countdownInput"
+                value={countdownSeconds}
+                onChange={(e) => setCountdownSeconds(Math.max(0, parseInt(e.target.value) || 0))}
+                min="0"
+                max="300"
+              />
+              <small className="form-text text-muted">
+                Set to 0 for immediate action. Maximum 300 seconds (5 minutes).
+              </small>
+            </div>
+            
+            <div className="d-flex gap-2">
+              <Button
+                variant="danger"
+                onClick={() => countdownAction === "end" ? handleExecuteEnd(true) : handleExecuteNextRound(true)}
+                disabled={submitting}
+              >
+                {countdownAction === "end" ? "End Immediately" : "Move to Blackball Immediately"}
+              </Button>
+              <Button
+                variant="warning"
+                onClick={() => countdownAction === "end" ? handleExecuteEnd(false) : handleExecuteNextRound(false)}
+                disabled={submitting || countdownSeconds === 0}
+              >
+                {countdownAction === "end" ? `End in ${countdownSeconds}s` : `Move to Blackball in ${countdownSeconds}s`}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -854,7 +1001,7 @@ export default function VotePage() {
 
         {/* Results Container */}
         {showResults && (
-          <div className="mt-4 border rounded p-4">
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#f8f9fa" }}>
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 {voteResults?.showBoardOnly ? "Board Round Results" : 
