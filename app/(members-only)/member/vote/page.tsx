@@ -30,6 +30,7 @@ type VoteInfo = {
   round?: "board" | "blackball";
   hasVoted?: boolean;
   votedPledges?: Record<string, boolean>;
+  abstainedPledges?: Record<string, boolean>;
   totalVotes?: number;
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
@@ -239,13 +240,12 @@ export default function VotePage() {
     if (!voteInfo?.pledges) return;
     setSubmitting(true);
     try {
-      await axios.post("/api/vote", {
-        ballot: voteInfo.pledges.map((pledge) => ({
-          pledge,
-          // If no selection made, default to "Continue" (abstention)
-          choice: pledgeSelections[pledge] || "Continue",
-        })),
-      });
+      const ballot = voteInfo.pledges.map((pledge) => ({
+        pledge,
+        choice: pledgeSelections[pledge] || null, // null for abstain
+      }));
+
+      await axios.post("/api/vote", { ballot });
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to submit ballot.");
@@ -272,7 +272,6 @@ export default function VotePage() {
     try {
       await axios.patch("/api/vote/manage", { action: "end" });
       fetchVoteInfo();
-      handleShowResults(); // Show results after ending
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to end vote.");
     } finally {
@@ -353,6 +352,33 @@ export default function VotePage() {
     setVoteResults(null);
   };
 
+  // Helper for pledge badge
+  function getPledgeBadge(
+    pledge: string,
+    boardResults?: any,
+    blackballResults?: any
+  ) {
+    // Blackball round: check blackball first, then board
+    if (blackballResults && blackballResults[pledge]) {
+      if (blackballResults[pledge].blackball > 0) {
+        return { variant: "danger", icon: faTimes, text: "Blackball" };
+      }
+      if (blackballResults[pledge].continue > 0) {
+        return { variant: "success", icon: faCheck, text: "Continue" };
+      }
+    }
+    // Board round: check board
+    if (boardResults && boardResults[pledge]) {
+      if (boardResults[pledge].board > 0) {
+        return { variant: "warning", icon: faExclamationTriangle, text: "Board" };
+      }
+      if (boardResults[pledge].continue > 0) {
+        return { variant: "success", icon: faCheck, text: "Continue" };
+      }
+    }
+    return null;
+  }
+
   if (!isLoaded || loadingUserData) {
     return (
       <div className="container">
@@ -389,37 +415,6 @@ export default function VotePage() {
         </div>
       </div>
     );
-  }
-
-  // Helper for pledge status
-  function getPledgeStatus(
-    pledge: string,
-    boardResults?: any,
-    blackballResults?: any
-  ) {
-    // Blackball round: check blackball
-    if (blackballResults && blackballResults[pledge]) {
-      if (blackballResults[pledge].blackball > 0) {
-        return { color: "bg-danger text-white", icon: faTimes, show: true };
-      }
-      if (blackballResults[pledge].continue > 0) {
-        return { color: "bg-success text-white", icon: faCheck, show: true };
-      }
-      // If no continue and no blackball, treat as failed (X)
-      return { color: "bg-danger text-white", icon: faTimes, show: true };
-    }
-    // Board round: check board
-    if (boardResults && boardResults[pledge]) {
-      if (boardResults[pledge].board > 0) {
-        return { color: "bg-warning text-dark", icon: faExclamationTriangle, show: true };
-      }
-      if (boardResults[pledge].continue > 0) {
-        return { color: "bg-success text-white", icon: faCheck, show: true };
-      }
-      // If no continue and no board, treat as warning
-      return { color: "bg-warning text-dark", icon: faExclamationTriangle, show: true };
-    }
-    return { color: "", icon: null, show: false };
   }
 
   // Main voting UI
@@ -476,6 +471,11 @@ export default function VotePage() {
               <div className="d-flex align-items-center">
                 <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
                 <div>
+                  {voteInfo.title && (
+                    <div className="mb-2">
+                      <strong>{voteInfo.title}</strong>
+                    </div>
+                  )}
                   <b>
                     Election vote is{" "}
                     {voteInfo.started
@@ -513,7 +513,7 @@ export default function VotePage() {
                       </Button>
                     )}
                     {voteInfo.ended && (
-                      <Button size="sm" variant="secondary" onClick={() => handleShowResults()} disabled={resultsLoading}>
+                      <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
                         <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
                       </Button>
                     )}
@@ -588,7 +588,7 @@ export default function VotePage() {
                       </>
                     )}
                     {voteInfo.ended && (
-                      <Button size="sm" variant="secondary" onClick={() => handleShowResults()} disabled={resultsLoading}>
+                      <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
                         <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
                       </Button>
                     )}
@@ -693,11 +693,6 @@ export default function VotePage() {
                 ? "Board Round: Vote for Each Pledge"
                 : "Blackball Round: Vote for Each Pledge"}
             </h4>
-            <div className="alert alert-info mb-3">
-              <small>
-                <strong>Note:</strong> You may leave pledges blank to abstain from voting on them. 
-              </small>
-            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -707,6 +702,7 @@ export default function VotePage() {
               <div className="list-group mb-3">
                 {voteInfo.pledges.map((pledge, index) => {
                   const votedForThis = voteInfo.votedPledges?.[pledge];
+                  const abstainedForThis = voteInfo.abstainedPledges?.[pledge];
                   const options =
                     voteInfo.round === "board"
                       ? ["Continue", "Board"]
@@ -720,9 +716,15 @@ export default function VotePage() {
                         <b>{pledge}</b>
                       </div>
                       {votedForThis ? (
-                        <span className="badge bg-success ms-2">
-                          Voted
-                        </span>
+                        abstainedForThis ? (
+                          <span className="badge text-dark bg-warning ms-2">
+                            Abstained
+                          </span>
+                        ) : (
+                          <span className="badge bg-success ms-2">
+                            Voted
+                          </span>
+                        )
                       ) : (
                         <>
                           {options.map((opt) => (
@@ -786,11 +788,11 @@ export default function VotePage() {
                 <ul className="list-group">
                   {voteInfo.pledges.map((pledge, index) => {
                     const res = voteInfo.boardResults?.[pledge] || { continue: 0, board: 0 };
-                    const status = getPledgeStatus(pledge, voteInfo.boardResults, undefined);
+                    const badge = getPledgeBadge(pledge, voteInfo.boardResults, undefined);
                     return (
                       <li
                         key={pledge}
-                        className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                        className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                       >
                         <b className="flex-grow-1">{pledge}</b>
                         <span className="me-3">
@@ -801,10 +803,10 @@ export default function VotePage() {
                           <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
                           {res.board}
                         </span>
-                        {/* Only show icon if not a check for passed */}
-                        {status.show && status.icon && (
-                          <span className="ms-2">
-                            <FontAwesomeIcon icon={status.icon} />
+                        {badge && (
+                          <span className={`badge bg-${badge.variant} ms-2`}>
+                            <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                            {badge.text}
                           </span>
                         )}
                       </li>
@@ -820,11 +822,11 @@ export default function VotePage() {
                 <ul className="list-group">
                   {voteInfo.pledges.map((pledge, index) => {
                     const res = voteInfo.blackballResults?.[pledge] || { continue: 0, blackball: 0 };
-                    const status = getPledgeStatus(pledge, undefined, voteInfo.blackballResults);
+                    const badge = getPledgeBadge(pledge, voteInfo.boardResults, voteInfo.blackballResults);
                     return (
                       <li
                         key={pledge}
-                        className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                        className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                       >
                         <b className="flex-grow-1">{pledge}</b>
                         <span className="me-3">
@@ -835,10 +837,10 @@ export default function VotePage() {
                           <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
                           {res.blackball}
                         </span>
-                        {/* Only show icon if not a check for passed */}
-                        {status.show && status.icon && (
-                          <span className="ms-2">
-                            <FontAwesomeIcon icon={status.icon} />
+                        {badge && (
+                          <span className={`badge bg-${badge.variant} ms-2`}>
+                            <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                            {badge.text}
                           </span>
                         )}
                       </li>
@@ -850,16 +852,21 @@ export default function VotePage() {
           </div>
         )}
 
-        {/* Results Modal */}
-        <Modal show={showResults} onHide={handleCloseResults} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>
-              {voteResults?.showBoardOnly ? "Board Round Results" : 
-               voteResults?.type === "Election" && voteResults?.title ? 
-               `${voteResults.title} - Results` : "Vote Results"}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+        {/* Results Container */}
+        {showResults && (
+          <div className="mt-4 border rounded p-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                {voteResults?.showBoardOnly ? "Board Round Results" : 
+                 voteResults?.type === "Election" && voteResults?.title ? 
+                 `${voteResults.title} - Results` : "Vote Results"}
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseResults}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Close
+              </Button>
+            </div>
+            
             {resultsLoading ? (
               <div className="text-center">
                 <FontAwesomeIcon icon={faHourglass} className="me-2" />
@@ -892,11 +899,11 @@ export default function VotePage() {
                     <ul className="list-group mb-3">
                       {voteResults.pledges?.map((pledge, index) => {
                         const res = voteResults.boardResults?.[pledge] || { continue: 0, board: 0 };
-                        const status = getPledgeStatus(pledge, voteResults.boardResults, undefined);
+                        const badge = getPledgeBadge(pledge, voteResults.boardResults, undefined);
                         return (
                           <li
                             key={pledge}
-                            className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                            className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                           >
                             <b className="flex-grow-1">{pledge}</b>
                             <span className="me-3">
@@ -907,9 +914,10 @@ export default function VotePage() {
                               <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
                               {res.board}
                             </span>
-                            {status.show && status.icon && (
-                              <span className="ms-2">
-                                <FontAwesomeIcon icon={status.icon} />
+                            {badge && (
+                              <span className={`badge bg-${badge.variant} ms-2`}>
+                                <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                                {badge.text}
                               </span>
                             )}
                           </li>
@@ -923,11 +931,11 @@ export default function VotePage() {
                         <ul className="list-group mb-3">
                           {voteResults.pledges?.map((pledge, index) => {
                             const res = voteResults.blackballResults?.[pledge] || { continue: 0, blackball: 0 };
-                            const status = getPledgeStatus(pledge, undefined, voteResults.blackballResults);
+                            const badge = getPledgeBadge(pledge, voteResults.boardResults, voteResults.blackballResults);
                             return (
                               <li
                                 key={pledge}
-                                className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                                className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                               >
                                 <b className="flex-grow-1">{pledge}</b>
                                 <span className="me-3">
@@ -938,9 +946,10 @@ export default function VotePage() {
                                   <FontAwesomeIcon icon={faTimes} className="me-1" />
                                   {res.blackball}
                                 </span>
-                                {status.show && status.icon && (
-                                  <span className="ms-2">
-                                    <FontAwesomeIcon icon={status.icon} />
+                                {badge && (
+                                  <span className={`badge bg-${badge.variant} ms-2`}>
+                                    <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                                    {badge.text}
                                   </span>
                                 )}
                               </li>
@@ -958,8 +967,8 @@ export default function VotePage() {
             ) : (
               <div className="text-danger">No results available.</div>
             )}
-          </Modal.Body>
-        </Modal>
+          </div>
+        )}
 
         {/* Voting Modal (Create) */}
         <Modal show={showModal} onHide={handleCloseModal} centered>

@@ -45,14 +45,23 @@ export async function POST(req: Request) {
           if (!vote.pledges.includes(pledge)) {
             return NextResponse.json({ error: `Invalid pledge: ${pledge}` }, { status: 400 });
           }
-          const validChoices = vote.round === "board" ? ["Continue", "Board"] : ["Continue", "Blackball"];
-          if (!validChoices.includes(choice)) {
-            return NextResponse.json({ error: `Invalid choice for ${pledge}` }, { status: 400 });
-          }
+          
+          // Check if already voted for this pledge in this round
           if (vote.votes.some((v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === vote.round)) {
             return NextResponse.json({ error: `Already voted for ${pledge} this round` }, { status: 400 });
           }
-          vote.votes.push({ clerkId, pledge, choice, round: vote.round });
+          
+          // Handle abstain votes (null choice) vs actual choices
+          if (choice === null) {
+            // Record abstain vote
+            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: vote.round });
+          } else {
+            const validChoices = vote.round === "board" ? ["Continue", "Board"] : ["Continue", "Blackball"];
+            if (!validChoices.includes(choice)) {
+              return NextResponse.json({ error: `Invalid choice for ${pledge}` }, { status: 400 });
+            }
+            vote.votes.push({ clerkId, pledge, choice, round: vote.round });
+          }
         }
         await vote.save();
         return NextResponse.json({ success: true });
@@ -101,12 +110,15 @@ export async function GET(req: Request) {
         totalVotes: vote.votes.length,
       });
     } else if (vote.type === "Pledge") {
-      // For each pledge, check if user has voted in this round
+      // For each pledge, check if user has voted in this round and what they voted
       const votedPledges: Record<string, boolean> = {};
+      const abstainedPledges: Record<string, boolean> = {};
       for (const pledge of vote.pledges) {
-        votedPledges[pledge] = vote.votes.some(
+        const userVote = vote.votes.find(
           (v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === vote.round
         );
+        votedPledges[pledge] = !!userVote;
+        abstainedPledges[pledge] = userVote?.choice === "Abstain";
       }
       return NextResponse.json({
         type: vote.type,
@@ -115,6 +127,7 @@ export async function GET(req: Request) {
         ended: vote.ended,
         round: vote.round,
         votedPledges,
+        abstainedPledges,
         totalVotes: vote.votes.filter((v: any) => v.round === vote.round).length,
       });
     }
