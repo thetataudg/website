@@ -17,8 +17,8 @@ import {
   faPause,
   faPlus,
   faClock,
+  faUser,
 } from "@fortawesome/free-solid-svg-icons";
-import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
 
 type VoteInfo = {
@@ -59,8 +59,8 @@ export default function VotePage() {
   const [userData, setUserData] = useState<any>(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
-  // Modal state
-  const [showModal, setShowModal] = useState(false);
+  // Start vote state (replaced modal)
+  const [showStartVote, setShowStartVote] = useState(false);
   const [voteType, setVoteType] = useState<null | "Election" | "Pledge Vote">(null);
   const [names, setNames] = useState<string[]>([""]);
   const [pledgeNames, setPledgeNames] = useState<string[]>([""]);
@@ -209,10 +209,10 @@ export default function VotePage() {
     // eslint-disable-next-line
   }, [isSignedIn]);
 
-  // Modal handlers
-  const handleOpenModal = () => setShowModal(true);
-  const handleCloseModal = () => {
-    setShowModal(false);
+  // Start vote handlers (replaced modal handlers)
+  const handleOpenStartVote = () => setShowStartVote(true);
+  const handleCloseStartVote = () => {
+    setShowStartVote(false);
     setVoteType(null);
     setNames([""]);
     setPledgeNames([""]);
@@ -264,7 +264,7 @@ export default function VotePage() {
           pledges: pledgeNames.filter((n) => n.trim()),
         });
       }
-      handleCloseModal();
+      handleCloseStartVote();
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to create vote.");
@@ -533,7 +533,7 @@ export default function VotePage() {
             }
             onClick={
               userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
-                ? handleOpenModal
+                ? handleOpenStartVote
                 : undefined
             }
           >
@@ -693,9 +693,8 @@ export default function VotePage() {
               </div>
             </div>
           ) : (
-            <div className="alert alert-primary d-flex align-items-center" role="alert">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
-              There are currently no votes running.
+            <div className="alert alert-dark d-flex align-items-center" role="alert">
+              No votes are running.
             </div>
           )}
         </div>
@@ -713,9 +712,164 @@ export default function VotePage() {
           </div>
         )}
 
+        {/* Start Vote Container (replaced modal) */}
+        {showStartVote && (
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                <FontAwesomeIcon icon={faPlay} className="me-2" />
+                Start New Vote
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseStartVote}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Cancel
+              </Button>
+            </div>
+
+            {!voteType && (
+              <div className="d-flex gap-3">
+                <Button
+                  variant="primary"
+                  className="flex-fill"
+                  onClick={() => handleVoteTypeSelect("Election")}
+                >
+                  <FontAwesomeIcon icon={faCheck} className="me-2" />
+                  Election
+                </Button>
+                <Button
+                  variant="warning"
+                  className="flex-fill"
+                  onClick={() => handleVoteTypeSelect("Pledge Vote")}
+                >
+                  <FontAwesomeIcon icon={faUser} className="me-2" />
+                  Pledge Vote
+                </Button>
+              </div>
+            )}
+
+            {voteType === "Election" && (
+              <form onSubmit={handleSubmit}>
+                <h5 className="mb-3">Enter Election Details</h5>
+                <div className="mb-3">
+                  <label htmlFor="electionTitle" className="form-label">Title (optional)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="electionTitle"
+                    value={electionTitle}
+                    onChange={(e) => setElectionTitle(e.target.value)}
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Options</label>
+                  {names.map((name, idx) => (
+                    <div className="input-group mb-2" key={idx}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={`Option ${idx + 1}`}
+                        value={name}
+                        onChange={(e) => handleNameChange(idx, e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger"
+                        onClick={() => handleRemoveName(idx)}
+                        disabled={names.length === 1}
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline-primary"
+                    type="button"
+                    size="sm"
+                    onClick={handleAddName}
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="me-1" />
+                    Add Candidate
+                  </Button>
+                </div>
+                <div className="d-flex gap-2 justify-content-end">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setVoteType(null)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="success"
+                    type="submit"
+                    disabled={submitting || names.some((c) => !c.trim())}
+                  >
+                    {submitting ? "Creating..." : "Create Election"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {voteType === "Pledge Vote" && (
+              <form onSubmit={handleSubmit}>
+                <h5 className="mb-3">Enter Pledge Names</h5>
+                <div className="mb-3">
+                  <label className="form-label">Pledges</label>
+                  {pledgeNames.map((name, idx) => (
+                    <div className="input-group mb-2" key={idx}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={`Pledge ${idx + 1}`}
+                        value={name}
+                        onChange={(e) => handlePledgeNameChange(idx, e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger"
+                        onClick={() => handleRemovePledge(idx)}
+                        disabled={pledgeNames.length === 1}
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline-primary"
+                    type="button"
+                    size="sm"
+                    onClick={handleAddPledge}
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="me-1" />
+                    Add Pledge
+                  </Button>
+                </div>
+                <div className="d-flex gap-2 justify-content-end">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setVoteType(null)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="success"
+                    type="submit"
+                    disabled={submitting || pledgeNames.some((c) => !c.trim())}
+                  >
+                    {submitting ? "Creating..." : "Create Pledge Vote"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
         {/* Countdown Control Container */}
         {showCountdown && (
-          <div className="mt-4 border rounded p-4">
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 <FontAwesomeIcon icon={faClock} className="me-2" />
@@ -751,6 +905,7 @@ export default function VotePage() {
                 onClick={() => countdownAction === "end" ? handleExecuteEnd(true) : handleExecuteNextRound(true)}
                 disabled={submitting}
               >
+                <FontAwesomeIcon icon={faStop} className="me-1" />
                 {countdownAction === "end" ? "End Immediately" : "Move to Blackball Immediately"}
               </Button>
               <Button
@@ -758,6 +913,7 @@ export default function VotePage() {
                 onClick={() => countdownAction === "end" ? handleExecuteEnd(false) : handleExecuteNextRound(false)}
                 disabled={submitting || countdownSeconds === 0}
               >
+                <FontAwesomeIcon icon={faClock} className="me-1" />
                 {countdownAction === "end" ? `End in ${countdownSeconds}s` : `Move to Blackball in ${countdownSeconds}s`}
               </Button>
             </div>
@@ -1113,132 +1269,6 @@ export default function VotePage() {
             )}
           </div>
         )}
-
-        {/* Voting Modal (Create) */}
-        <Modal show={showModal} onHide={handleCloseModal} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Start New Vote</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {!voteType && (
-              <div>
-                <Button
-                  variant="primary"
-                  className="w-100 mb-2"
-                  onClick={() => handleVoteTypeSelect("Election")}
-                >
-                  Election
-                </Button>
-                <Button
-                  variant="warning"
-                  className="w-100 mb-2"
-                  onClick={() => handleVoteTypeSelect("Pledge Vote")}
-                >
-                  Pledge Vote
-                </Button>
-              </div>
-            )}
-
-            {voteType === "Election" && (
-              <form onSubmit={handleSubmit}>
-                <h5>Enter Election Details</h5>
-                <div className="mb-3">
-                  <label htmlFor="electionTitle" className="form-label">Title (optional)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="electionTitle"
-                    value={electionTitle}
-                    onChange={(e) => setElectionTitle(e.target.value)}
-                  />
-                </div>
-                <h6>Options</h6>
-                {names.map((name, idx) => (
-                  <div className="input-group mb-2" key={idx}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder={`Option ${idx + 1}`}
-                      value={name}
-                      onChange={(e) => handleNameChange(idx, e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={() => handleRemoveName(idx)}
-                      disabled={names.length === 1}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-                <Button
-                  variant="primary"
-                  type="button"
-                  className="mb-3"
-                  onClick={handleAddName}
-                >
-                  <FontAwesomeIcon icon={faPlus} className="me-1" />
-                  Add Candidate
-                </Button>
-                <div className="d-flex justify-content-end">
-                  <Button
-                    variant="success"
-                    type="submit"
-                    disabled={submitting || names.some((c) => !c.trim())}
-                  >
-                    {submitting ? "Submitting..." : "Submit"}
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {voteType === "Pledge Vote" && (
-              <form onSubmit={handleSubmit}>
-                <h5>Enter Pledge Names</h5>
-                {pledgeNames.map((name, idx) => (
-                  <div className="input-group mb-2" key={idx}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder={`Pledge ${idx + 1}`}
-                      value={name}
-                      onChange={(e) => handlePledgeNameChange(idx, e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={() => handleRemovePledge(idx)}
-                      disabled={pledgeNames.length === 1}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-                <Button
-                  variant="primary"
-                  type="button"
-                  className="mb-3"
-                  onClick={handleAddPledge}
-                >
-                  <FontAwesomeIcon icon={faPlus} className="me-1" />
-                  Add Pledge
-                </Button>
-                <div className="d-flex justify-content-end">
-                  <Button
-                    variant="success"
-                    type="submit"
-                    disabled={submitting || pledgeNames.some((c) => !c.trim())}
-                  >
-                    {submitting ? "Submitting..." : "Submit"}
-                  </Button>
-                </div>
-              </form>
-            )}
-          </Modal.Body>
-        </Modal>
       </div>
     </div>
   );
