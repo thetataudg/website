@@ -715,7 +715,7 @@ export default function VotePage() {
 
         {/* Countdown Control Container */}
         {showCountdown && (
-          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#fff3cd" }}>
+          <div className="mt-4 border rounded p-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 <FontAwesomeIcon icon={faClock} className="me-2" />

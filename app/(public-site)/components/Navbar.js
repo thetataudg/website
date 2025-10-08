@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React, { useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
-import { SignedIn } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
 
 const Navbar = () => {
@@ -123,6 +123,17 @@ const Navbar = () => {
               Member
             </li>
           </SignedIn>
+          <SignedOut>
+            <li
+              className="px-4 cursor-pointer capitalize py-6 text-4xl"
+              onClick={() => {
+                setNav(false);
+                handleMemberNavigation();
+              }}
+            >
+              Sign In
+            </li>
+          </SignedOut>
         </ul>
       )}
     </div>
