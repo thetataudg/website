@@ -3,8 +3,10 @@
 import Link from "next/link";
 import React, { useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
-import { SignedIn } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
+
+import { SignInButton } from "@clerk/nextjs";
 
 const Navbar = () => {
   const [nav, setNav] = useState(false);
@@ -88,6 +90,15 @@ const Navbar = () => {
             Member
           </li>
         </SignedIn>
+        <SignedOut>
+          <li
+            className="nav-links px-4 cursor-pointer capitalize font-medium text-white hover:scale-105 hover:text-slate-400 hover:underline duration-100 link-underline"
+          >
+            <SignInButton>
+              Sign In
+            </SignInButton>
+          </li>
+        </SignedOut>
       </ul>
 
       <div
@@ -123,6 +134,16 @@ const Navbar = () => {
               Member
             </li>
           </SignedIn>
+          <SignedOut>
+            <li
+              className="px-4 cursor-pointer capitalize py-6 text-4xl"
+              onClick={() => {
+                setNav(false);
+              }}
+            >
+              <SignInButton />
+            </li>
+          </SignedOut>
         </ul>
       )}
     </div>

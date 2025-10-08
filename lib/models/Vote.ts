@@ -8,6 +8,7 @@ const VoteSchema = new Schema({
   round: { type: String, enum: ["board", "blackball"], default: "board" }, // for Pledge
   started: { type: Boolean, default: false },
   ended: { type: Boolean, default: false },
+  endTime: { type: Date }, // When the vote is scheduled to end
   votes: [
     {
       clerkId: { type: String, required: true },

@@ -44,6 +44,7 @@ export async function POST(req: Request) {
       round: type === "Pledge" ? "board" : undefined,
       started: false,
       ended: false,
+      endTime: null,
       votes: [],
       createdAt: new Date(),
     });
@@ -73,29 +74,88 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await requireECouncil(req);
-    const { action } = await req.json();
+    const { action, countdown } = await req.json();
     const vote = await Vote.findOne({ ended: false });
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "No active vote to update" }, { status: 404 });
     }
+    
     if (action === "start") {
       if (vote.started) return NextResponse.json({ error: "Vote already started" }, { status: 400 });
       vote.started = true;
+      vote.endTime = null; // Clear any existing end time
       await vote.save();
       return NextResponse.json({ success: true });
     }
+    
     if (action === "end") {
       if (!vote.started) return NextResponse.json({ error: "Vote not started" }, { status: 400 });
-      vote.ended = true;
-      await vote.save();
-      return NextResponse.json({ success: true });
+      
+      if (countdown && countdown > 0) {
+        // Set end time for countdown
+        const endTime = new Date(Date.now() + countdown * 1000);
+        vote.endTime = endTime;
+        await vote.save();
+        
+        // Schedule actual ending
+        setTimeout(async () => {
+          try {
+            const currentVote = await Vote.findById(vote._id);
+            if (currentVote && !currentVote.ended && currentVote.endTime && new Date() >= currentVote.endTime) {
+              currentVote.ended = true;
+              currentVote.endTime = null;
+              await currentVote.save();
+              logger.info({ voteId: vote._id }, "Vote automatically ended after countdown");
+            }
+          } catch (error) {
+            logger.error({ error, voteId: vote._id }, "Failed to auto-end vote after countdown");
+          }
+        }, countdown * 1000);
+        
+        return NextResponse.json({ success: true, endTime: endTime.toISOString() });
+      } else {
+        // End immediately
+        vote.ended = true;
+        vote.endTime = null;
+        await vote.save();
+        return NextResponse.json({ success: true });
+      }
     }
+    
     if (action === "nextRound" && vote.type === "Pledge" && vote.round === "board") {
-      vote.round = "blackball";
-      vote.started = false; // must be started again for blackball
-      await vote.save();
-      return NextResponse.json({ success: true });
+      if (countdown && countdown > 0) {
+        // Set end time for countdown before moving to next round
+        const endTime = new Date(Date.now() + countdown * 1000);
+        vote.endTime = endTime;
+        await vote.save();
+        
+        // Schedule next round transition
+        setTimeout(async () => {
+          try {
+            const currentVote = await Vote.findById(vote._id);
+            if (currentVote && !currentVote.ended && currentVote.round === "board" && currentVote.endTime && new Date() >= currentVote.endTime) {
+              currentVote.round = "blackball";
+              currentVote.started = false;
+              currentVote.endTime = null;
+              await currentVote.save();
+              logger.info({ voteId: vote._id }, "Vote automatically moved to next round after countdown");
+            }
+          } catch (error) {
+            logger.error({ error, voteId: vote._id }, "Failed to auto-transition to next round after countdown");
+          }
+        }, countdown * 1000);
+        
+        return NextResponse.json({ success: true, endTime: endTime.toISOString(), action: "nextRound" });
+      } else {
+        // Move to next round immediately
+        vote.round = "blackball";
+        vote.started = false;
+        vote.endTime = null;
+        await vote.save();
+        return NextResponse.json({ success: true });
+      }
     }
+    
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update vote");
@@ -112,6 +172,23 @@ export async function GET(req: Request) {
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "No vote found" }, { status: 404 });
     }
+    
+    // Check if vote should be auto-ended
+    if (vote.endTime && new Date() >= vote.endTime && !vote.ended) {
+      if (vote.type === "Pledge" && vote.round === "board") {
+        // Auto-transition to next round
+        vote.round = "blackball";
+        vote.started = false;
+        vote.endTime = null;
+        await vote.save();
+      } else {
+        // Auto-end vote
+        vote.ended = true;
+        vote.endTime = null;
+        await vote.save();
+      }
+    }
+    
     if (vote.type === "Election") {
       // Tally results - exclude abstentions from option tallies
       const tally: Record<string, number> = {};
@@ -128,6 +205,7 @@ export async function GET(req: Request) {
         options: vote.options,
         started: vote.started,
         ended: vote.ended,
+        endTime: vote.endTime?.toISOString() || null,
         results: tally,
         totalVotes: vote.votes.length, // This includes abstentions
       });
@@ -155,6 +233,7 @@ export async function GET(req: Request) {
         started: vote.started,
         ended: vote.ended,
         round: vote.round,
+        endTime: vote.endTime?.toISOString() || null,
         boardResults,
         blackballResults,
         totalVotes: vote.votes.length,

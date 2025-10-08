@@ -16,8 +16,9 @@ import {
   faExclamationTriangle,
   faPause,
   faPlus,
+  faClock,
+  faUser,
 } from "@fortawesome/free-solid-svg-icons";
-import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
 
 type VoteInfo = {
@@ -30,7 +31,9 @@ type VoteInfo = {
   round?: "board" | "blackball";
   hasVoted?: boolean;
   votedPledges?: Record<string, boolean>;
+  abstainedPledges?: Record<string, boolean>;
   totalVotes?: number;
+  endTime?: string | null;
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
 };
@@ -56,8 +59,8 @@ export default function VotePage() {
   const [userData, setUserData] = useState<any>(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
-  // Modal state
-  const [showModal, setShowModal] = useState(false);
+  // Start vote state (replaced modal)
+  const [showStartVote, setShowStartVote] = useState(false);
   const [voteType, setVoteType] = useState<null | "Election" | "Pledge Vote">(null);
   const [names, setNames] = useState<string[]>([""]);
   const [pledgeNames, setPledgeNames] = useState<string[]>([""]);
@@ -77,8 +80,16 @@ export default function VotePage() {
   const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
 
+  // Countdown state
+  const [showCountdown, setShowCountdown] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(30);
+  const [countdownAction, setCountdownAction] = useState<"end" | "nextRound">("end");
+  const [currentCountdown, setCurrentCountdown] = useState<number | null>(null);
+  const [countdownTarget, setCountdownTarget] = useState<string | null>(null);
+
   // Polling
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -97,6 +108,49 @@ export default function VotePage() {
     }
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (voteInfo?.endTime && !voteInfo.ended) {
+      const endTime = new Date(voteInfo.endTime).getTime();
+      
+      const updateCountdown = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+        setCurrentCountdown(remaining);
+        
+        if (remaining === 0) {
+          setCurrentCountdown(null);
+          setCountdownTarget(null);
+          fetchVoteInfo(); // Refresh to get updated state
+        }
+      };
+      
+      updateCountdown(); // Initial update
+      countdownRef.current = setInterval(updateCountdown, 1000);
+      
+      // Set the countdown target message
+      if (voteInfo.type === "Pledge" && voteInfo.round === "board") {
+        setCountdownTarget("Moving to blackball round");
+      } else {
+        setCountdownTarget("Vote ending");
+      }
+    } else {
+      setCurrentCountdown(null);
+      setCountdownTarget(null);
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [voteInfo?.endTime, voteInfo?.ended]);
 
   // Fetch vote info
   const fetchVoteInfo = async () => {
@@ -155,10 +209,10 @@ export default function VotePage() {
     // eslint-disable-next-line
   }, [isSignedIn]);
 
-  // Modal handlers
-  const handleOpenModal = () => setShowModal(true);
-  const handleCloseModal = () => {
-    setShowModal(false);
+  // Start vote handlers (replaced modal handlers)
+  const handleOpenStartVote = () => setShowStartVote(true);
+  const handleCloseStartVote = () => {
+    setShowStartVote(false);
     setVoteType(null);
     setNames([""]);
     setPledgeNames([""]);
@@ -210,7 +264,7 @@ export default function VotePage() {
           pledges: pledgeNames.filter((n) => n.trim()),
         });
       }
-      handleCloseModal();
+      handleCloseStartVote();
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to create vote.");
@@ -239,13 +293,12 @@ export default function VotePage() {
     if (!voteInfo?.pledges) return;
     setSubmitting(true);
     try {
-      await axios.post("/api/vote", {
-        ballot: voteInfo.pledges.map((pledge) => ({
-          pledge,
-          // If no selection made, default to "Continue" (abstention)
-          choice: pledgeSelections[pledge] || "Continue",
-        })),
-      });
+      const ballot = voteInfo.pledges.map((pledge) => ({
+        pledge,
+        choice: pledgeSelections[pledge] || null, // null for abstain
+      }));
+
+      await axios.post("/api/vote", { ballot });
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to submit ballot.");
@@ -267,12 +320,35 @@ export default function VotePage() {
     }
   };
 
-  const handleEndVote = async () => {
+  // Show countdown box for end vote
+  const handleShowEndCountdown = () => {
+    setCountdownAction("end");
+    setShowCountdown(true);
+  };
+
+  // Show countdown box for next round
+  const handleShowNextRoundCountdown = () => {
+    setCountdownAction("nextRound");
+    setShowCountdown(true);
+  };
+
+  // Close countdown box
+  const handleCloseCountdown = () => {
+    setShowCountdown(false);
+    setCountdownSeconds(30);
+  };
+
+  // Execute end vote with countdown
+  const handleExecuteEnd = async (immediate = false) => {
     setSubmitting(true);
     try {
-      await axios.patch("/api/vote/manage", { action: "end" });
+      await axios.patch("/api/vote/manage", { 
+        action: "end",
+        countdown: immediate ? 0 : countdownSeconds
+      });
+      setShowCountdown(false);
+      setCountdownSeconds(30);
       fetchVoteInfo();
-      handleShowResults(); // Show results after ending
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to end vote.");
     } finally {
@@ -280,10 +356,16 @@ export default function VotePage() {
     }
   };
 
-  const handleNextRound = async () => {
+  // Execute next round with countdown
+  const handleExecuteNextRound = async (immediate = false) => {
     setSubmitting(true);
     try {
-      await axios.patch("/api/vote/manage", { action: "nextRound" });
+      await axios.patch("/api/vote/manage", { 
+        action: "nextRound", 
+        countdown: immediate ? 0 : countdownSeconds
+      });
+      setShowCountdown(false);
+      setCountdownSeconds(30);
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to move to next round.");
@@ -353,6 +435,33 @@ export default function VotePage() {
     setVoteResults(null);
   };
 
+  // Helper for pledge badge
+  function getPledgeBadge(
+    pledge: string,
+    boardResults?: any,
+    blackballResults?: any
+  ) {
+    // Blackball round: check blackball first, then board
+    if (blackballResults && blackballResults[pledge]) {
+      if (blackballResults[pledge].blackball > 0) {
+        return { variant: "danger", icon: faTimes, text: "Blackball" };
+      }
+      if (blackballResults[pledge].continue > 0) {
+        return { variant: "success", icon: faCheck, text: "Continue" };
+      }
+    }
+    // Board round: check board
+    if (boardResults && boardResults[pledge]) {
+      if (boardResults[pledge].board > 0) {
+        return { variant: "warning", icon: faExclamationTriangle, text: "Board" };
+      }
+      if (boardResults[pledge].continue > 0) {
+        return { variant: "success", icon: faCheck, text: "Continue" };
+      }
+    }
+    return null;
+  }
+
   if (!isLoaded || loadingUserData) {
     return (
       <div className="container">
@@ -391,37 +500,6 @@ export default function VotePage() {
     );
   }
 
-  // Helper for pledge status
-  function getPledgeStatus(
-    pledge: string,
-    boardResults?: any,
-    blackballResults?: any
-  ) {
-    // Blackball round: check blackball
-    if (blackballResults && blackballResults[pledge]) {
-      if (blackballResults[pledge].blackball > 0) {
-        return { color: "bg-danger text-white", icon: faTimes, show: true };
-      }
-      if (blackballResults[pledge].continue > 0) {
-        return { color: "bg-success text-white", icon: faCheck, show: true };
-      }
-      // If no continue and no blackball, treat as failed (X)
-      return { color: "bg-danger text-white", icon: faTimes, show: true };
-    }
-    // Board round: check board
-    if (boardResults && boardResults[pledge]) {
-      if (boardResults[pledge].board > 0) {
-        return { color: "bg-warning text-dark", icon: faExclamationTriangle, show: true };
-      }
-      if (boardResults[pledge].continue > 0) {
-        return { color: "bg-success text-white", icon: faCheck, show: true };
-      }
-      // If no continue and no board, treat as warning
-      return { color: "bg-warning text-dark", icon: faExclamationTriangle, show: true };
-    }
-    return { color: "", icon: null, show: false };
-  }
-
   // Main voting UI
   return (
     <div className="container-xxl mt-4">
@@ -455,7 +533,7 @@ export default function VotePage() {
             }
             onClick={
               userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
-                ? handleOpenModal
+                ? handleOpenStartVote
                 : undefined
             }
           >
@@ -463,6 +541,16 @@ export default function VotePage() {
             Start Vote
           </button>
         </div>
+
+        {/* Countdown Alert */}
+        {currentCountdown !== null && countdownTarget && (
+          <div className="alert alert-danger d-flex align-items-center mt-3" role="alert">
+            <FontAwesomeIcon icon={faClock} className="me-2" />
+            <div className="flex-grow-1">
+              <b>{countdownTarget} in {currentCountdown} second{currentCountdown !== 1 ? 's' : ''}...</b>
+            </div>
+          </div>
+        )}
 
         {/* Vote status and options */}
         <div className="mt-3">
@@ -476,6 +564,11 @@ export default function VotePage() {
               <div className="d-flex align-items-center">
                 <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
                 <div>
+                  {voteInfo.title && (
+                    <div className="mb-2">
+                      <strong>{voteInfo.title}</strong>
+                    </div>
+                  )}
                   <b>
                     Election vote is{" "}
                     {voteInfo.started
@@ -508,12 +601,12 @@ export default function VotePage() {
                       </Button>
                     )}
                     {voteInfo.started && !voteInfo.ended && (
-                      <Button size="sm" variant="danger" onClick={handleEndVote} disabled={submitting}>
+                      <Button size="sm" variant="danger" onClick={handleShowEndCountdown} disabled={submitting}>
                         <FontAwesomeIcon icon={faStop} className="me-1" /> End
                       </Button>
                     )}
                     {voteInfo.ended && (
-                      <Button size="sm" variant="secondary" onClick={() => handleShowResults()} disabled={resultsLoading}>
+                      <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
                         <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
                       </Button>
                     )}
@@ -568,14 +661,14 @@ export default function VotePage() {
                         <Button 
                           size="sm" 
                           variant={voteInfo.round === "board" ? "secondary" : "danger"}
-                          onClick={handleEndVote} 
+                          onClick={handleShowEndCountdown} 
                           disabled={submitting || voteInfo.round === "board"}
                           title={voteInfo.round === "board" ? "Cannot end during board round - use Next Round instead" : "End vote"}
                         >
                           <FontAwesomeIcon icon={faStop} className="me-1" /> End
                         </Button>
                         {voteInfo.round === "board" && (
-                          <Button size="sm" variant="warning" onClick={handleNextRound} disabled={submitting}>
+                          <Button size="sm" variant="warning" onClick={handleShowNextRoundCountdown} disabled={submitting}>
                             <FontAwesomeIcon icon={faArrowRight} className="me-1" /> Next Round
                           </Button>
                         )}
@@ -588,7 +681,7 @@ export default function VotePage() {
                       </>
                     )}
                     {voteInfo.ended && (
-                      <Button size="sm" variant="secondary" onClick={() => handleShowResults()} disabled={resultsLoading}>
+                      <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
                         <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
                       </Button>
                     )}
@@ -600,9 +693,8 @@ export default function VotePage() {
               </div>
             </div>
           ) : (
-            <div className="alert alert-primary d-flex align-items-center" role="alert">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
-              There are currently no votes running.
+            <div className="alert alert-dark d-flex align-items-center" role="alert">
+              No votes are running.
             </div>
           )}
         </div>
@@ -617,6 +709,214 @@ export default function VotePage() {
             <Button size="sm" variant="info" onClick={() => handleShowResults(true)} disabled={resultsLoading}>
               <FontAwesomeIcon icon={faChartBar} className="me-1" /> View Board Results
             </Button>
+          </div>
+        )}
+
+        {/* Start Vote Container (replaced modal) */}
+        {showStartVote && (
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                <FontAwesomeIcon icon={faPlay} className="me-2" />
+                Start New Vote
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseStartVote}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Cancel
+              </Button>
+            </div>
+
+            {!voteType && (
+              <div className="d-flex gap-3">
+                <Button
+                  variant="primary"
+                  className="flex-fill"
+                  onClick={() => handleVoteTypeSelect("Election")}
+                >
+                  <FontAwesomeIcon icon={faCheck} className="me-2" />
+                  Election
+                </Button>
+                <Button
+                  variant="warning"
+                  className="flex-fill"
+                  onClick={() => handleVoteTypeSelect("Pledge Vote")}
+                >
+                  <FontAwesomeIcon icon={faUser} className="me-2" />
+                  Pledge Vote
+                </Button>
+              </div>
+            )}
+
+            {voteType === "Election" && (
+              <form onSubmit={handleSubmit}>
+                <h5 className="mb-3">Enter Election Details</h5>
+                <div className="mb-3">
+                  <label htmlFor="electionTitle" className="form-label">Title (optional)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="electionTitle"
+                    value={electionTitle}
+                    onChange={(e) => setElectionTitle(e.target.value)}
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Options</label>
+                  {names.map((name, idx) => (
+                    <div className="input-group mb-2" key={idx}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={`Option ${idx + 1}`}
+                        value={name}
+                        onChange={(e) => handleNameChange(idx, e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger"
+                        onClick={() => handleRemoveName(idx)}
+                        disabled={names.length === 1}
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline-primary"
+                    type="button"
+                    size="sm"
+                    onClick={handleAddName}
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="me-1" />
+                    Add Candidate
+                  </Button>
+                </div>
+                <div className="d-flex gap-2 justify-content-end">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setVoteType(null)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="success"
+                    type="submit"
+                    disabled={submitting || names.some((c) => !c.trim())}
+                  >
+                    {submitting ? "Creating..." : "Create Election"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {voteType === "Pledge Vote" && (
+              <form onSubmit={handleSubmit}>
+                <h5 className="mb-3">Enter Pledge Names</h5>
+                <div className="mb-3">
+                  <label className="form-label">Pledges</label>
+                  {pledgeNames.map((name, idx) => (
+                    <div className="input-group mb-2" key={idx}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={`Pledge ${idx + 1}`}
+                        value={name}
+                        onChange={(e) => handlePledgeNameChange(idx, e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger"
+                        onClick={() => handleRemovePledge(idx)}
+                        disabled={pledgeNames.length === 1}
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline-primary"
+                    type="button"
+                    size="sm"
+                    onClick={handleAddPledge}
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="me-1" />
+                    Add Pledge
+                  </Button>
+                </div>
+                <div className="d-flex gap-2 justify-content-end">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setVoteType(null)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="success"
+                    type="submit"
+                    disabled={submitting || pledgeNames.some((c) => !c.trim())}
+                  >
+                    {submitting ? "Creating..." : "Create Pledge Vote"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* Countdown Control Container */}
+        {showCountdown && (
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                <FontAwesomeIcon icon={faClock} className="me-2" />
+                {countdownAction === "end" ? "End Vote" : "Move to Blackball Round"}
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseCountdown}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Cancel
+              </Button>
+            </div>
+            
+            <div className="mb-3">
+              <label htmlFor="countdownInput" className="form-label">
+                Countdown time (seconds):
+              </label>
+              <input
+                type="number"
+                className="form-control"
+                id="countdownInput"
+                value={countdownSeconds}
+                onChange={(e) => setCountdownSeconds(Math.max(0, parseInt(e.target.value) || 0))}
+                min="0"
+                max="300"
+              />
+              <small className="form-text text-muted">
+                Set to 0 for immediate action. Maximum 300 seconds (5 minutes).
+              </small>
+            </div>
+            
+            <div className="d-flex gap-2">
+              <Button
+                variant="danger"
+                onClick={() => countdownAction === "end" ? handleExecuteEnd(true) : handleExecuteNextRound(true)}
+                disabled={submitting}
+              >
+                <FontAwesomeIcon icon={faStop} className="me-1" />
+                {countdownAction === "end" ? "End Immediately" : "Move to Blackball Immediately"}
+              </Button>
+              <Button
+                variant="warning"
+                onClick={() => countdownAction === "end" ? handleExecuteEnd(false) : handleExecuteNextRound(false)}
+                disabled={submitting || countdownSeconds === 0}
+              >
+                <FontAwesomeIcon icon={faClock} className="me-1" />
+                {countdownAction === "end" ? `End in ${countdownSeconds}s` : `Move to Blackball in ${countdownSeconds}s`}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -693,11 +993,6 @@ export default function VotePage() {
                 ? "Board Round: Vote for Each Pledge"
                 : "Blackball Round: Vote for Each Pledge"}
             </h4>
-            <div className="alert alert-info mb-3">
-              <small>
-                <strong>Note:</strong> You may leave pledges blank to abstain from voting on them. 
-              </small>
-            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -707,6 +1002,7 @@ export default function VotePage() {
               <div className="list-group mb-3">
                 {voteInfo.pledges.map((pledge, index) => {
                   const votedForThis = voteInfo.votedPledges?.[pledge];
+                  const abstainedForThis = voteInfo.abstainedPledges?.[pledge];
                   const options =
                     voteInfo.round === "board"
                       ? ["Continue", "Board"]
@@ -720,9 +1016,15 @@ export default function VotePage() {
                         <b>{pledge}</b>
                       </div>
                       {votedForThis ? (
-                        <span className="badge bg-success ms-2">
-                          Voted
-                        </span>
+                        abstainedForThis ? (
+                          <span className="badge text-dark bg-warning ms-2">
+                            Abstained
+                          </span>
+                        ) : (
+                          <span className="badge bg-success ms-2">
+                            Voted
+                          </span>
+                        )
                       ) : (
                         <>
                           {options.map((opt) => (
@@ -786,11 +1088,11 @@ export default function VotePage() {
                 <ul className="list-group">
                   {voteInfo.pledges.map((pledge, index) => {
                     const res = voteInfo.boardResults?.[pledge] || { continue: 0, board: 0 };
-                    const status = getPledgeStatus(pledge, voteInfo.boardResults, undefined);
+                    const badge = getPledgeBadge(pledge, voteInfo.boardResults, undefined);
                     return (
                       <li
                         key={pledge}
-                        className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                        className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                       >
                         <b className="flex-grow-1">{pledge}</b>
                         <span className="me-3">
@@ -801,10 +1103,10 @@ export default function VotePage() {
                           <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
                           {res.board}
                         </span>
-                        {/* Only show icon if not a check for passed */}
-                        {status.show && status.icon && (
-                          <span className="ms-2">
-                            <FontAwesomeIcon icon={status.icon} />
+                        {badge && (
+                          <span className={`badge bg-${badge.variant} ms-2`}>
+                            <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                            {badge.text}
                           </span>
                         )}
                       </li>
@@ -820,11 +1122,11 @@ export default function VotePage() {
                 <ul className="list-group">
                   {voteInfo.pledges.map((pledge, index) => {
                     const res = voteInfo.blackballResults?.[pledge] || { continue: 0, blackball: 0 };
-                    const status = getPledgeStatus(pledge, undefined, voteInfo.blackballResults);
+                    const badge = getPledgeBadge(pledge, voteInfo.boardResults, voteInfo.blackballResults);
                     return (
                       <li
                         key={pledge}
-                        className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                        className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                       >
                         <b className="flex-grow-1">{pledge}</b>
                         <span className="me-3">
@@ -835,10 +1137,10 @@ export default function VotePage() {
                           <FontAwesomeIcon icon={faTimes} className="text-danger me-1" />
                           {res.blackball}
                         </span>
-                        {/* Only show icon if not a check for passed */}
-                        {status.show && status.icon && (
-                          <span className="ms-2">
-                            <FontAwesomeIcon icon={status.icon} />
+                        {badge && (
+                          <span className={`badge bg-${badge.variant} ms-2`}>
+                            <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                            {badge.text}
                           </span>
                         )}
                       </li>
@@ -850,16 +1152,21 @@ export default function VotePage() {
           </div>
         )}
 
-        {/* Results Modal */}
-        <Modal show={showResults} onHide={handleCloseResults} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>
-              {voteResults?.showBoardOnly ? "Board Round Results" : 
-               voteResults?.type === "Election" && voteResults?.title ? 
-               `${voteResults.title} - Results` : "Vote Results"}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+        {/* Results Container */}
+        {showResults && (
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#f8f9fa" }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                {voteResults?.showBoardOnly ? "Board Round Results" : 
+                 voteResults?.type === "Election" && voteResults?.title ? 
+                 `${voteResults.title} - Results` : "Vote Results"}
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseResults}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Close
+              </Button>
+            </div>
+            
             {resultsLoading ? (
               <div className="text-center">
                 <FontAwesomeIcon icon={faHourglass} className="me-2" />
@@ -892,11 +1199,11 @@ export default function VotePage() {
                     <ul className="list-group mb-3">
                       {voteResults.pledges?.map((pledge, index) => {
                         const res = voteResults.boardResults?.[pledge] || { continue: 0, board: 0 };
-                        const status = getPledgeStatus(pledge, voteResults.boardResults, undefined);
+                        const badge = getPledgeBadge(pledge, voteResults.boardResults, undefined);
                         return (
                           <li
                             key={pledge}
-                            className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                            className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                           >
                             <b className="flex-grow-1">{pledge}</b>
                             <span className="me-3">
@@ -907,9 +1214,10 @@ export default function VotePage() {
                               <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
                               {res.board}
                             </span>
-                            {status.show && status.icon && (
-                              <span className="ms-2">
-                                <FontAwesomeIcon icon={status.icon} />
+                            {badge && (
+                              <span className={`badge bg-${badge.variant} ms-2`}>
+                                <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                                {badge.text}
                               </span>
                             )}
                           </li>
@@ -923,11 +1231,11 @@ export default function VotePage() {
                         <ul className="list-group mb-3">
                           {voteResults.pledges?.map((pledge, index) => {
                             const res = voteResults.blackballResults?.[pledge] || { continue: 0, blackball: 0 };
-                            const status = getPledgeStatus(pledge, undefined, voteResults.blackballResults);
+                            const badge = getPledgeBadge(pledge, voteResults.boardResults, voteResults.blackballResults);
                             return (
                               <li
                                 key={pledge}
-                                className={`list-group-item d-flex align-items-center ${status.color} ${index % 2 === 1 && !status.color ? 'bg-light' : ''}`}
+                                className={`list-group-item d-flex align-items-center ${index % 2 === 1 ? 'bg-light' : ''}`}
                               >
                                 <b className="flex-grow-1">{pledge}</b>
                                 <span className="me-3">
@@ -938,9 +1246,10 @@ export default function VotePage() {
                                   <FontAwesomeIcon icon={faTimes} className="me-1" />
                                   {res.blackball}
                                 </span>
-                                {status.show && status.icon && (
-                                  <span className="ms-2">
-                                    <FontAwesomeIcon icon={status.icon} />
+                                {badge && (
+                                  <span className={`badge bg-${badge.variant} ms-2`}>
+                                    <FontAwesomeIcon icon={badge.icon} className="me-1" />
+                                    {badge.text}
                                   </span>
                                 )}
                               </li>
@@ -958,134 +1267,8 @@ export default function VotePage() {
             ) : (
               <div className="text-danger">No results available.</div>
             )}
-          </Modal.Body>
-        </Modal>
-
-        {/* Voting Modal (Create) */}
-        <Modal show={showModal} onHide={handleCloseModal} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Start New Vote</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {!voteType && (
-              <div>
-                <Button
-                  variant="primary"
-                  className="w-100 mb-2"
-                  onClick={() => handleVoteTypeSelect("Election")}
-                >
-                  Election
-                </Button>
-                <Button
-                  variant="warning"
-                  className="w-100 mb-2"
-                  onClick={() => handleVoteTypeSelect("Pledge Vote")}
-                >
-                  Pledge Vote
-                </Button>
-              </div>
-            )}
-
-            {voteType === "Election" && (
-              <form onSubmit={handleSubmit}>
-                <h5>Enter Election Details</h5>
-                <div className="mb-3">
-                  <label htmlFor="electionTitle" className="form-label">Title (optional)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="electionTitle"
-                    value={electionTitle}
-                    onChange={(e) => setElectionTitle(e.target.value)}
-                  />
-                </div>
-                <h6>Options</h6>
-                {names.map((name, idx) => (
-                  <div className="input-group mb-2" key={idx}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder={`Option ${idx + 1}`}
-                      value={name}
-                      onChange={(e) => handleNameChange(idx, e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={() => handleRemoveName(idx)}
-                      disabled={names.length === 1}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-                <Button
-                  variant="primary"
-                  type="button"
-                  className="mb-3"
-                  onClick={handleAddName}
-                >
-                  <FontAwesomeIcon icon={faPlus} className="me-1" />
-                  Add Candidate
-                </Button>
-                <div className="d-flex justify-content-end">
-                  <Button
-                    variant="success"
-                    type="submit"
-                    disabled={submitting || names.some((c) => !c.trim())}
-                  >
-                    {submitting ? "Submitting..." : "Submit"}
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {voteType === "Pledge Vote" && (
-              <form onSubmit={handleSubmit}>
-                <h5>Enter Pledge Names</h5>
-                {pledgeNames.map((name, idx) => (
-                  <div className="input-group mb-2" key={idx}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder={`Pledge ${idx + 1}`}
-                      value={name}
-                      onChange={(e) => handlePledgeNameChange(idx, e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={() => handleRemovePledge(idx)}
-                      disabled={pledgeNames.length === 1}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-                <Button
-                  variant="primary"
-                  type="button"
-                  className="mb-3"
-                  onClick={handleAddPledge}
-                >
-                  <FontAwesomeIcon icon={faPlus} className="me-1" />
-                  Add Pledge
-                </Button>
-                <div className="d-flex justify-content-end">
-                  <Button
-                    variant="success"
-                    type="submit"
-                    disabled={submitting || pledgeNames.some((c) => !c.trim())}
-                  >
-                    {submitting ? "Submitting..." : "Submit"}
-                  </Button>
-                </div>
-              </form>
-            )}
-          </Modal.Body>
-        </Modal>
+          </div>
+        )}
       </div>
     </div>
   );
