@@ -122,40 +122,6 @@ export async function PATCH(req: Request) {
       }
     }
     
-    if (action === "nextRound" && vote.type === "Pledge" && vote.round === "board") {
-      if (countdown && countdown > 0) {
-        // Set end time for countdown before moving to next round
-        const endTime = new Date(Date.now() + countdown * 1000);
-        vote.endTime = endTime;
-        await vote.save();
-        
-        // Schedule next round transition
-        setTimeout(async () => {
-          try {
-            const currentVote = await Vote.findById(vote._id);
-            if (currentVote && !currentVote.ended && currentVote.round === "board" && currentVote.endTime && new Date() >= currentVote.endTime) {
-              currentVote.round = "blackball";
-              currentVote.started = false;
-              currentVote.endTime = null;
-              await currentVote.save();
-              logger.info({ voteId: vote._id }, "Vote automatically moved to next round after countdown");
-            }
-          } catch (error) {
-            logger.error({ error, voteId: vote._id }, "Failed to auto-transition to next round after countdown");
-          }
-        }, countdown * 1000);
-        
-        return NextResponse.json({ success: true, endTime: endTime.toISOString(), action: "nextRound" });
-      } else {
-        // Move to next round immediately
-        vote.round = "blackball";
-        vote.started = false;
-        vote.endTime = null;
-        await vote.save();
-        return NextResponse.json({ success: true });
-      }
-    }
-    
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update vote");
@@ -175,18 +141,10 @@ export async function GET(req: Request) {
     
     // Check if vote should be auto-ended
     if (vote.endTime && new Date() >= vote.endTime && !vote.ended) {
-      if (vote.type === "Pledge" && vote.round === "board") {
-        // Auto-transition to next round
-        vote.round = "blackball";
-        vote.started = false;
-        vote.endTime = null;
-        await vote.save();
-      } else {
-        // Auto-end vote
-        vote.ended = true;
-        vote.endTime = null;
-        await vote.save();
-      }
+      // Auto-end vote
+      vote.ended = true;
+      vote.endTime = null;
+      await vote.save();
     }
     
     if (vote.type === "Election") {

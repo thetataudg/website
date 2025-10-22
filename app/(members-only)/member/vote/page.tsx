@@ -72,7 +72,7 @@ export default function VotePage() {
   const [voteLoading, setVoteLoading] = useState(true);
   const [voteError, setVoteError] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string>("");
-  const [pledgeSelections, setPledgeSelections] = useState<Record<string, string>>({});
+  const [pledgeSelections, setPledgeSelections] = useState<Record<string, { board?: string; blackball?: string }>>({});
   const [voted, setVoted] = useState(false);
 
   // Results
@@ -83,8 +83,9 @@ export default function VotePage() {
   // Countdown state
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(30);
-  const [countdownAction, setCountdownAction] = useState<"end" | "nextRound">("end");
+  const [countdownAction, setCountdownAction] = useState<"end">("end");
   const [currentCountdown, setCurrentCountdown] = useState<number | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [countdownTarget, setCountdownTarget] = useState<string | null>(null);
 
   // Polling
@@ -130,11 +131,7 @@ export default function VotePage() {
       countdownRef.current = setInterval(updateCountdown, 1000);
       
       // Set the countdown target message
-      if (voteInfo.type === "Pledge" && voteInfo.round === "board") {
-        setCountdownTarget("Moving to blackball round");
-      } else {
-        setCountdownTarget("Vote ending");
-      }
+      setCountdownTarget("Vote ending");
     } else {
       setCurrentCountdown(null);
       setCountdownTarget(null);
@@ -288,15 +285,22 @@ export default function VotePage() {
     }
   };
 
-  // Vote for pledges (Pledge) - submit all at once, with abstentions as "Continue"
+  // Vote for pledges (Pledge) - submit all at once with confirmation
   const handlePledgeBallot = async () => {
     if (!voteInfo?.pledges) return;
+    
     setSubmitting(true);
     try {
-      const ballot = voteInfo.pledges.map((pledge) => ({
-        pledge,
-        choice: pledgeSelections[pledge] || null, // null for abstain
-      }));
+      const ballot = voteInfo.pledges.map((pledge) => {
+        const boardChoice = pledgeSelections[pledge]?.board;
+        const blackballChoice = pledgeSelections[pledge]?.blackball;
+        
+        return {
+          pledge,
+          boardChoice: boardChoice || "Abstain",
+          blackballChoice: blackballChoice || "Abstain",
+        };
+      });
 
       await axios.post("/api/vote", { ballot });
       fetchVoteInfo();
@@ -326,12 +330,6 @@ export default function VotePage() {
     setShowCountdown(true);
   };
 
-  // Show countdown box for next round
-  const handleShowNextRoundCountdown = () => {
-    setCountdownAction("nextRound");
-    setShowCountdown(true);
-  };
-
   // Close countdown box
   const handleCloseCountdown = () => {
     setShowCountdown(false);
@@ -351,24 +349,6 @@ export default function VotePage() {
       fetchVoteInfo();
     } catch (err: any) {
       alert(err?.response?.data?.error || "Failed to end vote.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Execute next round with countdown
-  const handleExecuteNextRound = async (immediate = false) => {
-    setSubmitting(true);
-    try {
-      await axios.patch("/api/vote/manage", { 
-        action: "nextRound", 
-        countdown: immediate ? 0 : countdownSeconds
-      });
-      setShowCountdown(false);
-      setCountdownSeconds(30);
-      fetchVoteInfo();
-    } catch (err: any) {
-      alert(err?.response?.data?.error || "Failed to move to next round.");
     } finally {
       setSubmitting(false);
     }
@@ -564,11 +544,6 @@ export default function VotePage() {
               <div className="d-flex align-items-center">
                 <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
                 <div>
-                  {voteInfo.title && (
-                    <div className="mb-2">
-                      <strong>{voteInfo.title}</strong>
-                    </div>
-                  )}
                   <b>
                     Election vote is{" "}
                     {voteInfo.started
@@ -656,29 +631,14 @@ export default function VotePage() {
                       </Button>
                     )}
                     {voteInfo.started && !voteInfo.ended && (
-                      <>
-                        {/* Only show End button in blackball round, gray out in board round */}
-                        <Button 
-                          size="sm" 
-                          variant={voteInfo.round === "board" ? "secondary" : "danger"}
-                          onClick={handleShowEndCountdown} 
-                          disabled={submitting || voteInfo.round === "board"}
-                          title={voteInfo.round === "board" ? "Cannot end during board round - use Next Round instead" : "End vote"}
-                        >
-                          <FontAwesomeIcon icon={faStop} className="me-1" /> End
-                        </Button>
-                        {voteInfo.round === "board" && (
-                          <Button size="sm" variant="warning" onClick={handleShowNextRoundCountdown} disabled={submitting}>
-                            <FontAwesomeIcon icon={faArrowRight} className="me-1" /> Next Round
-                          </Button>
-                        )}
-                        {/* Show board results button during blackball round */}
-                        {voteInfo.round === "blackball" && voteInfo.boardResults && (
-                          <Button size="sm" variant="info" onClick={() => handleShowResults(true)} disabled={resultsLoading}>
-                            <FontAwesomeIcon icon={faChartBar} className="me-1" /> Board Results
-                          </Button>
-                        )}
-                      </>
+                      <Button 
+                        size="sm" 
+                        variant="danger"
+                        onClick={handleShowEndCountdown} 
+                        disabled={submitting}
+                      >
+                        <FontAwesomeIcon icon={faStop} className="me-1" /> End
+                      </Button>
                     )}
                     {voteInfo.ended && (
                       <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
@@ -698,19 +658,6 @@ export default function VotePage() {
             </div>
           )}
         </div>
-
-        {/* Between rounds notice for E-Council with Board Results button */}
-        {userData.isECouncil && voteInfo && voteInfo.type === "Pledge" && !voteInfo.started && !voteInfo.ended && voteInfo.round === "blackball" && (
-          <div className="alert alert-primary d-flex align-items-center justify-content-between mt-3" role="alert">
-            <div>
-              <FontAwesomeIcon icon={faHourglass} className="me-2" />
-              <b>Pledge vote is paused between board and blackball rounds.</b>
-            </div>
-            <Button size="sm" variant="info" onClick={() => handleShowResults(true)} disabled={resultsLoading}>
-              <FontAwesomeIcon icon={faChartBar} className="me-1" /> View Board Results
-            </Button>
-          </div>
-        )}
 
         {/* Start Vote Container (replaced modal) */}
         {showStartVote && (
@@ -873,7 +820,7 @@ export default function VotePage() {
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 <FontAwesomeIcon icon={faClock} className="me-2" />
-                {countdownAction === "end" ? "End Vote" : "Move to Blackball Round"}
+                End Vote
               </h4>
               <Button size="sm" variant="outline-secondary" onClick={handleCloseCountdown}>
                 <FontAwesomeIcon icon={faTimes} className="me-1" />
@@ -902,19 +849,19 @@ export default function VotePage() {
             <div className="d-flex gap-2">
               <Button
                 variant="danger"
-                onClick={() => countdownAction === "end" ? handleExecuteEnd(true) : handleExecuteNextRound(true)}
+                onClick={() => handleExecuteEnd(true)}
                 disabled={submitting}
               >
                 <FontAwesomeIcon icon={faStop} className="me-1" />
-                {countdownAction === "end" ? "End Immediately" : "Move to Blackball Immediately"}
+                End Immediately
               </Button>
               <Button
                 variant="warning"
-                onClick={() => countdownAction === "end" ? handleExecuteEnd(false) : handleExecuteNextRound(false)}
+                onClick={() => handleExecuteEnd(false)}
                 disabled={submitting || countdownSeconds === 0}
               >
                 <FontAwesomeIcon icon={faClock} className="me-1" />
-                {countdownAction === "end" ? `End in ${countdownSeconds}s` : `Move to Blackball in ${countdownSeconds}s`}
+                End in {countdownSeconds}s
               </Button>
             </div>
           </div>
@@ -976,8 +923,9 @@ export default function VotePage() {
               </div>
               <Button
                 variant="success"
-                type="submit"
+                type="button"
                 disabled={!selectedOption || voted || submitting}
+                onClick={() => setShowConfirmDialog(true)}
               >
                 {voted ? "Voted" : "Submit Vote"}
               </Button>
@@ -1026,45 +974,81 @@ export default function VotePage() {
                           </span>
                         )
                       ) : (
-                        <>
-                          {options.map((opt) => (
-                            <label key={opt} className="me-2 mb-0">
-                              <input
-                                type="radio"
-                                name={`pledge-${pledge}`}
-                                value={opt}
-                                checked={pledgeSelections[pledge] === opt}
-                                onChange={() =>
-                                  setPledgeSelections((prev) => ({
-                                    ...prev,
-                                    [pledge]: opt,
-                                  }))
-                                }
-                                disabled={submitting}
-                                className="form-check-input me-1"
-                              />
-                              {opt}
-                            </label>
-                          ))}
-                          <label className="me-2 mb-0 text-muted">
-                            <input
-                              type="radio"
-                              name={`pledge-${pledge}`}
-                              value=""
-                              checked={!pledgeSelections[pledge]}
-                              onChange={() =>
-                                setPledgeSelections((prev) => {
-                                  const updated = { ...prev };
-                                  delete updated[pledge];
-                                  return updated;
-                                })
-                              }
-                              disabled={submitting}
-                              className="form-check-input me-1"
-                            />
-                            Abstain
-                          </label>
-                        </>
+                        <div className="row g-4">
+                          {/* Board Vote Column */}
+                          <div className="col-md-6">
+                            <h6 className="text-primary mb-3 text-center fw-bold">Board</h6>
+                            <div className="d-grid gap-2">
+                              {['Continue', 'Board', 'Abstain'].map((opt) => (
+                                <button
+                                  key={`board-${opt}`}
+                                  type="button"
+                                  className={`btn btn-sm ${
+                                    pledgeSelections[pledge]?.board === opt
+                                      ? opt === 'Board' 
+                                        ? 'btn-warning text-dark fw-bold' 
+                                        : opt === 'Continue'
+                                        ? 'btn-success fw-bold'
+                                        : 'btn-secondary fw-bold'
+                                      : 'btn-outline-secondary'
+                                  }`}
+                                  onClick={() =>
+                                    setPledgeSelections((prev) => ({
+                                      ...prev,
+                                      [pledge]: {
+                                        ...prev[pledge],
+                                        board: prev[pledge]?.board === opt ? undefined : opt,
+                                      },
+                                    }))
+                                  }
+                                  disabled={submitting}
+                                >
+                                  {opt === 'Continue' && <span className="me-1">✓</span>}
+                                  {opt === 'Board' && <span className="me-1">⚠</span>}
+                                  {opt === 'Abstain' && <span className="me-1">—</span>}
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Blackball Vote Column */}
+                          <div className="col-md-6">
+                            <h6 className="text-danger mb-3 text-center fw-bold">Blackball</h6>
+                            <div className="d-grid gap-2">
+                              {['Continue', 'Blackball', 'Abstain'].map((opt) => (
+                                <button
+                                  key={`blackball-${opt}`}
+                                  type="button"
+                                  className={`btn btn-sm ${
+                                    pledgeSelections[pledge]?.blackball === opt
+                                      ? opt === 'Blackball' 
+                                        ? 'btn-danger fw-bold' 
+                                        : opt === 'Continue'
+                                        ? 'btn-success fw-bold'
+                                        : 'btn-secondary fw-bold'
+                                      : 'btn-outline-secondary'
+                                  }`}
+                                  onClick={() =>
+                                    setPledgeSelections((prev) => ({
+                                      ...prev,
+                                      [pledge]: {
+                                        ...prev[pledge],
+                                        blackball: prev[pledge]?.blackball === opt ? undefined : opt,
+                                      },
+                                    }))
+                                  }
+                                  disabled={submitting}
+                                >
+                                  {opt === 'Continue' && <span className="me-1">✓</span>}
+                                  {opt === 'Blackball' && <span className="me-1">✕</span>}
+                                  {opt === 'Abstain' && <span className="me-1">—</span>}
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
@@ -1074,13 +1058,22 @@ export default function VotePage() {
               {voteInfo.pledges.some((pledge) => !voteInfo.votedPledges?.[pledge]) && (
                 <Button
                   variant="success"
-                  type="submit"
-                  disabled={submitting}
+                  type="button"
+                  disabled={
+                    submitting || 
+                    !voteInfo.pledges.every((pledge) => 
+                      !voteInfo.votedPledges?.[pledge] ? 
+                        pledgeSelections[pledge]?.board && pledgeSelections[pledge]?.blackball 
+                        : true
+                    )
+                  }
+                  onClick={() => setShowConfirmDialog(true)}
                 >
                   Submit Ballot
                 </Button>
               )}
             </form>
+            <br />
             {/* Board round results (live, ECouncil only, during board round) */}
             {userData.isECouncil && voteInfo.round === "board" && voteInfo.boardResults && (
               <div className="mt-4">
@@ -1267,6 +1260,108 @@ export default function VotePage() {
             ) : (
               <div className="text-danger">No results available.</div>
             )}
+          </div>
+        )}
+
+        {/* Confirmation Dialog */}
+        {showConfirmDialog && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon icon={faCheck} className="me-2" />
+                    Confirm Ballot Submission
+                  </h5>
+                </div>
+                <div className="modal-body">
+                  {voteInfo?.type === "Election" ? (
+                    <p>
+                      Are you sure you want to submit your vote for <strong>{selectedOption}</strong>?
+                    </p>
+                  ) : (
+                    <div>
+                      {(() => {
+                        const significantVotes = voteInfo?.pledges?.filter((pledge) => {
+                          const selection = pledgeSelections[pledge];
+                          return (selection?.board && selection.board !== "Continue" && selection.board !== "Abstain") ||
+                                 (selection?.blackball && selection.blackball !== "Continue" && selection.blackball !== "Abstain");
+                        }) || [];
+
+                        if (significantVotes.length > 0) {
+                          return (
+                            <>
+                              <p>Are you sure you want to submit your pledge ballot with the following votes?</p>
+                              <div className="mt-3">
+                                {significantVotes.map((pledge) => {
+                                  const selection = pledgeSelections[pledge];
+                                  const boardVote = selection?.board;
+                                  const blackballVote = selection?.blackball;
+                                  const showBoard = boardVote && boardVote !== "Continue" && boardVote !== "Abstain";
+                                  const showBlackball = blackballVote && blackballVote !== "Continue" && blackballVote !== "Abstain";
+                                  
+                                  return (
+                                    <div key={pledge} className="mb-2">
+                                      <strong>{pledge}:</strong>
+                                      <div className="ms-3">
+                                        {showBoard && (
+                                          <span className="badge bg-warning text-dark me-2">{boardVote}</span>
+                                        )}
+                                        {showBlackball && (
+                                          <span className="badge bg-danger">{blackballVote}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          );
+                        } else {
+                          return <p>Are you sure you want to submit your pledge ballot? All pledges will receive Continue/Abstain votes.</p>;
+                        }
+                      })()}
+                    </div>
+                  )}
+                  <p className="text-warning mt-3">
+                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
+                    This action cannot be undone.
+                  </p>
+                </div>
+                <div className="modal-footer">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowConfirmDialog(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="success"
+                    onClick={() => {
+                      setShowConfirmDialog(false);
+                      if (voteInfo?.type === "Election") {
+                        handleVote();
+                      } else {
+                        handlePledgeBallot();
+                      }
+                    }}
+                    disabled={
+                      submitting || 
+                      (voteInfo?.type === "Pledge" && 
+                        !voteInfo.pledges?.every((pledge) => 
+                          voteInfo.votedPledges?.[pledge] || 
+                          (pledgeSelections[pledge]?.board && pledgeSelections[pledge]?.blackball)
+                        )
+                      )
+                    }
+                  >
+                    <FontAwesomeIcon icon={faCheck} className="me-1" />
+                    {submitting ? "Submitting..." : "Confirm & Submit"}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
