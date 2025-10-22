@@ -28,20 +28,11 @@ export async function POST(req: Request) {
     
     // Check if vote should be auto-ended
     if (vote.endTime && new Date() >= vote.endTime) {
-      if (vote.type === "Pledge" && vote.round === "board") {
-        // Auto-transition to next round
-        vote.round = "blackball";
-        vote.started = false;
-        vote.endTime = null;
-        await vote.save();
-        return NextResponse.json({ error: "Vote round has ended and moved to blackball round" }, { status: 400 });
-      } else {
-        // Auto-end vote
-        vote.ended = true;
-        vote.endTime = null;
-        await vote.save();
-        return NextResponse.json({ error: "Vote has ended" }, { status: 400 });
-      }
+      // Auto-end vote
+      vote.ended = true;
+      vote.endTime = null;
+      await vote.save();
+      return NextResponse.json({ error: "Vote has ended" }, { status: 400 });
     }
     
     if (vote.type === "Election") {
@@ -57,10 +48,10 @@ export async function POST(req: Request) {
       await vote.save();
       return NextResponse.json({ success: true });
     } else if (vote.type === "Pledge") {
-      // Support batch ballot submission
+      // Support batch ballot submission with dual choices
       if (Array.isArray(body.ballot)) {
         for (const item of body.ballot) {
-          const { pledge, choice } = item;
+          const { pledge, boardChoice, blackballChoice } = item;
           if (!vote.pledges.includes(pledge)) {
             return NextResponse.json({ error: `Invalid pledge: ${pledge}` }, { status: 400 });
           }
@@ -70,16 +61,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: `Already voted for ${pledge} this round` }, { status: 400 });
           }
           
-          // Handle abstain votes (null choice) vs actual choices
-          if (choice === null) {
-            // Record abstain vote
-            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: vote.round });
-          } else {
-            const validChoices = vote.round === "board" ? ["Continue", "Board"] : ["Continue", "Blackball"];
-            if (!validChoices.includes(choice)) {
-              return NextResponse.json({ error: `Invalid choice for ${pledge}` }, { status: 400 });
+          // Handle board choice
+          if (boardChoice && boardChoice !== "Abstain") {
+            const validBoardChoices = ["Continue", "Board"];
+            if (!validBoardChoices.includes(boardChoice)) {
+              return NextResponse.json({ error: `Invalid board choice for ${pledge}` }, { status: 400 });
             }
-            vote.votes.push({ clerkId, pledge, choice, round: vote.round });
+            vote.votes.push({ clerkId, pledge, choice: boardChoice, round: "board" });
+          } else {
+            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "board" });
+          }
+          
+          // Handle blackball choice
+          if (blackballChoice && blackballChoice !== "Abstain") {
+            const validBlackballChoices = ["Continue", "Blackball"];
+            if (!validBlackballChoices.includes(blackballChoice)) {
+              return NextResponse.json({ error: `Invalid blackball choice for ${pledge}` }, { status: 400 });
+            }
+            vote.votes.push({ clerkId, pledge, choice: blackballChoice, round: "blackball" });
+          } else {
+            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "blackball" });
           }
         }
         await vote.save();
@@ -120,18 +121,10 @@ export async function GET(req: Request) {
     
     // Check if vote should be auto-ended
     if (vote.endTime && new Date() >= vote.endTime && !vote.ended) {
-      if (vote.type === "Pledge" && vote.round === "board") {
-        // Auto-transition to next round
-        vote.round = "blackball";
-        vote.started = false;
-        vote.endTime = null;
-        await vote.save();
-      } else {
-        // Auto-end vote
-        vote.ended = true;
-        vote.endTime = null;
-        await vote.save();
-      }
+      // Auto-end vote
+      vote.ended = true;
+      vote.endTime = null;
+      await vote.save();
     }
     
     if (vote.type === "Election") {
@@ -147,15 +140,19 @@ export async function GET(req: Request) {
         totalVotes: vote.votes.length,
       });
     } else if (vote.type === "Pledge") {
-      // For each pledge, check if user has voted in this round and what they voted
+      // For each pledge, check if user has voted in both rounds
       const votedPledges: Record<string, boolean> = {};
       const abstainedPledges: Record<string, boolean> = {};
       for (const pledge of vote.pledges) {
-        const userVote = vote.votes.find(
-          (v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === vote.round
+        const boardVote = vote.votes.find(
+          (v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === "board"
         );
-        votedPledges[pledge] = !!userVote;
-        abstainedPledges[pledge] = userVote?.choice === "Abstain";
+        const blackballVote = vote.votes.find(
+          (v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === "blackball"
+        );
+        // Consider voted if they have votes in both rounds
+        votedPledges[pledge] = !!(boardVote && blackballVote);
+        abstainedPledges[pledge] = (boardVote?.choice === "Abstain" && blackballVote?.choice === "Abstain");
       }
       return NextResponse.json({
         type: vote.type,
@@ -166,7 +163,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         votedPledges,
         abstainedPledges,
-        totalVotes: vote.votes.filter((v: any) => v.round === vote.round).length,
+        totalVotes: Math.floor(vote.votes.filter((v: any) => v.round === "board").length), // Count unique voters
       });
     }
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });
