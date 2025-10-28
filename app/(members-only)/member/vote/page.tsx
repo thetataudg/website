@@ -258,11 +258,11 @@ export default function VotePage() {
     }
   };
 
-  // Live update: poll every 8 seconds when signed in
+  // Live update: poll every 10 seconds when signed in
   useEffect(() => {
     if (!isSignedIn) return;
     fetchVoteInfo();
-    pollingRef.current = setInterval(fetchVoteInfo, 8000);
+    pollingRef.current = setInterval(fetchVoteInfo, 10000);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
