@@ -83,6 +83,7 @@ export async function PATCH(req: Request) {
     if (action === "start") {
       if (vote.started) return NextResponse.json({ error: "Vote already started" }, { status: 400 });
       vote.started = true;
+      vote.startedAt = new Date(); // Set the start time
       vote.endTime = null; // Clear any existing end time
       await vote.save();
       return NextResponse.json({ success: true });
@@ -163,6 +164,7 @@ export async function GET(req: Request) {
         options: vote.options,
         started: vote.started,
         ended: vote.ended,
+        startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         results: tally,
         totalVotes: vote.votes.length, // This includes abstentions
@@ -191,6 +193,7 @@ export async function GET(req: Request) {
         started: vote.started,
         ended: vote.ended,
         round: vote.round,
+        startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         boardResults,
         blackballResults,

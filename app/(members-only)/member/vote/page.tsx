@@ -33,6 +33,7 @@ type VoteInfo = {
   votedPledges?: Record<string, boolean>;
   abstainedPledges?: Record<string, boolean>;
   totalVotes?: number;
+  startedAt?: string | null;
   endTime?: string | null;
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
@@ -50,6 +51,8 @@ type VoteResults = {
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
   totalVotes: number;
+  startedAt?: string | null;
+  endTime?: string | null;
   showBoardOnly?: boolean;
 };
 
@@ -88,9 +91,27 @@ export default function VotePage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [countdownTarget, setCountdownTarget] = useState<string | null>(null);
 
+  // Modal state for alerts and confirmations
+  const [alertModal, setAlertModal] = useState<{ show: boolean; title: string; message: string; variant: 'danger' | 'success' | 'warning' }>({
+    show: false,
+    title: '',
+    message: '',
+    variant: 'danger'
+  });
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
+    show: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
   // Polling
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Elapsed time state
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -148,6 +169,48 @@ export default function VotePage() {
       }
     };
   }, [voteInfo?.endTime, voteInfo?.ended]);
+
+  // Elapsed time effect
+  useEffect(() => {
+    if (voteInfo?.startedAt && voteInfo.started) {
+      const startTime = new Date(voteInfo.startedAt).getTime();
+      console.log('Starting timer - startedAt:', voteInfo.startedAt, 'startTime:', startTime);
+      
+      const updateElapsed = () => {
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        console.log('Elapsed time:', elapsed);
+        setElapsedTime(elapsed);
+      };
+      
+      updateElapsed(); // Initial update
+      
+      // Only run interval if vote is still active
+      if (!voteInfo.ended) {
+        elapsedTimerRef.current = setInterval(updateElapsed, 1000);
+      } else {
+        // For ended votes, just show the final elapsed time
+        if (elapsedTimerRef.current) {
+          clearInterval(elapsedTimerRef.current);
+          elapsedTimerRef.current = null;
+        }
+      }
+    } else {
+      console.log('Timer not started - startedAt:', voteInfo?.startedAt, 'started:', voteInfo?.started, 'ended:', voteInfo?.ended);
+      setElapsedTime(0);
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    };
+  }, [voteInfo?.startedAt, voteInfo?.started, voteInfo?.ended]);
 
   // Fetch vote info
   const fetchVoteInfo = async () => {
@@ -264,7 +327,12 @@ export default function VotePage() {
       handleCloseStartVote();
       fetchVoteInfo();
     } catch (err: any) {
-      alert(err?.response?.data?.error || "Failed to create vote.");
+      setAlertModal({
+        show: true,
+        title: 'Failed to Create Vote',
+        message: err?.response?.data?.error || "Failed to create vote.",
+        variant: 'danger'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -279,7 +347,12 @@ export default function VotePage() {
       setVoted(true);
       fetchVoteInfo();
     } catch (err: any) {
-      alert(err?.response?.data?.error || "Failed to submit vote.");
+      setAlertModal({
+        show: true,
+        title: 'Failed to Submit Vote',
+        message: err?.response?.data?.error || "Failed to submit vote.",
+        variant: 'danger'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -305,7 +378,12 @@ export default function VotePage() {
       await axios.post("/api/vote", { ballot });
       fetchVoteInfo();
     } catch (err: any) {
-      alert(err?.response?.data?.error || "Failed to submit ballot.");
+      setAlertModal({
+        show: true,
+        title: 'Failed to Submit Ballot',
+        message: err?.response?.data?.error || "Failed to submit ballot.",
+        variant: 'danger'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -318,7 +396,12 @@ export default function VotePage() {
       await axios.patch("/api/vote/manage", { action: "start" });
       fetchVoteInfo();
     } catch (err: any) {
-      alert(err?.response?.data?.error || "Failed to start vote.");
+      setAlertModal({
+        show: true,
+        title: 'Failed to Start Vote',
+        message: err?.response?.data?.error || "Failed to start vote.",
+        variant: 'danger'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -348,7 +431,12 @@ export default function VotePage() {
       setCountdownSeconds(30);
       fetchVoteInfo();
     } catch (err: any) {
-      alert(err?.response?.data?.error || "Failed to end vote.");
+      setAlertModal({
+        show: true,
+        title: 'Failed to End Vote',
+        message: err?.response?.data?.error || "Failed to end vote.",
+        variant: 'danger'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -357,30 +445,76 @@ export default function VotePage() {
   const handleDeleteVote = async () => {
     if (!voteInfo) return;
     if (!voteInfo.ended) {
-      if (!window.confirm("The vote is still running. End it before deleting?")) return;
-      setSubmitting(true);
-      try {
-        await axios.patch("/api/vote/manage", { action: "end" });
-        await fetchVoteInfo();
-      } catch (err: any) {
-        alert(err?.response?.data?.error || "Failed to end vote.");
-        setSubmitting(false);
-        return;
-      }
-      setSubmitting(false);
+      setConfirmModal({
+        show: true,
+        title: 'Vote Still Running',
+        message: 'The vote is still running. End it before deleting?',
+        onConfirm: async () => {
+          setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
+          setSubmitting(true);
+          try {
+            await axios.patch("/api/vote/manage", { action: "end" });
+            await fetchVoteInfo();
+            // After ending, prompt to delete
+            setConfirmModal({
+              show: true,
+              title: 'Delete Vote',
+              message: 'Are you sure you want to delete the ended vote? This cannot be undone.',
+              onConfirm: async () => {
+                setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
+                setSubmitting(true);
+                try {
+                  await axios.delete("/api/vote/manage");
+                  await fetchVoteInfo();
+                  window.location.reload(); // Refresh to clear state
+                } catch (err: any) {
+                  setAlertModal({
+                    show: true,
+                    title: 'Failed to Delete Vote',
+                    message: err?.response?.data?.error || "Failed to delete vote.",
+                    variant: 'danger'
+                  });
+                } finally {
+                  setSubmitting(false);
+                }
+              }
+            });
+          } catch (err: any) {
+            setAlertModal({
+              show: true,
+              title: 'Failed to End Vote',
+              message: err?.response?.data?.error || "Failed to end vote.",
+              variant: 'danger'
+            });
+            setSubmitting(false);
+          }
+        }
+      });
+      return;
     }
-    if (window.confirm("Are you sure you want to delete the ended vote? This cannot be undone.")) {
-      setSubmitting(true);
-      try {
-        await axios.delete("/api/vote/manage");
-        await fetchVoteInfo();
-        window.location.reload(); // Refresh to clear state
-      } catch (err: any) {
-        alert(err?.response?.data?.error || "Failed to delete vote.");
-      } finally {
-        setSubmitting(false);
+    setConfirmModal({
+      show: true,
+      title: 'Delete Vote',
+      message: 'Are you sure you want to delete the ended vote? This cannot be undone.',
+      onConfirm: async () => {
+        setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
+        setSubmitting(true);
+        try {
+          await axios.delete("/api/vote/manage");
+          await fetchVoteInfo();
+          window.location.reload(); // Refresh to clear state
+        } catch (err: any) {
+          setAlertModal({
+            show: true,
+            title: 'Failed to Delete Vote',
+            message: err?.response?.data?.error || "Failed to delete vote.",
+            variant: 'danger'
+          });
+        } finally {
+          setSubmitting(false);
+        }
       }
-    }
+    });
   };
 
   // Show results - modified to handle board-only results
@@ -404,7 +538,12 @@ export default function VotePage() {
       }
     } catch (err: any) {
       setVoteResults(null);
-      alert(err?.response?.data?.error || "Failed to fetch results.");
+      setAlertModal({
+        show: true,
+        title: 'Failed to Fetch Results',
+        message: err?.response?.data?.error || "Failed to fetch results.",
+        variant: 'danger'
+      });
     } finally {
       setResultsLoading(false);
     }
@@ -413,6 +552,31 @@ export default function VotePage() {
   const handleCloseResults = () => {
     setShowResults(false);
     setVoteResults(null);
+  };
+
+  // Helper to format elapsed time
+  const formatElapsedTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  };
+
+  // Helper to format time of day
+  const formatTime = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   // Helper for pledge badge
@@ -524,8 +688,8 @@ export default function VotePage() {
 
         {/* Countdown Alert */}
         {currentCountdown !== null && countdownTarget && (
-          <div className="alert alert-danger d-flex align-items-center mt-3" role="alert">
-            <FontAwesomeIcon icon={faClock} className="me-2" />
+          <div className="alert alert-primary d-flex align-items-center mt-3" role="alert">
+            <FontAwesomeIcon icon={faHourglass} className="me-2" />
             <div className="flex-grow-1">
               <b>{countdownTarget} in {currentCountdown} second{currentCountdown !== 1 ? 's' : ''}...</b>
             </div>
@@ -540,118 +704,162 @@ export default function VotePage() {
               Loading vote info...
             </div>
           ) : voteInfo && voteInfo.type === "Election" ? (
-            <div className={`alert ${voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
-              <div className="d-flex align-items-center">
-                <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
-                <div>
-                  <b>
-                    Election vote is{" "}
-                    {voteInfo.started
-                      ? voteInfo.ended
-                        ? "completed"
-                        : "running"
-                      : "suspended"}
-                    .
-                  </b>
-                  {voteLoading && (
-                    <span className="ms-2 text-muted">
-                      <FontAwesomeIcon icon={faHourglass} spin />
+            <>
+              <div className={`alert ${voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
+                <div className="d-flex align-items-center">
+                  <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
+                  <div>
+                    <b>
+                      Election vote is{" "}
+                      {voteInfo.started
+                        ? voteInfo.ended
+                          ? "completed"
+                          : "running"
+                        : "suspended"}
+                      .
+                    </b>
+                    {voteLoading && (
+                      <span className="ms-2 text-muted">
+                        <FontAwesomeIcon icon={faHourglass} spin />
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="d-flex align-items-center gap-2">
+                  {typeof voteInfo.totalVotes === "number" && (
+                    <span className="badge bg-info text-dark">
+                      {voteInfo.totalVotes} ballot{voteInfo.totalVotes === 1 ? "" : "s"} received
                     </span>
                   )}
                 </div>
               </div>
               
-              <div className="d-flex align-items-center gap-2">
-                {typeof voteInfo.totalVotes === "number" && (
-                  <span className="badge bg-info text-dark">
-                    {voteInfo.totalVotes} ballot{voteInfo.totalVotes === 1 ? "" : "s"} received
-                  </span>
-                )}
-                
-                {userData.isECouncil && (
-                  <div className="d-flex gap-2">
-                    {!voteInfo.started && !voteInfo.ended && (
-                      <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
-                        <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+              {/* E-Council Control Panel */}
+              {userData.isECouncil && (
+                <div className="border rounded p-3 mb-3" style={{ backgroundColor: "#f8f9fa" }}>
+                  <div className="d-flex align-items-center justify-content-between mb-3">
+                    <h6 className="mb-0">
+                      <FontAwesomeIcon icon={faUser} className="me-2" />
+                      E-Council Controls
+                    </h6>
+                    <div className="d-flex gap-2">
+                      {!voteInfo.started && !voteInfo.ended && (
+                        <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
+                          <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+                        </Button>
+                      )}
+                      {voteInfo.started && !voteInfo.ended && (
+                        <Button size="sm" variant="danger" onClick={handleShowEndCountdown} disabled={submitting}>
+                          <FontAwesomeIcon icon={faStop} className="me-1" /> End
+                        </Button>
+                      )}
+                      {voteInfo.ended && (
+                        <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
+                          <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
+                        <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
                       </Button>
-                    )}
-                    {voteInfo.started && !voteInfo.ended && (
-                      <Button size="sm" variant="danger" onClick={handleShowEndCountdown} disabled={submitting}>
-                        <FontAwesomeIcon icon={faStop} className="me-1" /> End
-                      </Button>
-                    )}
-                    {voteInfo.ended && (
-                      <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
-                        <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
-                      <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
-                    </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+                  
+                  {/* Time Information */}
+                  {voteInfo.started && (
+                    <div>
+                      <small className="d-block mb-1">
+                        Time Running: <strong>{formatElapsedTime(elapsedTime)}</strong>
+                        {' • '}
+                        Scheduled End: <strong>{voteInfo.endTime ? formatTime(voteInfo.endTime) : 'N/A'}</strong>
+                      </small>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           ) : voteInfo && voteInfo.type === "Pledge" ? (
-            <div className={`alert ${voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
-              <div className="d-flex align-items-center">
-                <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
-                <div>
-                  <b>
-                    Pledge vote is{" "}
-                    {voteInfo.started
-                      ? voteInfo.ended
-                        ? "completed"
-                        : voteInfo.round === "blackball"
-                        ? "on blackball round"
-                        : "on board round"
-                      : "suspended"}
-                    .
-                  </b>
-                  {voteLoading && (
-                    <span className="ms-2 text-muted">
-                      <FontAwesomeIcon icon={faHourglass} spin />
+            <>
+              <div className={`alert ${voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
+                <div className="d-flex align-items-center">
+                  <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
+                  <div>
+                    <b>
+                      Pledge vote is{" "}
+                      {voteInfo.started
+                        ? voteInfo.ended
+                          ? "completed"
+                          : voteInfo.round === "blackball"
+                          ? "active"
+                          : "active"
+                        : "suspended"}
+                      .
+                    </b>
+                    {voteLoading && (
+                      <span className="ms-2 text-muted">
+                        <FontAwesomeIcon icon={faHourglass} spin />
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="d-flex align-items-center gap-2">
+                  {typeof voteInfo.totalVotes === "number" && voteInfo.pledges?.length && (
+                    <span className="badge bg-info text-dark">
+                      {Math.floor(voteInfo.totalVotes / voteInfo.pledges.length)} active{Math.floor(voteInfo.totalVotes / voteInfo.pledges.length) === 1 ? "" : "s"} voted
                     </span>
                   )}
                 </div>
               </div>
               
-              <div className="d-flex align-items-center gap-2">
-                {typeof voteInfo.totalVotes === "number" && voteInfo.pledges?.length && (
-                  <span className="badge bg-info text-dark">
-                    {Math.floor(voteInfo.totalVotes / voteInfo.pledges.length)} active{Math.floor(voteInfo.totalVotes / voteInfo.pledges.length) === 1 ? "" : "s"} voted
-                  </span>
-                )}
-                
-                {userData.isECouncil && (
-                  <div className="d-flex gap-2">
-                    {!voteInfo.started && !voteInfo.ended && (
-                      <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
-                        <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+              {/* E-Council Control Panel */}
+              {userData.isECouncil && (
+                <div className="border rounded p-3 mb-3" style={{ backgroundColor: "#f8f9fa" }}>
+                  <div className="d-flex align-items-center justify-content-between mb-3">
+                    <h6 className="mb-0">
+                      <FontAwesomeIcon icon={faUser} className="me-2" />
+                      E-Council Controls
+                    </h6>
+                    <div className="d-flex gap-2">
+                      {!voteInfo.started && !voteInfo.ended && (
+                        <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
+                          <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+                        </Button>
+                      )}
+                      {voteInfo.started && !voteInfo.ended && (
+                        <Button 
+                          size="sm" 
+                          variant="danger"
+                          onClick={handleShowEndCountdown} 
+                          disabled={submitting}
+                        >
+                          <FontAwesomeIcon icon={faStop} className="me-1" /> End
+                        </Button>
+                      )}
+                      {voteInfo.ended && (
+                        <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
+                          <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
+                        <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
                       </Button>
-                    )}
-                    {voteInfo.started && !voteInfo.ended && (
-                      <Button 
-                        size="sm" 
-                        variant="danger"
-                        onClick={handleShowEndCountdown} 
-                        disabled={submitting}
-                      >
-                        <FontAwesomeIcon icon={faStop} className="me-1" /> End
-                      </Button>
-                    )}
-                    {voteInfo.ended && (
-                      <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
-                        <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
-                      <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
-                    </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+                  
+                  {/* Time Information */}
+                  {voteInfo.started && (
+                    <div>
+                      <small className="d-block mb-1">
+                        Time Running: <strong>{formatElapsedTime(elapsedTime)}</strong>
+                        {' • '}
+                        Scheduled End: <strong>{voteInfo.endTime ? formatTime(voteInfo.endTime) : 'N/A'}</strong>
+                      </small>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           ) : (
             <div className="alert alert-dark d-flex align-items-center" role="alert">
               No votes are running.
@@ -938,8 +1146,8 @@ export default function VotePage() {
           <div className="mt-4">
             <h4>
               {voteInfo.round === "board"
-                ? "Board Round: Vote for Each Pledge"
-                : "Blackball Round: Vote for Each Pledge"}
+                ? "Pledge Vote: Vote for Each Pledge"
+                : "Pledge Vote: Vote for Each Pledge"}
             </h4>
             <form
               onSubmit={(e) => {
@@ -1358,6 +1566,72 @@ export default function VotePage() {
                   >
                     <FontAwesomeIcon icon={faCheck} className="me-1" />
                     {submitting ? "Submitting..." : "Confirm & Submit"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Alert Modal */}
+        {alertModal.show && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className={`modal-header bg-${alertModal.variant} text-white`}>
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon 
+                      icon={alertModal.variant === 'danger' ? faTimes : alertModal.variant === 'warning' ? faExclamationTriangle : faCheck} 
+                      className="me-2" 
+                    />
+                    {alertModal.title}
+                  </h5>
+                </div>
+                <div className="modal-body">
+                  <p>{alertModal.message}</p>
+                </div>
+                <div className="modal-footer">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setAlertModal({ show: false, title: '', message: '', variant: 'danger' })}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirm Modal */}
+        {confirmModal.show && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-warning">
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                    {confirmModal.title}
+                  </h5>
+                </div>
+                <div className="modal-body">
+                  <p>{confirmModal.message}</p>
+                </div>
+                <div className="modal-footer">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} })}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={confirmModal.onConfirm}
+                    disabled={submitting}
+                  >
+                    <FontAwesomeIcon icon={faCheck} className="me-1" />
+                    {submitting ? 'Processing...' : 'Confirm'}
                   </Button>
                 </div>
               </div>
