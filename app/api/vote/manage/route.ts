@@ -149,10 +149,15 @@ export async function GET(req: Request) {
     }
     
     if (vote.type === "Election") {
-      // Tally results - exclude abstentions from option tallies
+      // Tally results - exclude abstentions and invalidated ballots
       const tally: Record<string, number> = {};
       for (const opt of vote.options) tally[opt] = 0;
-      for (const v of vote.votes) {
+      
+      const validVotes = vote.votes.filter((v: any) => 
+        !vote.invalidatedBallots?.includes(v.clerkId)
+      );
+      
+      for (const v of validVotes) {
         if (typeof v.choice === "string" && tally.hasOwnProperty(v.choice)) {
           tally[v.choice]++;
         }
@@ -167,26 +172,56 @@ export async function GET(req: Request) {
         startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         results: tally,
-        totalVotes: vote.votes.length, // This includes abstentions
+        totalVotes: validVotes.length, // This includes abstentions but excludes invalidated
+        voterListVerified: vote.voterListVerified || false,
       });
     } else if (vote.type === "Pledge") {
+      // Filter out invalidated ballots
+      const validVotes = vote.votes.filter((v: any) => 
+        !vote.invalidatedBallots?.includes(v.clerkId)
+      );
+      
       // Board round results
-      const boardResults: Record<string, { continue: number; board: number }> = {};
-      const blackballResults: Record<string, { continue: number; blackball: number }> = {};
+      const boardResults: Record<string, { continue: number; board: number; invalidBoard?: boolean }> = {};
+      const blackballResults: Record<string, { continue: number; blackball: number; invalidBlackball?: boolean }> = {};
+      
       for (const pledge of vote.pledges) {
-        boardResults[pledge] = { continue: 0, board: 0 };
-        blackballResults[pledge] = { continue: 0, blackball: 0 };
-      }
-      for (const v of vote.votes) {
-        if (v.round === "board" && boardResults[v.pledge]) {
-          if (v.choice === "Continue") boardResults[v.pledge].continue++;
-          if (v.choice === "Board") boardResults[v.pledge].board++;
+        const hasCon = vote.pledgeValidCons?.get(pledge) || false;
+        boardResults[pledge] = { continue: 0, board: 0, invalidBoard: false };
+        blackballResults[pledge] = { continue: 0, blackball: 0, invalidBlackball: false };
+        
+        // Check if there are any board/blackball votes for this pledge
+        let hasBoardVote = false;
+        let hasBlackballVote = false;
+        
+        for (const v of validVotes) {
+          if (v.pledge === pledge) {
+            if (v.round === "board") {
+              if (v.choice === "Continue") boardResults[pledge].continue++;
+              if (v.choice === "Board") {
+                boardResults[pledge].board++;
+                hasBoardVote = true;
+              }
+            }
+            if (v.round === "blackball") {
+              if (v.choice === "Continue") blackballResults[pledge].continue++;
+              if (v.choice === "Blackball") {
+                blackballResults[pledge].blackball++;
+                hasBlackballVote = true;
+              }
+            }
+          }
         }
-        if (v.round === "blackball" && blackballResults[v.pledge]) {
-          if (v.choice === "Continue") blackballResults[v.pledge].continue++;
-          if (v.choice === "Blackball") blackballResults[v.pledge].blackball++;
+        
+        // Mark as invalid if they have board/blackball votes but no valid con
+        if (hasBoardVote && !hasCon) {
+          boardResults[pledge].invalidBoard = true;
+        }
+        if (hasBlackballVote && !hasCon) {
+          blackballResults[pledge].invalidBlackball = true;
         }
       }
+      
       return NextResponse.json({
         type: vote.type,
         pledges: vote.pledges,
@@ -197,7 +232,8 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         boardResults,
         blackballResults,
-        totalVotes: vote.votes.length,
+        totalVotes: validVotes.filter((v: any) => v.round === "board").length,
+        voterListVerified: vote.voterListVerified || false,
       });
     }
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });

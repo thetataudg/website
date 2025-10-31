@@ -35,6 +35,7 @@ type VoteInfo = {
   totalVotes?: number;
   startedAt?: string | null;
   endTime?: string | null;
+  voterListVerified?: boolean;
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
 };
@@ -48,12 +49,21 @@ type VoteResults = {
   ended: boolean;
   round?: "board" | "blackball";
   results?: Record<string, number>;
-  boardResults?: Record<string, { continue: number; board: number }>;
-  blackballResults?: Record<string, { continue: number; blackball: number }>;
+  boardResults?: Record<string, { continue: number; board: number; invalidBoard?: boolean }>;
+  blackballResults?: Record<string, { continue: number; blackball: number; invalidBlackball?: boolean }>;
   totalVotes: number;
   startedAt?: string | null;
   endTime?: string | null;
   showBoardOnly?: boolean;
+  voterListVerified?: boolean;
+};
+
+type VoterInfo = {
+  clerkId: string;
+  name: string;
+  rollNo: string;
+  status: 'voted' | 'no-ballot';
+  isInvalidated: boolean;
 };
 
 export default function VotePage() {
@@ -105,10 +115,22 @@ export default function VotePage() {
     onConfirm: () => {}
   });
 
+  // Voter list and ballot management state
+  const [showVoterList, setShowVoterList] = useState(false);
+  const [voterList, setVoterList] = useState<VoterInfo[]>([]);
+  const [voterListLoading, setVoterListLoading] = useState(false);
+  const [voterListVerified, setVoterListVerified] = useState(false);
+
+  // Pledge cons management state
+  const [showPledgeCons, setShowPledgeCons] = useState(false);
+  const [pledgeCons, setPledgeCons] = useState<Record<string, boolean>>({});
+  const [pledgeConsLoading, setPledgeConsLoading] = useState(false);
+
   // Polling
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownVoterListRef = useRef<boolean>(false);
 
   // Elapsed time state
   const [elapsedTime, setElapsedTime] = useState<number>(0);
@@ -246,6 +268,7 @@ export default function VotePage() {
         return res.data;
       });
       setVoted(res.data.hasVoted || false);
+      setVoterListVerified(res.data.voterListVerified || false);
     } catch (err: any) {
       if (err.response && err.response.data && err.response.data.error) {
         setVoteError(err.response.data.error);
@@ -268,6 +291,50 @@ export default function VotePage() {
     };
     // eslint-disable-next-line
   }, [isSignedIn]);
+
+  // Auto-show voter list when vote ends for E-Council (before verification)
+  useEffect(() => {
+    if (voteInfo && voteInfo.ended && !voteInfo.voterListVerified && userData?.isECouncil && !hasShownVoterListRef.current) {
+      // Set show to true and fetch voter list
+      setShowVoterList(true);
+      setVoterListLoading(true);
+      axios.get("/api/vote/ballots")
+        .then(res => {
+          setVoterList(res.data.voterList || []);
+          setVoterListVerified(res.data.voterListVerified || false);
+        })
+        .catch(err => {
+          setAlertModal({
+            show: true,
+            title: 'Failed to Fetch Voter List',
+            message: err?.response?.data?.error || "Failed to fetch voter list.",
+            variant: 'danger'
+          });
+          setShowVoterList(false);
+        })
+        .finally(() => {
+          setVoterListLoading(false);
+        });
+      hasShownVoterListRef.current = true;
+    }
+    // Mark as shown if already verified (so it doesn't try to show on page load)
+    if (voteInfo?.voterListVerified) {
+      hasShownVoterListRef.current = true;
+    }
+    // Reset ref when vote is no longer ended or when it's a new vote
+    if (!voteInfo?.ended) {
+      hasShownVoterListRef.current = false;
+    }
+    // eslint-disable-next-line
+  }, [voteInfo?.ended, voteInfo?.voterListVerified, userData?.isECouncil]);
+
+  // Auto-show results when vote is ended and verified
+  useEffect(() => {
+    if (voteInfo && voteInfo.ended && voteInfo.voterListVerified && userData?.isECouncil && !showResults) {
+      handleShowResults();
+    }
+    // eslint-disable-next-line
+  }, [voteInfo?.ended, voteInfo?.voterListVerified, userData?.isECouncil]);
 
   // Start vote handlers (replaced modal handlers)
   const handleOpenStartVote = () => setShowStartVote(true);
@@ -523,6 +590,7 @@ export default function VotePage() {
     setShowResults(true);
     try {
       const res = await axios.get("/api/vote/manage");
+      setVoterListVerified(res.data.voterListVerified || false);
       // If boardOnly is true, remove blackball results from the response
       if (boardOnly && res.data.blackballResults) {
         setVoteResults({
@@ -552,6 +620,155 @@ export default function VotePage() {
   const handleCloseResults = () => {
     setShowResults(false);
     setVoteResults(null);
+  };
+
+  // Voter list management
+  const handleShowVoterList = async () => {
+    // Prevent opening if already verified
+    if (voteInfo?.voterListVerified) {
+      setAlertModal({
+        show: true,
+        title: 'Already Verified',
+        message: 'The voter list has already been verified and cannot be modified.',
+        variant: 'warning'
+      });
+      return;
+    }
+    
+    setVoterListLoading(true);
+    setShowVoterList(true);
+    try {
+      const res = await axios.get("/api/vote/ballots");
+      setVoterList(res.data.voterList || []);
+      setVoterListVerified(res.data.voterListVerified || false);
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Fetch Voter List',
+        message: err?.response?.data?.error || "Failed to fetch voter list.",
+        variant: 'danger'
+      });
+      setShowVoterList(false);
+    } finally {
+      setVoterListLoading(false);
+    }
+  };
+
+  const handleInvalidateBallot = async (clerkId: string) => {
+    try {
+      await axios.post("/api/vote/ballots", { clerkId });
+      // Refresh voter list and results
+      await handleShowVoterList();
+      if (showResults) {
+        await handleShowResults();
+      }
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Invalidate Ballot',
+        message: err?.response?.data?.error || "Failed to invalidate ballot.",
+        variant: 'danger'
+      });
+    }
+  };
+
+  const handleRestoreBallot = async (clerkId: string) => {
+    try {
+      await axios.delete(`/api/vote/ballots?clerkId=${clerkId}`);
+      // Refresh voter list and results
+      await handleShowVoterList();
+      if (showResults) {
+        await handleShowResults();
+      }
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Restore Ballot',
+        message: err?.response?.data?.error || "Failed to restore ballot.",
+        variant: 'danger'
+      });
+    }
+  };
+
+  const handleCloseVoterList = () => {
+    setShowVoterList(false);
+    setVoterList([]);
+  };
+
+  const handleVerifyVoterList = async () => {
+    try {
+      await axios.put("/api/vote/ballots");
+      setVoterListVerified(true);
+      setShowVoterList(false);
+      // Automatically show results after verification
+      await handleShowResults();
+      fetchVoteInfo(); // Refresh to get updated verification status
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Verify Voter List',
+        message: err?.response?.data?.error || "Failed to verify voter list.",
+        variant: 'danger'
+      });
+    }
+  };
+
+  // Pledge cons management
+  const handleShowPledgeCons = async () => {
+    setPledgeConsLoading(true);
+    setShowPledgeCons(true);
+    try {
+      const res = await axios.get("/api/vote/pledge-cons");
+      setPledgeCons(res.data.pledgeValidCons || {});
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Fetch Pledge Cons',
+        message: err?.response?.data?.error || "Failed to fetch pledge cons.",
+        variant: 'danger'
+      });
+      setShowPledgeCons(false);
+    } finally {
+      setPledgeConsLoading(false);
+    }
+  };
+
+  const handleTogglePledgeCon = (pledge: string) => {
+    setPledgeCons(prev => ({
+      ...prev,
+      [pledge]: !prev[pledge]
+    }));
+  };
+
+  const handleSavePledgeCons = async () => {
+    setPledgeConsLoading(true);
+    try {
+      await axios.post("/api/vote/pledge-cons", { pledgeValidCons: pledgeCons });
+      setAlertModal({
+        show: true,
+        title: 'Success',
+        message: 'Pledge cons saved successfully.',
+        variant: 'success'
+      });
+      setShowPledgeCons(false);
+      // Refresh results if showing
+      if (showResults) {
+        await handleShowResults();
+      }
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Save Pledge Cons',
+        message: err?.response?.data?.error || "Failed to save pledge cons.",
+        variant: 'danger'
+      });
+    } finally {
+      setPledgeConsLoading(false);
+    }
+  };
+
+  const handleClosePledgeCons = () => {
+    setShowPledgeCons(false);
   };
 
   // Helper to format elapsed time
@@ -588,6 +805,9 @@ export default function VotePage() {
     // Blackball round: check blackball first, then board
     if (blackballResults && blackballResults[pledge]) {
       if (blackballResults[pledge].blackball > 0) {
+        if (blackballResults[pledge].invalidBlackball) {
+          return { variant: "primary", icon: faExclamationTriangle, text: "Invalid Blackball" };
+        }
         return { variant: "danger", icon: faTimes, text: "Blackball" };
       }
       if (blackballResults[pledge].continue > 0) {
@@ -597,6 +817,9 @@ export default function VotePage() {
     // Board round: check board
     if (boardResults && boardResults[pledge]) {
       if (boardResults[pledge].board > 0) {
+        if (boardResults[pledge].invalidBoard) {
+          return { variant: "primary", icon: faExclamationTriangle, text: "Invalid Board" };
+        }
         return { variant: "warning", icon: faExclamationTriangle, text: "Board" };
       }
       if (boardResults[pledge].continue > 0) {
@@ -755,8 +978,44 @@ export default function VotePage() {
                         </Button>
                       )}
                       {voteInfo.ended && (
-                        <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
-                          <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
+                        <>
+                          {!voteInfo.voterListVerified && (
+                            <Button 
+                              size="sm" 
+                              variant="info" 
+                              onClick={() => {
+                                setShowVoterList(true);
+                                if (voterList.length === 0) {
+                                  setVoterListLoading(true);
+                                  axios.get("/api/vote/ballots")
+                                    .then(res => {
+                                      setVoterList(res.data.voterList || []);
+                                      setVoterListVerified(res.data.voterListVerified || false);
+                                    })
+                                    .catch(err => {
+                                      setAlertModal({
+                                        show: true,
+                                        title: 'Failed to Fetch Voter List',
+                                        message: err?.response?.data?.error || "Failed to fetch voter list.",
+                                        variant: 'danger'
+                                      });
+                                      setShowVoterList(false);
+                                    })
+                                    .finally(() => {
+                                      setVoterListLoading(false);
+                                    });
+                                }
+                              }}
+                              disabled={voterListLoading}
+                            >
+                              <FontAwesomeIcon icon={faUser} className="me-1" /> Voter List
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {voteInfo.type === "Pledge" && (
+                        <Button size="sm" variant="secondary" onClick={handleShowPledgeCons} disabled={pledgeConsLoading}>
+                          <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" /> Cons
                         </Button>
                       )}
                       <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
@@ -837,10 +1096,44 @@ export default function VotePage() {
                         </Button>
                       )}
                       {voteInfo.ended && (
-                        <Button size="sm" variant="primary" onClick={() => handleShowResults()} disabled={resultsLoading}>
-                          <FontAwesomeIcon icon={faChartBar} className="me-1" /> Results
-                        </Button>
+                        <>
+                          {!voteInfo.voterListVerified && (
+                            <Button 
+                              size="sm" 
+                              variant="info" 
+                              onClick={() => {
+                                setShowVoterList(true);
+                                if (voterList.length === 0) {
+                                  setVoterListLoading(true);
+                                  axios.get("/api/vote/ballots")
+                                    .then(res => {
+                                      setVoterList(res.data.voterList || []);
+                                      setVoterListVerified(res.data.voterListVerified || false);
+                                    })
+                                    .catch(err => {
+                                      setAlertModal({
+                                        show: true,
+                                        title: 'Failed to Fetch Voter List',
+                                        message: err?.response?.data?.error || "Failed to fetch voter list.",
+                                        variant: 'danger'
+                                      });
+                                      setShowVoterList(false);
+                                    })
+                                    .finally(() => {
+                                      setVoterListLoading(false);
+                                    });
+                                }
+                              }}
+                              disabled={voterListLoading}
+                            >
+                              <FontAwesomeIcon icon={faUser} className="me-1" /> Voter List
+                            </Button>
+                          )}
+                        </>
                       )}
+                      <Button size="sm" variant="secondary" onClick={handleShowPledgeCons} disabled={pledgeConsLoading}>
+                        <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" /> Cons
+                      </Button>
                       <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
                         <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
                       </Button>
@@ -1072,6 +1365,94 @@ export default function VotePage() {
                 End in {countdownSeconds}s
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* Voter List Verification Panel */}
+        {showVoterList && voteInfo && voteInfo.ended && (
+          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">
+                <FontAwesomeIcon icon={faUser} className="me-2" />
+                Voter List & Ballot Management
+              </h4>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseVoterList}>
+                <FontAwesomeIcon icon={faTimes} className="me-1" />
+                Close
+              </Button>
+            </div>
+
+            {voterListLoading ? (
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {!voterListVerified && (
+                  <div className="alert alert-warning mb-3">
+                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                    Review the voter list and invalidate any ballots from members who were not present. 
+                    Click "Verify Voter List" when complete to enable viewing results.
+                  </div>
+                )}
+                <div className="list-group mb-3" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {voterList.map((voter) => (
+                    <div
+                      key={voter.clerkId}
+                      className="list-group-item d-flex justify-content-between align-items-center"
+                    >
+                      <div>
+                        <strong>{voter.name}</strong>
+                        <span className="text-muted ms-2">({voter.rollNo})</span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <span
+                          className={`badge bg-${
+                            voter.status === 'voted' 
+                              ? 'success' 
+                              : voter.isInvalidated 
+                              ? 'danger' 
+                              : 'dark'
+                          }`}
+                        >
+                          {voter.status === 'voted' 
+                            ? 'Voted' 
+                            : voter.isInvalidated 
+                            ? 'Ballot Excluded' 
+                            : 'No Ballot'}
+                        </span>
+                        {voter.status !== 'no-ballot' && !voter.isInvalidated && !voterListVerified && (
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleInvalidateBallot(voter.clerkId)}
+                            title="Invalidate ballot"
+                          >
+                            <FontAwesomeIcon icon={faTimes} />
+                          </button>
+                        )}
+                        {voter.isInvalidated && !voterListVerified && (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleRestoreBallot(voter.clerkId)}
+                            title="Restore ballot"
+                          >
+                            <FontAwesomeIcon icon={faCheck} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {!voterListVerified && (
+                  <Button variant="success" onClick={handleVerifyVoterList} className="w-100">
+                    <FontAwesomeIcon icon={faCheck} className="me-1" />
+                    Verify Voter List
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -1356,16 +1737,12 @@ export default function VotePage() {
         {/* Results Container */}
         {showResults && (
           <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#f8f9fa" }}>
-            <div className="d-flex justify-content-between align-items-center mb-3">
+            <div className="mb-3">
               <h4 className="mb-0">
                 {voteResults?.showBoardOnly ? "Board Round Results" : 
                  voteResults?.type === "Election" && voteResults?.title ? 
                  `${voteResults.title} - Results` : "Vote Results"}
               </h4>
-              <Button size="sm" variant="outline-secondary" onClick={handleCloseResults}>
-                <FontAwesomeIcon icon={faTimes} className="me-1" />
-                Close
-              </Button>
             </div>
             
             {resultsLoading ? (
@@ -1632,6 +2009,74 @@ export default function VotePage() {
                   >
                     <FontAwesomeIcon icon={faCheck} className="me-1" />
                     {submitting ? 'Processing...' : 'Confirm'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pledge Cons Management Modal */}
+        {showPledgeCons && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-secondary text-white">
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                    Manage Pledge Cons
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close btn-close-white"
+                    onClick={handleClosePledgeCons}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  {pledgeConsLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-muted mb-3">
+                        Mark which pledges have a valid con on the floor. Pledges without valid cons will have their board/blackball votes marked as invalid.
+                      </p>
+                      <table className="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Pledge Name</th>
+                            <th className="text-center">Con?</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {voteInfo?.pledges?.map((pledge) => (
+                            <tr key={pledge}>
+                              <td>{pledge}</td>
+                              <td className="text-center">
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  checked={pledgeCons[pledge] || false}
+                                  onChange={() => handleTogglePledgeCon(pledge)}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <Button variant="secondary" onClick={handleClosePledgeCons} disabled={pledgeConsLoading}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" onClick={handleSavePledgeCons} disabled={pledgeConsLoading}>
+                    <FontAwesomeIcon icon={faCheck} className="me-1" />
+                    {pledgeConsLoading ? 'Saving...' : 'Save'}
                   </Button>
                 </div>
               </div>
