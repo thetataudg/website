@@ -10,6 +10,9 @@ const VoteSchema = new Schema({
   ended: { type: Boolean, default: false },
   startedAt: { type: Date }, // When the vote was started
   endTime: { type: Date }, // When the vote is scheduled to end
+  invalidatedBallots: [{ type: String }], // Array of clerkIds whose ballots have been invalidated
+  pledgeValidCons: { type: Map, of: Boolean, default: {} }, // Maps pledge name to whether they have a valid con
+  voterListVerified: { type: Boolean, default: false }, // Whether E-Council has verified the voter list
   votes: [
     {
       clerkId: { type: String, required: true },

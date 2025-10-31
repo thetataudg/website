@@ -139,6 +139,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         hasVoted,
         totalVotes: vote.votes.length,
+        voterListVerified: vote.voterListVerified || false,
       });
     } else if (vote.type === "Pledge") {
       // For each pledge, check if user has voted in both rounds
@@ -166,6 +167,7 @@ export async function GET(req: Request) {
         votedPledges,
         abstainedPledges,
         totalVotes: Math.floor(vote.votes.filter((v: any) => v.round === "board").length), // Count unique voters
+        voterListVerified: vote.voterListVerified || false,
       });
     }
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });
