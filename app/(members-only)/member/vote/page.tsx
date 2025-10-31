@@ -1013,11 +1013,6 @@ export default function VotePage() {
                           )}
                         </>
                       )}
-                      {voteInfo.type === "Pledge" && (
-                        <Button size="sm" variant="secondary" onClick={handleShowPledgeCons} disabled={pledgeConsLoading}>
-                          <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" /> Cons
-                        </Button>
-                      )}
                       <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
                         <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
                       </Button>
