@@ -19,6 +19,7 @@ const VoteSchema = new Schema({
       pledge: { type: String }, // for Pledge
       choice: { type: String, required: true }, // "Continue", "Board", "Blackball", or election option
       round: { type: String }, // "board" or "blackball"
+      proxy: { type: Boolean, default: false }, // whether this vote was submitted as a proxy before the vote started
     },
   ],
   createdAt: { type: Date, default: Date.now },

@@ -36,7 +36,11 @@ export async function POST(req: Request) {
     }
     
     if (vote.type === "Election") {
-      const { choice } = body;
+      const { choice, proxy } = body;
+      // If the vote hasn't started, only allow submissions marked as proxy
+      if (!vote.started && !proxy) {
+        return NextResponse.json({ error: "Vote not started" }, { status: 400 });
+      }
       // Allow "Abstain" as a valid choice in addition to the defined options
       if (!vote.options.includes(choice) && choice !== "Abstain") {
         return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
@@ -44,12 +48,17 @@ export async function POST(req: Request) {
       if (vote.votes.some((v: any) => v.clerkId === clerkId)) {
         return NextResponse.json({ error: "Already voted" }, { status: 400 });
       }
-      vote.votes.push({ clerkId, choice });
+      vote.votes.push({ clerkId, choice, proxy: !!proxy });
       await vote.save();
       return NextResponse.json({ success: true });
     } else if (vote.type === "Pledge") {
       // Support batch ballot submission with dual choices
       if (Array.isArray(body.ballot)) {
+        const isProxy = !!body.proxy;
+        // If vote hasn't started, only allow proxy submissions
+        if (!vote.started && !isProxy) {
+          return NextResponse.json({ error: "Vote not started" }, { status: 400 });
+        }
         for (const item of body.ballot) {
           const { pledge, boardChoice, blackballChoice } = item;
           if (!vote.pledges.includes(pledge)) {
@@ -67,9 +76,9 @@ export async function POST(req: Request) {
             if (!validBoardChoices.includes(boardChoice)) {
               return NextResponse.json({ error: `Invalid board choice for ${pledge}` }, { status: 400 });
             }
-            vote.votes.push({ clerkId, pledge, choice: boardChoice, round: "board" });
+            vote.votes.push({ clerkId, pledge, choice: boardChoice, round: "board", proxy: isProxy });
           } else {
-            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "board" });
+            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "board", proxy: isProxy });
           }
           
           // Handle blackball choice
@@ -78,9 +87,9 @@ export async function POST(req: Request) {
             if (!validBlackballChoices.includes(blackballChoice)) {
               return NextResponse.json({ error: `Invalid blackball choice for ${pledge}` }, { status: 400 });
             }
-            vote.votes.push({ clerkId, pledge, choice: blackballChoice, round: "blackball" });
+            vote.votes.push({ clerkId, pledge, choice: blackballChoice, round: "blackball", proxy: isProxy });
           } else {
-            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "blackball" });
+            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "blackball", proxy: isProxy });
           }
         }
         await vote.save();
@@ -98,7 +107,11 @@ export async function POST(req: Request) {
         if (vote.votes.some((v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === vote.round)) {
           return NextResponse.json({ error: "Already voted for this pledge this round" }, { status: 400 });
         }
-        vote.votes.push({ clerkId, pledge, choice, round: vote.round });
+        const isProxySingle = !!body.proxy;
+        if (!vote.started && !isProxySingle) {
+          return NextResponse.json({ error: "Vote not started" }, { status: 400 });
+        }
+        vote.votes.push({ clerkId, pledge, choice, round: vote.round, proxy: isProxySingle });
         await vote.save();
         return NextResponse.json({ success: true });
       }
