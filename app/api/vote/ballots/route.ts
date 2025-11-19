@@ -38,22 +38,27 @@ export async function GET(req: Request) {
     const voterList = activeMembers.map(member => {
       const memberVotes = vote.votes.filter((v: any) => v.clerkId === member.clerkId);
       const isInvalidated = vote.invalidatedBallots?.includes(member.clerkId);
-      
-      let status: 'voted' | 'no-ballot' = 'no-ballot';
-      
+
+      // Determine if any of the member's ballots are marked as proxy
+      const hasProxy = memberVotes.some((v: any) => v.proxy === true);
+
+      // status can be 'voted', 'proxy', or 'no-ballot'
+      let status: 'voted' | 'no-ballot' | 'proxy' = 'no-ballot';
+
       if (memberVotes.length > 0 && !isInvalidated) {
-        // Anyone who submitted a ballot counts as voted (including abstentions)
-        status = 'voted';
+        // If any of the submitted ballots were proxy, mark as proxy
+        status = hasProxy ? 'proxy' : 'voted';
       } else if (isInvalidated) {
         status = 'no-ballot';
       }
-      
+
       return {
         clerkId: member.clerkId,
         name: `${member.fName} ${member.lName}`,
         rollNo: member.rollNo,
         status,
-        isInvalidated
+        isInvalidated,
+        isProxy: hasProxy,
       };
     });
     

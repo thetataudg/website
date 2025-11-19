@@ -18,6 +18,7 @@ import {
   faPlus,
   faClock,
   faUser,
+  faUnlock,
 } from "@fortawesome/free-solid-svg-icons";
 import Button from "react-bootstrap/Button";
 
@@ -62,8 +63,9 @@ type VoterInfo = {
   clerkId: string;
   name: string;
   rollNo: string;
-  status: 'voted' | 'no-ballot';
+  status: 'voted' | 'no-ballot' | 'proxy';
   isInvalidated: boolean;
+  isProxy?: boolean;
 };
 
 export default function VotePage() {
@@ -120,6 +122,9 @@ export default function VotePage() {
   const [voterList, setVoterList] = useState<VoterInfo[]>([]);
   const [voterListLoading, setVoterListLoading] = useState(false);
   const [voterListVerified, setVoterListVerified] = useState(false);
+  // Proxy vote mode (unlocks ballot before vote starts)
+  const [proxyMode, setProxyMode] = useState(false);
+  const [showProxyConfirm, setShowProxyConfirm] = useState(false);
 
   // Pledge cons management state
   const [showPledgeCons, setShowPledgeCons] = useState(false);
@@ -410,8 +415,9 @@ export default function VotePage() {
     if (!selectedOption) return;
     setSubmitting(true);
     try {
-      await axios.post("/api/vote", { choice: selectedOption });
+      await axios.post("/api/vote", { choice: selectedOption, proxy: proxyMode });
       setVoted(true);
+      setProxyMode(false);
       fetchVoteInfo();
     } catch (err: any) {
       setAlertModal({
@@ -442,8 +448,9 @@ export default function VotePage() {
         };
       });
 
-      await axios.post("/api/vote", { ballot });
+      await axios.post("/api/vote", { ballot, proxy: proxyMode });
       fetchVoteInfo();
+      setProxyMode(false);
     } catch (err: any) {
       setAlertModal({
         show: true,
@@ -1405,17 +1412,21 @@ export default function VotePage() {
                       <div className="d-flex align-items-center gap-2">
                         <span
                           className={`badge bg-${
-                            voter.status === 'voted' 
-                              ? 'success' 
-                              : voter.isInvalidated 
-                              ? 'danger' 
+                            voter.status === 'proxy'
+                              ? 'primary'
+                              : voter.status === 'voted'
+                              ? 'success'
+                              : voter.isInvalidated
+                              ? 'danger'
                               : 'dark'
                           }`}
                         >
-                          {voter.status === 'voted' 
-                            ? 'Voted' 
-                            : voter.isInvalidated 
-                            ? 'Ballot Excluded' 
+                          {voter.status === 'proxy'
+                            ? 'Proxy Ballot'
+                            : voter.status === 'voted'
+                            ? 'Voted'
+                            : voter.isInvalidated
+                            ? 'Ballot Excluded'
                             : 'No Ballot'}
                         </span>
                         {voter.status !== 'no-ballot' && !voter.isInvalidated && !voterListVerified && (
@@ -1459,10 +1470,19 @@ export default function VotePage() {
           </div>
         )}
 
+        {/* Proxy unlock button when vote is suspended */}
+        {voteInfo && voteInfo.type === "Election" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && (
+          <div className="mt-3">
+            <Button variant="danger" onClick={() => setShowProxyConfirm(true)} disabled={voted || submitting}>
+              <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
+            </Button>
+          </div>
+        )}
+
         {/* Voting options: Election */}
-        {voteInfo && voteInfo.type === "Election" && voteInfo.started && !voteInfo.ended && !voted && (
+        {voteInfo && voteInfo.type === "Election" && ((voteInfo.started && !voteInfo.ended) || (proxyMode && !voteInfo.ended && !voteInfo.started)) && !voted && (
           <div className="mt-4">
-            <h4>{voteInfo.title ? `${voteInfo.title}` : "Vote for an option"}</h4>
+            <h4>{voteInfo.title ? `${voteInfo.title}` : "Vote for an option"}{proxyMode && <span className="ms-3 badge bg-primary text-white">Proxy</span>}</h4>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1517,8 +1537,17 @@ export default function VotePage() {
           </div>
         )}
 
+        {/* Proxy unlock button when pledge vote is suspended */}
+        {voteInfo && voteInfo.type === "Pledge" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && (
+          <div className="mt-3">
+            <Button variant="danger" onClick={() => setShowProxyConfirm(true)} disabled={voted || submitting}>
+              <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
+            </Button>
+          </div>
+        )}
+
         {/* Voting options: Pledge */}
-        {voteInfo && voteInfo.type === "Pledge" && voteInfo.started && !voteInfo.ended && voteInfo.pledges && (
+        {voteInfo && voteInfo.type === "Pledge" && ((voteInfo.started && !voteInfo.ended) || (proxyMode && !voteInfo.ended && !voteInfo.started)) && voteInfo.pledges && (
           <div className="mt-4">
             <h4>
               {voteInfo.round === "board"
@@ -2004,6 +2033,40 @@ export default function VotePage() {
                   >
                     <FontAwesomeIcon icon={faCheck} className="me-1" />
                     {submitting ? 'Processing...' : 'Confirm'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Proxy Confirm Modal */}
+        {showProxyConfirm && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-danger text-white">
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon icon={faUnlock} className="me-2" />
+                    Unlock Ballot (Proxy)
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close btn-close-white"
+                    onClick={() => setShowProxyConfirm(false)}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <p>
+                    Are you sure you want to unlock the ballot and submit a proxy vote? This action cannot be undone, and you must make the Scribe aware of your intention to proxy vote for your vote to be tallied.
+                  </p>
+                </div>
+                <div className="modal-footer">
+                  <Button variant="secondary" onClick={() => setShowProxyConfirm(false)} disabled={submitting}>
+                    Cancel
+                  </Button>
+                  <Button variant="danger" onClick={() => { setProxyMode(true); setShowProxyConfirm(false); }} disabled={submitting}>
+                    <FontAwesomeIcon icon={faUnlock} className="me-1" /> Confirm Proxy Vote
                   </Button>
                 </div>
               </div>
