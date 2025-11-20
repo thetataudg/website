@@ -21,7 +21,17 @@ export async function POST(req: Request) {
   try {
     const { member, clerkId } = await requireActiveMember(req);
     const body = await req.json();
-    const vote = await Vote.findOne({ ended: false });
+    const { voteId } = body;
+    
+    // If voteId provided, use it; otherwise find the running vote
+    let vote;
+    if (voteId) {
+      vote = await Vote.findById(voteId);
+    } else {
+      // Find the currently running vote (started but not ended)
+      vote = await Vote.findOne({ started: true, ended: false });
+    }
+    
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "No active vote" }, { status: 404 });
     }
@@ -127,7 +137,19 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { member, clerkId } = await requireActiveMember(req);
-    const vote = await Vote.findOne({ ended: false }) || await Vote.findOne({ ended: true }).sort({ createdAt: -1 });
+    const { searchParams } = new URL(req.url);
+    const voteId = searchParams.get('voteId');
+    
+    let vote;
+    if (voteId) {
+      vote = await Vote.findById(voteId);
+    } else {
+      // Find running vote, or most recent ended vote, or any suspended vote
+      vote = await Vote.findOne({ started: true, ended: false }) || 
+             await Vote.findOne({ ended: true }).sort({ createdAt: -1 }) ||
+             await Vote.findOne({ started: false, ended: false }).sort({ createdAt: -1 });
+    }
+    
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "No vote found" }, { status: 404 });
     }
@@ -143,6 +165,7 @@ export async function GET(req: Request) {
     if (vote.type === "Election") {
       const hasVoted = vote.votes.some((v: any) => v.clerkId === clerkId);
       return NextResponse.json({
+        _id: vote._id,
         type: vote.type,
         title: vote.title,
         options: vote.options,
@@ -170,6 +193,7 @@ export async function GET(req: Request) {
         abstainedPledges[pledge] = (boardVote?.choice === "Abstain" && blackballVote?.choice === "Abstain");
       }
       return NextResponse.json({
+        _id: vote._id,
         type: vote.type,
         pledges: vote.pledges,
         started: vote.started,

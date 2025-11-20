@@ -16,7 +16,7 @@ async function requireECouncil(req: Request) {
   return member;
 }
 
-// POST: Create a new vote (not started)
+// POST: Create a new vote (suspended, not started)
 export async function POST(req: Request) {
   try {
     await requireECouncil(req);
@@ -31,11 +31,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Invalid pledge list" }, { status: 400 });
       }
     }
-    // Only one open vote at a time
-    const existing = await Vote.findOne({ ended: false });
-    if (existing) {
-      return NextResponse.json({ error: "A vote is already in progress" }, { status: 400 });
-    }
+    // Create vote in suspended state (started: false, ended: false)
     const vote = await Vote.create({
       type,
       title: type === "Election" ? title : undefined,
@@ -46,6 +42,7 @@ export async function POST(req: Request) {
       ended: false,
       endTime: null,
       votes: [],
+      removedOptions: [],
       createdAt: new Date(),
     });
     return NextResponse.json({ success: true, voteId: vote._id }, { status: 201 });
@@ -55,14 +52,28 @@ export async function POST(req: Request) {
   }
 }
 
-// DELETE: Delete the current vote
+// DELETE: Delete a specific vote by ID
 export async function DELETE(req: Request) {
   try {
     await requireECouncil(req);
-    const vote = await Vote.findOneAndDelete({ ended: true });
-    if (!vote) {
-      return NextResponse.json({ error: "No ended vote to delete" }, { status: 404 });
+    const { searchParams } = new URL(req.url);
+    const voteId = searchParams.get('voteId');
+    
+    if (!voteId) {
+      return NextResponse.json({ error: "voteId is required" }, { status: 400 });
     }
+    
+    const vote = await Vote.findById(voteId);
+    if (!vote) {
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
+    }
+    
+    // Prevent deleting a running vote
+    if (vote.started && !vote.ended) {
+      return NextResponse.json({ error: "Cannot delete a running vote" }, { status: 400 });
+    }
+    
+    await Vote.findByIdAndDelete(voteId);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete vote");
@@ -74,14 +85,26 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await requireECouncil(req);
-    const { action, countdown } = await req.json();
-    const vote = await Vote.findOne({ ended: false });
+    const { action, countdown, voteId } = await req.json();
+    
+    if (!voteId) {
+      return NextResponse.json({ error: "voteId is required" }, { status: 400 });
+    }
+    
+    const vote = await Vote.findById(voteId);
     if (!vote || Array.isArray(vote)) {
-      return NextResponse.json({ error: "No active vote to update" }, { status: 404 });
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
     
     if (action === "start") {
       if (vote.started) return NextResponse.json({ error: "Vote already started" }, { status: 400 });
+      
+      // Check if another vote is currently running
+      const runningVote = await Vote.findOne({ started: true, ended: false });
+      if (runningVote) {
+        return NextResponse.json({ error: "Another vote is already running" }, { status: 400 });
+      }
+      
       vote.started = true;
       vote.startedAt = new Date(); // Set the start time
       vote.endTime = null; // Clear any existing end time
@@ -130,14 +153,43 @@ export async function PATCH(req: Request) {
   }
 }
 
-// GET: Get results of the vote
+// GET: Get results of a specific vote or list all votes
 export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const voteId = searchParams.get('voteId');
+    
+    // If no voteId, return list of all votes (oldest first, so new votes appear at bottom)
+    // This endpoint is accessible to all authenticated members for proxy voting
+    if (!voteId) {
+      const clerkId = await requireAuth(req as any);
+      await connectDB();
+      const member = await Member.findOne({ clerkId }).lean();
+      if (!member || Array.isArray(member)) {
+        throw new Error("Not authorized");
+      }
+      
+      const votes = await Vote.find({}).sort({ createdAt: 1 }).lean();
+      return NextResponse.json({ 
+        votes: votes.map(v => ({
+          _id: v._id,
+          type: v.type,
+          title: v.title,
+          started: v.started,
+          ended: v.ended,
+          createdAt: v.createdAt,
+          voteCount: v.votes?.length || 0,
+        }))
+      });
+    }
+    
+    // For specific vote results, require E-Council
     await requireECouncil(req);
-    // Find the most recent vote (ended or not)
-    const vote = await Vote.findOne({}).sort({ createdAt: -1 });
+    
+    // Find specific vote
+    const vote = await Vote.findById(voteId);
     if (!vote || Array.isArray(vote)) {
-      return NextResponse.json({ error: "No vote found" }, { status: 404 });
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
     
     // Check if vote should be auto-ended
@@ -149,7 +201,7 @@ export async function GET(req: Request) {
     }
     
     if (vote.type === "Election") {
-      // Tally results - exclude abstentions and invalidated ballots
+      // Tally results - exclude abstentions, invalidated ballots, and votes for removed options
       const tally: Record<string, number> = {};
       for (const opt of vote.options) tally[opt] = 0;
       
@@ -158,10 +210,11 @@ export async function GET(req: Request) {
       );
       
       for (const v of validVotes) {
-        if (typeof v.choice === "string" && tally.hasOwnProperty(v.choice)) {
+        // Only count votes for options that still exist (not removed)
+        if (typeof v.choice === "string" && tally.hasOwnProperty(v.choice) && !vote.removedOptions?.includes(v.choice)) {
           tally[v.choice]++;
         }
-        // Note: Abstain votes are ignored in tallying but still count toward totalVotes
+        // Note: Abstain votes and votes for removed options are ignored in tallying but still count toward totalVotes
       }
       return NextResponse.json({
         type: vote.type,
@@ -172,8 +225,9 @@ export async function GET(req: Request) {
         startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         results: tally,
-        totalVotes: validVotes.length, // This includes abstentions but excludes invalidated
+        totalVotes: validVotes.length, // This includes abstentions and removed option votes but excludes invalidated
         voterListVerified: vote.voterListVerified || false,
+        removedOptions: vote.removedOptions || [],
       });
     } else if (vote.type === "Pledge") {
       // Filter out invalidated ballots

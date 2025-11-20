@@ -23,6 +23,7 @@ import {
 import Button from "react-bootstrap/Button";
 
 type VoteInfo = {
+  _id?: string;
   type: string;
   title?: string;
   options?: string[];
@@ -74,8 +75,13 @@ export default function VotePage() {
   const [userData, setUserData] = useState<any>(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
-  // Start vote state (replaced modal)
-  const [showStartVote, setShowStartVote] = useState(false);
+  // Vote list state
+  const [votesList, setVotesList] = useState<any[]>([]);
+  const [votesLoading, setVotesLoading] = useState(true);
+  const [selectedVoteId, setSelectedVoteId] = useState<string | null>(null);
+
+  // Create vote state (replaced modal)
+  const [showCreateVote, setShowCreateVote] = useState(false);
   const [voteType, setVoteType] = useState<null | "Election" | "Pledge Vote">(null);
   const [names, setNames] = useState<string[]>([""]);
   const [pledgeNames, setPledgeNames] = useState<string[]>([""]);
@@ -89,6 +95,10 @@ export default function VotePage() {
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [pledgeSelections, setPledgeSelections] = useState<Record<string, { board?: string; blackball?: string }>>({});
   const [voted, setVoted] = useState(false);
+
+  // Candidate management state
+  const [showCandidateManager, setShowCandidateManager] = useState(false);
+  const [newCandidate, setNewCandidate] = useState<string>("");
 
   // Results
   const [showResults, setShowResults] = useState(false);
@@ -140,6 +150,13 @@ export default function VotePage() {
   // Elapsed time state
   const [elapsedTime, setElapsedTime] = useState<number>(0);
 
+  // Helper function to check if user can access E-Council controls
+  const canAccessECouncilControls = () => {
+    if (!userData?.ecouncilPosition) return false;
+    const position = userData.ecouncilPosition.toLowerCase();
+    return position.includes('regent') || position.includes('scribe');
+  };
+
   useEffect(() => {
     async function fetchUserData() {
       try {
@@ -148,6 +165,7 @@ export default function VotePage() {
         setUserData({
           type: data.status,
           isECouncil: data.isECouncil,
+          ecouncilPosition: data.ecouncilPosition,
         });
       } catch (error) {
         setUserData(null);
@@ -172,6 +190,9 @@ export default function VotePage() {
           setCurrentCountdown(null);
           setCountdownTarget(null);
           fetchVoteInfo(); // Refresh to get updated state
+          if (canAccessECouncilControls()) {
+            fetchVotesList(); // Also refresh votes list
+          }
         }
       };
       
@@ -243,7 +264,8 @@ export default function VotePage() {
   const fetchVoteInfo = async () => {
     setVoteError(null);
     try {
-      const res = await axios.get("/api/vote");
+      const url = selectedVoteId ? `/api/vote?voteId=${selectedVoteId}` : "/api/vote";
+      const res = await axios.get(url);
       setVoteInfo(prev => {
         // Election: reset if options or status change
         if (
@@ -286,24 +308,72 @@ export default function VotePage() {
     }
   };
 
-  // Live update: poll every 10 seconds when signed in
+  // Fetch votes list for all members
+  useEffect(() => {
+    if (userData) {
+      fetchVotesList(true); // Show loading on initial fetch
+    }
+    // eslint-disable-next-line
+  }, [userData]);
+
+  // Adaptive polling: only poll when necessary to reduce API calls
   useEffect(() => {
     if (!isSignedIn) return;
     fetchVoteInfo();
-    pollingRef.current = setInterval(fetchVoteInfo, 10000);
+    
+    // Determine polling interval based on vote state
+    let pollInterval = null;
+    
+    if (voteInfo?.started && !voteInfo?.ended) {
+      // Vote is actively running: poll every 5 seconds
+      pollInterval = 5000;
+    } else if (voteInfo?.endTime && !voteInfo?.ended) {
+      // Vote has scheduled end time: poll every 3 seconds to catch the end
+      pollInterval = 3000;
+    } else if (!voteInfo || (!voteInfo?.started && !voteInfo?.ended)) {
+      // Suspended vote or no vote: poll every 15 seconds (low priority)
+      pollInterval = 15000;
+    } else if (voteInfo?.ended && !voteInfo?.voterListVerified) {
+      // Vote ended, awaiting verification: poll every 10 seconds
+      pollInterval = 10000;
+    }
+    // If vote is ended and verified, don't poll at all (pollInterval stays null)
+    
+    if (pollInterval) {
+      pollingRef.current = setInterval(fetchVoteInfo, pollInterval);
+    }
+    
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
     // eslint-disable-next-line
-  }, [isSignedIn]);
+  }, [isSignedIn, selectedVoteId, voteInfo?.started, voteInfo?.ended, voteInfo?.endTime, voteInfo?.voterListVerified]);
+
+  // Poll votes list only when there's an active/running vote
+  useEffect(() => {
+    if (!isSignedIn || !userData) return;
+    
+    // Check if there's any non-ended vote in the list
+    const hasActiveVote = votesList.some(v => !v.ended);
+    
+    if (!hasActiveVote) {
+      // No active votes: don't poll, just fetch once
+      return;
+    }
+    
+    // Active vote exists: poll every 10 seconds (longer than before)
+    const votesPolling = setInterval(() => fetchVotesList(false), 10000);
+    return () => clearInterval(votesPolling);
+    // eslint-disable-next-line
+  }, [isSignedIn, userData, votesList.length, votesList.some(v => !v.ended)]);
 
   // Auto-show voter list when vote ends for E-Council (before verification)
   useEffect(() => {
-    if (voteInfo && voteInfo.ended && !voteInfo.voterListVerified && userData?.isECouncil && !hasShownVoterListRef.current) {
+    if (voteInfo && voteInfo._id && voteInfo.ended && !voteInfo.voterListVerified && canAccessECouncilControls() && !hasShownVoterListRef.current) {
       // Set show to true and fetch voter list
       setShowVoterList(true);
       setVoterListLoading(true);
-      axios.get("/api/vote/ballots")
+      axios.get(`/api/vote/ballots?voteId=${voteInfo._id}`)
         .then(res => {
           setVoterList(res.data.voterList || []);
           setVoterListVerified(res.data.voterListVerified || false);
@@ -331,20 +401,43 @@ export default function VotePage() {
       hasShownVoterListRef.current = false;
     }
     // eslint-disable-next-line
-  }, [voteInfo?.ended, voteInfo?.voterListVerified, userData?.isECouncil]);
+  }, [voteInfo?.ended, voteInfo?.voterListVerified, userData?.ecouncilPosition]);
 
-  // Auto-show results when vote is ended and verified
+  // Auto-show results when an ended vote is selected and voter list is verified
   useEffect(() => {
-    if (voteInfo && voteInfo.ended && voteInfo.voterListVerified && userData?.isECouncil && !showResults) {
+    if (voteInfo && voteInfo._id && voteInfo.ended && voteInfo.voterListVerified && canAccessECouncilControls()) {
+      // Show results for this specific ended vote only after voter list is verified
       handleShowResults();
+    } else {
+      // Hide results if vote is not ended, not verified, or no vote selected
+      setShowResults(false);
+      setVoteResults(null);
     }
     // eslint-disable-next-line
-  }, [voteInfo?.ended, voteInfo?.voterListVerified, userData?.isECouncil]);
+  }, [voteInfo?._id, voteInfo?.ended, voteInfo?.voterListVerified, userData?.ecouncilPosition]);
 
-  // Start vote handlers (replaced modal handlers)
-  const handleOpenStartVote = () => setShowStartVote(true);
-  const handleCloseStartVote = () => {
-    setShowStartVote(false);
+  // Fetch votes list
+  const fetchVotesList = async (showLoading = false) => {
+    if (showLoading) setVotesLoading(true);
+    try {
+      const res = await axios.get("/api/vote/manage");
+      setVotesList(res.data.votes || []);
+      // Select the running vote if there is one
+      const runningVote = res.data.votes?.find((v: any) => v.started && !v.ended);
+      if (runningVote && !selectedVoteId) {
+        setSelectedVoteId(runningVote._id);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch votes list", err);
+    } finally {
+      if (showLoading) setVotesLoading(false);
+    }
+  };
+
+  // Create vote handlers
+  const handleOpenCreateVote = () => setShowCreateVote(true);
+  const handleCloseCreateVote = () => {
+    setShowCreateVote(false);
     setVoteType(null);
     setNames([""]);
     setPledgeNames([""]);
@@ -396,7 +489,8 @@ export default function VotePage() {
           pledges: pledgeNames.filter((n) => n.trim()),
         });
       }
-      handleCloseStartVote();
+      handleCloseCreateVote();
+      fetchVotesList();
       fetchVoteInfo();
     } catch (err: any) {
       setAlertModal({
@@ -412,10 +506,10 @@ export default function VotePage() {
 
   // Vote for an option (Election)
   const handleVote = async () => {
-    if (!selectedOption) return;
+    if (!selectedOption || !voteInfo) return;
     setSubmitting(true);
     try {
-      await axios.post("/api/vote", { choice: selectedOption, proxy: proxyMode });
+      await axios.post("/api/vote", { voteId: voteInfo._id, choice: selectedOption, proxy: proxyMode });
       setVoted(true);
       setProxyMode(false);
       fetchVoteInfo();
@@ -433,7 +527,7 @@ export default function VotePage() {
 
   // Vote for pledges (Pledge) - submit all at once with confirmation
   const handlePledgeBallot = async () => {
-    if (!voteInfo?.pledges) return;
+    if (!voteInfo?.pledges || !voteInfo._id) return;
     
     setSubmitting(true);
     try {
@@ -448,7 +542,7 @@ export default function VotePage() {
         };
       });
 
-      await axios.post("/api/vote", { ballot, proxy: proxyMode });
+      await axios.post("/api/vote", { voteId: voteInfo._id, ballot, proxy: proxyMode });
       fetchVoteInfo();
       setProxyMode(false);
     } catch (err: any) {
@@ -465,10 +559,12 @@ export default function VotePage() {
 
   // Management actions (E-Council)
   const handleStartVote = async () => {
+    if (!voteInfo?._id) return;
     setSubmitting(true);
     try {
-      await axios.patch("/api/vote/manage", { action: "start" });
+      await axios.patch("/api/vote/manage", { action: "start", voteId: voteInfo._id });
       fetchVoteInfo();
+      fetchVotesList();
     } catch (err: any) {
       setAlertModal({
         show: true,
@@ -495,10 +591,12 @@ export default function VotePage() {
 
   // Execute end vote with countdown
   const handleExecuteEnd = async (immediate = false) => {
+    if (!voteInfo?._id) return;
     setSubmitting(true);
     try {
       await axios.patch("/api/vote/manage", { 
         action: "end",
+        voteId: voteInfo._id,
         countdown: immediate ? 0 : countdownSeconds
       });
       setShowCountdown(false);
@@ -517,7 +615,7 @@ export default function VotePage() {
   };
 
   const handleDeleteVote = async () => {
-    if (!voteInfo) return;
+    if (!voteInfo || !voteInfo._id) return;
     if (!voteInfo.ended) {
       setConfirmModal({
         show: true,
@@ -527,8 +625,9 @@ export default function VotePage() {
           setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
           setSubmitting(true);
           try {
-            await axios.patch("/api/vote/manage", { action: "end" });
+            await axios.patch("/api/vote/manage", { action: "end", voteId: voteInfo._id });
             await fetchVoteInfo();
+            await fetchVotesList();
             // After ending, prompt to delete
             setConfirmModal({
               show: true,
@@ -538,9 +637,12 @@ export default function VotePage() {
                 setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
                 setSubmitting(true);
                 try {
-                  await axios.delete("/api/vote/manage");
+                  await axios.delete(`/api/vote/manage?voteId=${voteInfo._id}`);
                   await fetchVoteInfo();
-                  window.location.reload(); // Refresh to clear state
+                  await fetchVotesList();
+                  setSelectedVoteId(null);
+                  setShowResults(false);
+                  setVoteResults(null);
                 } catch (err: any) {
                   setAlertModal({
                     show: true,
@@ -574,9 +676,12 @@ export default function VotePage() {
         setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
         setSubmitting(true);
         try {
-          await axios.delete("/api/vote/manage");
-          await fetchVoteInfo();
-          window.location.reload(); // Refresh to clear state
+          await axios.delete(`/api/vote/manage?voteId=${voteInfo._id}`);
+          await fetchVotesList();
+          setSelectedVoteId(null);
+          setVoteInfo(null);
+          setShowResults(false);
+          setVoteResults(null);
         } catch (err: any) {
           setAlertModal({
             show: true,
@@ -593,10 +698,11 @@ export default function VotePage() {
 
   // Show results - modified to handle board-only results
   const handleShowResults = async (boardOnly = false) => {
+    if (!voteInfo?._id) return;
     setResultsLoading(true);
     setShowResults(true);
     try {
-      const res = await axios.get("/api/vote/manage");
+      const res = await axios.get(`/api/vote/manage?voteId=${voteInfo._id}`);
       setVoterListVerified(res.data.voterListVerified || false);
       // If boardOnly is true, remove blackball results from the response
       if (boardOnly && res.data.blackballResults) {
@@ -631,6 +737,7 @@ export default function VotePage() {
 
   // Voter list management
   const handleShowVoterList = async () => {
+    if (!voteInfo?._id) return;
     // Prevent opening if already verified
     if (voteInfo?.voterListVerified) {
       setAlertModal({
@@ -645,7 +752,7 @@ export default function VotePage() {
     setVoterListLoading(true);
     setShowVoterList(true);
     try {
-      const res = await axios.get("/api/vote/ballots");
+      const res = await axios.get(`/api/vote/ballots?voteId=${voteInfo._id}`);
       setVoterList(res.data.voterList || []);
       setVoterListVerified(res.data.voterListVerified || false);
     } catch (err: any) {
@@ -662,8 +769,9 @@ export default function VotePage() {
   };
 
   const handleInvalidateBallot = async (clerkId: string) => {
+    if (!voteInfo?._id) return;
     try {
-      await axios.post("/api/vote/ballots", { clerkId });
+      await axios.post("/api/vote/ballots", { clerkId, voteId: voteInfo._id });
       // Refresh voter list and results
       await handleShowVoterList();
       if (showResults) {
@@ -680,8 +788,9 @@ export default function VotePage() {
   };
 
   const handleRestoreBallot = async (clerkId: string) => {
+    if (!voteInfo?._id) return;
     try {
-      await axios.delete(`/api/vote/ballots?clerkId=${clerkId}`);
+      await axios.delete(`/api/vote/ballots?clerkId=${clerkId}&voteId=${voteInfo._id}`);
       // Refresh voter list and results
       await handleShowVoterList();
       if (showResults) {
@@ -703,8 +812,9 @@ export default function VotePage() {
   };
 
   const handleVerifyVoterList = async () => {
+    if (!voteInfo?._id) return;
     try {
-      await axios.put("/api/vote/ballots");
+      await axios.put("/api/vote/ballots", { voteId: voteInfo._id });
       setVoterListVerified(true);
       setShowVoterList(false);
       // Automatically show results after verification
@@ -776,6 +886,54 @@ export default function VotePage() {
 
   const handleClosePledgeCons = () => {
     setShowPledgeCons(false);
+  };
+
+  // Candidate management handlers
+  const handleOpenCandidateManager = () => {
+    setShowCandidateManager(true);
+    setNewCandidate("");
+  };
+
+  const handleCloseCandidateManager = () => {
+    setShowCandidateManager(false);
+    setNewCandidate("");
+  };
+
+  const handleAddCandidate = async () => {
+    if (!newCandidate.trim() || !voteInfo?._id) return;
+    setSubmitting(true);
+    try {
+      await axios.post("/api/vote/options", { voteId: voteInfo._id, option: newCandidate.trim() });
+      setNewCandidate("");
+      await fetchVoteInfo();
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Add Candidate',
+        message: err?.response?.data?.error || "Failed to add candidate.",
+        variant: 'danger'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRemoveCandidate = async (option: string) => {
+    if (!voteInfo?._id) return;
+    setSubmitting(true);
+    try {
+      await axios.delete(`/api/vote/options?voteId=${voteInfo._id}&option=${encodeURIComponent(option)}`);
+      await fetchVoteInfo();
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Remove Candidate',
+        message: err?.response?.data?.error || "Failed to remove candidate.",
+        variant: 'danger'
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Helper to format elapsed time
@@ -880,40 +1038,19 @@ export default function VotePage() {
       <div>
         <div className="d-flex justify-content-between align-items-center">
           <h1>Chapter Voting</h1>
-          <button
-            className="btn"
-            style={{
-              backgroundColor: "#AD2831",
-              color: "#fff",
-              pointerEvents:
-                userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
-                  ? "auto"
-                  : "none",
-              opacity:
-                userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
-                  ? 1
-                  : 0.5,
-            }}
-            disabled={
-              !userData.isECouncil ||
-              !!(voteInfo && voteInfo.started && !voteInfo.ended)
-            }
-            title={
-              !userData.isECouncil
-                ? "Only E-Council may start a vote"
-                : voteInfo && voteInfo.started && !voteInfo.ended
-                ? "A vote is already running"
-                : "Start a new vote"
-            }
-            onClick={
-              userData.isECouncil && !(voteInfo && voteInfo.started && !voteInfo.ended)
-                ? handleOpenStartVote
-                : undefined
-            }
-          >
-            <FontAwesomeIcon icon={faPlay} className="me-2" />
-            Start Vote
-          </button>
+          {canAccessECouncilControls() && (
+            <button
+              className="btn"
+              style={{
+                backgroundColor: "#AD2831",
+                color: "#fff",
+              }}
+              onClick={handleOpenCreateVote}
+            >
+              <FontAwesomeIcon icon={faPlus} className="me-2" />
+              Create Vote
+            </button>
+          )}
         </div>
 
         {/* Countdown Alert */}
@@ -933,14 +1070,14 @@ export default function VotePage() {
               <FontAwesomeIcon icon={faHourglass} className="me-2" />
               Loading vote info...
             </div>
-          ) : voteInfo && voteInfo.type === "Election" ? (
+          ) : voteInfo && voteInfo.type === "Election" && selectedVoteId ? (
             <>
-              <div className={`alert ${voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
+              <div className={`alert ${voteInfo.ended ? 'alert-success' : voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
                 <div className="d-flex align-items-center">
-                  <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
+                  <FontAwesomeIcon icon={voteInfo.ended ? faCheck : voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
                   <div>
                     <b>
-                      Election vote is{" "}
+                      Vote is{" "}
                       {voteInfo.started
                         ? voteInfo.ended
                           ? "completed"
@@ -966,7 +1103,7 @@ export default function VotePage() {
               </div>
               
               {/* E-Council Control Panel */}
-              {userData.isECouncil && (
+              {canAccessECouncilControls() && (
                 <div className="border rounded p-3 mb-3" style={{ backgroundColor: "#f8f9fa" }}>
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <h6 className="mb-0">
@@ -975,9 +1112,22 @@ export default function VotePage() {
                     </h6>
                     <div className="d-flex gap-2">
                       {!voteInfo.started && !voteInfo.ended && (
-                        <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
-                          <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
-                        </Button>
+                        <>
+                          <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
+                            <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+                          </Button>
+                          {voteInfo.type === "Election" && (
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              onClick={handleOpenCandidateManager} 
+                              disabled={submitting || !selectedVoteId}
+                              title={!selectedVoteId ? "Please select a vote to manage candidates" : ""}
+                            >
+                              <FontAwesomeIcon icon={faUser} className="me-1" /> Manage Candidates
+                            </Button>
+                          )}
+                        </>
                       )}
                       {voteInfo.started && !voteInfo.ended && (
                         <Button size="sm" variant="danger" onClick={handleShowEndCountdown} disabled={submitting}>
@@ -991,10 +1141,11 @@ export default function VotePage() {
                               size="sm" 
                               variant="info" 
                               onClick={() => {
+                                if (!voteInfo._id) return;
                                 setShowVoterList(true);
                                 if (voterList.length === 0) {
                                   setVoterListLoading(true);
-                                  axios.get("/api/vote/ballots")
+                                  axios.get(`/api/vote/ballots?voteId=${voteInfo._id}`)
                                     .then(res => {
                                       setVoterList(res.data.voterList || []);
                                       setVoterListVerified(res.data.voterListVerified || false);
@@ -1039,14 +1190,14 @@ export default function VotePage() {
                 </div>
               )}
             </>
-          ) : voteInfo && voteInfo.type === "Pledge" ? (
+          ) : voteInfo && voteInfo.type === "Pledge" && selectedVoteId ? (
             <>
-              <div className={`alert ${voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
+              <div className={`alert ${voteInfo.ended ? 'alert-success' : voteInfo.started && !voteInfo.ended ? 'alert-success' : 'alert-warning'} d-flex align-items-center justify-content-between`} role="alert">
                 <div className="d-flex align-items-center">
-                  <FontAwesomeIcon icon={voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
+                  <FontAwesomeIcon icon={voteInfo.ended ? faCheck : voteInfo.started && !voteInfo.ended ? faCheck : faPause} className="me-2" />
                   <div>
                     <b>
-                      Pledge vote is{" "}
+                      Vote is{" "}
                       {voteInfo.started
                         ? voteInfo.ended
                           ? "completed"
@@ -1074,7 +1225,7 @@ export default function VotePage() {
               </div>
               
               {/* E-Council Control Panel */}
-              {userData.isECouncil && (
+              {canAccessECouncilControls() && (
                 <div className="border rounded p-3 mb-3" style={{ backgroundColor: "#f8f9fa" }}>
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <h6 className="mb-0">
@@ -1104,10 +1255,11 @@ export default function VotePage() {
                               size="sm" 
                               variant="info" 
                               onClick={() => {
+                                if (!voteInfo._id) return;
                                 setShowVoterList(true);
                                 if (voterList.length === 0) {
                                   setVoterListLoading(true);
-                                  axios.get("/api/vote/ballots")
+                                  axios.get(`/api/vote/ballots?voteId=${voteInfo._id}`)
                                     .then(res => {
                                       setVoterList(res.data.voterList || []);
                                       setVoterListVerified(res.data.voterListVerified || false);
@@ -1155,22 +1307,99 @@ export default function VotePage() {
                 </div>
               )}
             </>
-          ) : (
-            <div className="alert alert-dark d-flex align-items-center" role="alert">
-              No votes are running.
-            </div>
-          )}
+          ) : null}
         </div>
 
-        {/* Start Vote Container (replaced modal) */}
-        {showStartVote && (
+        {/* Votes List */}
+        {votesList.length > 0 && (
+          <div className="mt-4 border rounded p-3" style={{ backgroundColor: "#f8f9fa" }}>
+            <h5 className="mb-3">{canAccessECouncilControls() ? 'Votes' : 'Available Votes'}</h5>
+            {votesLoading ? (
+              <div className="text-center py-3">
+                <FontAwesomeIcon icon={faHourglass} spin className="me-2" />
+                Loading votes...
+              </div>
+            ) : votesList.length === 0 ? (
+              <div className="text-muted text-center py-3">
+                No votes created yet. Click "Create Vote" to get started.
+              </div>
+            ) : (
+              <div className="list-group">
+                {votesList.map((vote) => (
+                  <div
+                    key={vote._id}
+                    className={`list-group-item d-flex justify-content-between align-items-center`}
+                    style={{ 
+                      cursor: 'pointer',
+                      backgroundColor: selectedVoteId === vote._id ? '#f0f7ff' : 'transparent',
+                      borderLeft: selectedVoteId === vote._id ? '4px solid #0d6efd' : '4px solid transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => setSelectedVoteId(vote._id)}
+                  >
+                    <div>
+                      <strong>{vote.type === "Election" && vote.title ? vote.title : vote.type}</strong>
+                      <span className="ms-2 badge bg-secondary">{vote.voteCount} ballot{vote.voteCount === 1 ? '' : 's'}</span>
+                      {vote.started && !vote.ended && (
+                        <span className="ms-2 badge bg-success">Running</span>
+                      )}
+                      {vote.ended && (
+                        <span className="ms-2 badge bg-dark">Complete</span>
+                      )}
+                      {!vote.started && !vote.ended && (
+                        <span className="ms-2 badge bg-warning text-dark">Suspended</span>
+                      )}
+                    </div>
+                    {!vote.started && !vote.ended && canAccessECouncilControls() && (
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmModal({
+                            show: true,
+                            title: 'Delete Vote',
+                            message: `Are you sure you want to delete this ${vote.type}?`,
+                            onConfirm: async () => {
+                              setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
+                              try {
+                                await axios.delete(`/api/vote/manage?voteId=${vote._id}`);
+                                await fetchVotesList();
+                                if (selectedVoteId === vote._id) {
+                                  setSelectedVoteId(null);
+                                  setVoteInfo(null);
+                                }
+                              } catch (err: any) {
+                                setAlertModal({
+                                  show: true,
+                                  title: 'Failed to Delete Vote',
+                                  message: err?.response?.data?.error || "Failed to delete vote.",
+                                  variant: 'danger'
+                                });
+                              }
+                            }
+                          });
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Create Vote Container (replaced modal) */}
+        {showCreateVote && (
           <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
-                <FontAwesomeIcon icon={faPlay} className="me-2" />
-                Start New Vote
+                <FontAwesomeIcon icon={faPlus} className="me-2" />
+                Create New Vote
               </h4>
-              <Button size="sm" variant="outline-secondary" onClick={handleCloseStartVote}>
+              <Button size="sm" variant="outline-secondary" onClick={handleCloseCreateVote}>
                 <FontAwesomeIcon icon={faTimes} className="me-1" />
                 Cancel
               </Button>
@@ -1462,8 +1691,8 @@ export default function VotePage() {
           </div>
         )}
 
-        {/* Voted alert */}
-        {voteInfo && voteInfo.type === "Election" && voteInfo.started && !voteInfo.ended && voted && (
+        {/* Voted alert - for running votes and proxy votes on suspended votes */}
+        {voteInfo && voteInfo.type === "Election" && voted && !voteInfo.ended && (
           <div className="alert alert-info d-flex align-items-center mt-3" role="alert">
             <FontAwesomeIcon icon={faCheck} className="me-2" />
             Your vote has been counted.
@@ -1473,9 +1702,19 @@ export default function VotePage() {
         {/* Proxy unlock button when vote is suspended */}
         {voteInfo && voteInfo.type === "Election" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && (
           <div className="mt-3">
-            <Button variant="danger" onClick={() => setShowProxyConfirm(true)} disabled={voted || submitting}>
+            <Button 
+              variant="danger" 
+              onClick={() => setShowProxyConfirm(true)} 
+              disabled={voted || submitting || !selectedVoteId}
+              title={!selectedVoteId ? "Please select a vote to submit a proxy ballot" : ""}
+            >
               <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
             </Button>
+            {!selectedVoteId && (
+              <small className="d-block text-muted mt-2">
+                Select a vote from the list above to submit a proxy ballot
+              </small>
+            )}
           </div>
         )}
 
@@ -1540,9 +1779,19 @@ export default function VotePage() {
         {/* Proxy unlock button when pledge vote is suspended */}
         {voteInfo && voteInfo.type === "Pledge" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && (
           <div className="mt-3">
-            <Button variant="danger" onClick={() => setShowProxyConfirm(true)} disabled={voted || submitting}>
+            <Button 
+              variant="danger" 
+              onClick={() => setShowProxyConfirm(true)} 
+              disabled={voted || submitting || !selectedVoteId}
+              title={!selectedVoteId ? "Please select a vote to submit a proxy ballot" : ""}
+            >
               <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
             </Button>
+            {!selectedVoteId && (
+              <small className="d-block text-muted mt-2">
+                Select a vote from the list above to submit a proxy ballot
+              </small>
+            )}
           </div>
         )}
 
@@ -1688,7 +1937,7 @@ export default function VotePage() {
             </form>
             <br />
             {/* Board round results (live, ECouncil only, during board round) */}
-            {userData.isECouncil && voteInfo.round === "board" && voteInfo.boardResults && (
+            {canAccessECouncilControls() && voteInfo.round === "board" && voteInfo.boardResults && (
               <div className="mt-4">
                 <h5>Board Round Results</h5>
                 <ul className="list-group">
@@ -1722,7 +1971,7 @@ export default function VotePage() {
               </div>
             )}
             {/* Blackball round results (live, ECouncil only, during blackball round) */}
-            {userData.isECouncil && voteInfo.round === "blackball" && voteInfo.blackballResults && (
+            {canAccessECouncilControls() && voteInfo.round === "blackball" && voteInfo.blackballResults && (
               <div className="mt-4">
                 <h5>Blackball Round Results</h5>
                 <ul className="list-group">
@@ -2067,6 +2316,73 @@ export default function VotePage() {
                   </Button>
                   <Button variant="danger" onClick={() => { setProxyMode(true); setShowProxyConfirm(false); }} disabled={submitting}>
                     <FontAwesomeIcon icon={faUnlock} className="me-1" /> Confirm Proxy Vote
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Candidate Management Modal */}
+        {showCandidateManager && voteInfo && voteInfo.type === "Election" && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-secondary text-white">
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon icon={faUser} className="me-2" />
+                    Manage Candidates
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close btn-close-white"
+                    onClick={handleCloseCandidateManager}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label htmlFor="newCandidate" className="form-label">Add New Candidate</label>
+                    <div className="input-group">
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="newCandidate"
+                        value={newCandidate}
+                        onChange={(e) => setNewCandidate(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCandidate();
+                          }
+                        }}
+                        placeholder="Candidate name"
+                      />
+                      <Button variant="primary" onClick={handleAddCandidate} disabled={!newCandidate.trim() || submitting}>
+                        <FontAwesomeIcon icon={faPlus} className="me-1" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                  <h6>Current Candidates:</h6>
+                  <ul className="list-group">
+                    {voteInfo.options?.map((option) => (
+                      <li key={option} className="list-group-item d-flex justify-content-between align-items-center">
+                        {option}
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          onClick={() => handleRemoveCandidate(option)}
+                          disabled={submitting}
+                        >
+                          <FontAwesomeIcon icon={faTimes} />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="modal-footer">
+                  <Button variant="secondary" onClick={handleCloseCandidateManager} disabled={submitting}>
+                    Done
                   </Button>
                 </div>
               </div>

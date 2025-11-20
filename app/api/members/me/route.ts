@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil needsProfileReview needsPermissionReview"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview"
     )
     .lean() as any;
 
@@ -53,6 +53,7 @@ export async function GET(req: Request) {
       role: member.role,
       status: member.status,
       isECouncil: member.isECouncil,
+      ecouncilPosition: member.ecouncilPosition,
       needsProfileReview: member.needsProfileReview,
       needsPermissionReview: member.needsPermissionReview,
     },
