@@ -22,16 +22,23 @@ export async function GET(req: Request) {
     await requireECouncil(req);
     await connectDB();
     
+    const { searchParams } = new URL(req.url);
+    const voteId = searchParams.get('voteId');
+    
+    if (!voteId) {
+      return NextResponse.json({ error: "voteId is required" }, { status: 400 });
+    }
+    
     // Get all active members
     const activeMembers = await Member.find({ status: "Active" })
       .select("clerkId fName lName rollNo")
       .sort({ lName: 1, fName: 1 })
       .lean();
     
-    // Get the current vote
-    const vote = await Vote.findOne({}).sort({ createdAt: -1 });
+    // Get the specified vote
+    const vote = await Vote.findById(voteId);
     if (!vote || Array.isArray(vote)) {
-      return NextResponse.json({ error: "No vote found" }, { status: 404 });
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
     
     // Build voter status for each member
@@ -78,17 +85,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await requireECouncil(req);
-    const { clerkId } = await req.json();
+    const { clerkId, voteId } = await req.json();
     
-    if (!clerkId) {
-      return NextResponse.json({ error: "clerkId is required" }, { status: 400 });
+    if (!clerkId || !voteId) {
+      return NextResponse.json({ error: "clerkId and voteId are required" }, { status: 400 });
     }
     
     await connectDB();
-    const vote = await Vote.findOne({}).sort({ createdAt: -1 });
+    const vote = await Vote.findById(voteId);
     
     if (!vote || Array.isArray(vote)) {
-      return NextResponse.json({ error: "No vote found" }, { status: 404 });
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
     
     if (!vote.ended) {
@@ -123,16 +130,17 @@ export async function DELETE(req: Request) {
     await requireECouncil(req);
     const { searchParams } = new URL(req.url);
     const clerkId = searchParams.get('clerkId');
+    const voteId = searchParams.get('voteId');
     
-    if (!clerkId) {
-      return NextResponse.json({ error: "clerkId is required" }, { status: 400 });
+    if (!clerkId || !voteId) {
+      return NextResponse.json({ error: "clerkId and voteId are required" }, { status: 400 });
     }
     
     await connectDB();
-    const vote = await Vote.findOne({}).sort({ createdAt: -1 });
+    const vote = await Vote.findById(voteId);
     
     if (!vote || Array.isArray(vote)) {
-      return NextResponse.json({ error: "No vote found" }, { status: 404 });
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
     
     // Prevent modifications after verification
@@ -157,12 +165,17 @@ export async function DELETE(req: Request) {
 export async function PUT(req: Request) {
   try {
     await requireECouncil(req);
+    const { voteId } = await req.json();
+    
+    if (!voteId) {
+      return NextResponse.json({ error: "voteId is required" }, { status: 400 });
+    }
     
     await connectDB();
-    const vote = await Vote.findOne({}).sort({ createdAt: -1 });
+    const vote = await Vote.findById(voteId);
     
     if (!vote || Array.isArray(vote)) {
-      return NextResponse.json({ error: "No vote found" }, { status: 404 });
+      return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
     
     if (!vote.ended) {

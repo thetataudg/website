@@ -13,6 +13,7 @@ const VoteSchema = new Schema({
   invalidatedBallots: [{ type: String }], // Array of clerkIds whose ballots have been invalidated
   pledgeValidCons: { type: Map, of: Boolean, default: {} }, // Maps pledge name to whether they have a valid con
   voterListVerified: { type: Boolean, default: false }, // Whether E-Council has verified the voter list
+  removedOptions: [{ type: String }], // Array of options that were removed after proxy votes were cast
   votes: [
     {
       clerkId: { type: String, required: true },
