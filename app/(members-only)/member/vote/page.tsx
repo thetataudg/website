@@ -19,6 +19,7 @@ import {
   faClock,
   faUser,
   faUnlock,
+  faLock,
 } from "@fortawesome/free-solid-svg-icons";
 import Button from "react-bootstrap/Button";
 
@@ -349,23 +350,15 @@ export default function VotePage() {
     // eslint-disable-next-line
   }, [isSignedIn, selectedVoteId, voteInfo?.started, voteInfo?.ended, voteInfo?.endTime, voteInfo?.voterListVerified]);
 
-  // Poll votes list only when there's an active/running vote
+  // Poll votes list to check for new votes or changes
   useEffect(() => {
     if (!isSignedIn || !userData) return;
     
-    // Check if there's any non-ended vote in the list
-    const hasActiveVote = votesList.some(v => !v.ended);
-    
-    if (!hasActiveVote) {
-      // No active votes: don't poll, just fetch once
-      return;
-    }
-    
-    // Active vote exists: poll every 10 seconds (longer than before)
+    // Poll every 10 seconds to detect new votes or changes
     const votesPolling = setInterval(() => fetchVotesList(false), 10000);
     return () => clearInterval(votesPolling);
     // eslint-disable-next-line
-  }, [isSignedIn, userData, votesList.length, votesList.some(v => !v.ended)]);
+  }, [isSignedIn, userData]);
 
   // Auto-show voter list when vote ends for E-Council (before verification)
   useEffect(() => {
@@ -422,10 +415,30 @@ export default function VotePage() {
     try {
       const res = await axios.get("/api/vote/manage");
       setVotesList(res.data.votes || []);
-      // Select the running vote if there is one
+      
+      // Check if the currently selected vote still exists
+      if (selectedVoteId) {
+        const stillExists = res.data.votes?.find((v: any) => v._id === selectedVoteId);
+        if (!stillExists) {
+          // Vote was deleted, clear selection and state
+          setSelectedVoteId(null);
+          setVoteInfo(null);
+          setVoted(false);
+          setProxyMode(false);
+          setSelectedOption("");
+          setPledgeSelections({});
+        }
+      }
+      
+      // Select the running vote if there is one and no vote is currently selected
       const runningVote = res.data.votes?.find((v: any) => v.started && !v.ended);
       if (runningVote && !selectedVoteId) {
         setSelectedVoteId(runningVote._id);
+      }
+      
+      // Auto-select if there's only one vote and user is not E-Council
+      if (!selectedVoteId && !canAccessECouncilControls() && res.data.votes?.length === 1) {
+        setSelectedVoteId(res.data.votes[0]._id);
       }
     } catch (err: any) {
       console.error("Failed to fetch votes list", err);
@@ -1114,7 +1127,7 @@ export default function VotePage() {
                       {!voteInfo.started && !voteInfo.ended && (
                         <>
                           <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
-                            <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
+                            <FontAwesomeIcon icon={faPlay} className="me-1" /> Start Voting
                           </Button>
                           {voteInfo.type === "Election" && (
                             <Button 
@@ -1307,6 +1320,10 @@ export default function VotePage() {
                 </div>
               )}
             </>
+          ) : !selectedVoteId && !voteLoading && votesList.length === 0 ? (
+            <div className="alert alert-dark d-flex align-items-center" role="alert">
+              No active votes. {canAccessECouncilControls() && 'Click "Create Vote" to start a new one.'}
+            </div>
           ) : null}
         </div>
 
@@ -1335,55 +1352,43 @@ export default function VotePage() {
                       borderLeft: selectedVoteId === vote._id ? '4px solid #0d6efd' : '4px solid transparent',
                       transition: 'all 0.2s ease'
                     }}
-                    onClick={() => setSelectedVoteId(vote._id)}
+                    onClick={() => {
+                      if (selectedVoteId === vote._id) {
+                        // Unselect if clicking on already selected vote
+                        setSelectedVoteId(null);
+                        setVoteInfo(null);
+                        setVoted(false);
+                        setProxyMode(false);
+                        setSelectedOption("");
+                        setPledgeSelections({});
+                      } else {
+                        // Select the vote
+                        setSelectedVoteId(vote._id);
+                      }
+                    }}
                   >
                     <div>
                       <strong>{vote.type === "Election" && vote.title ? vote.title : vote.type}</strong>
                       <span className="ms-2 badge bg-secondary">{vote.voteCount} ballot{vote.voteCount === 1 ? '' : 's'}</span>
                       {vote.started && !vote.ended && (
-                        <span className="ms-2 badge bg-success">Running</span>
+                        <span className="ms-2 badge bg-success">
+                          <FontAwesomeIcon icon={faCheck} className="me-1" />
+                          Running
+                        </span>
                       )}
                       {vote.ended && (
-                        <span className="ms-2 badge bg-dark">Complete</span>
+                        <span className="ms-2 badge bg-dark">
+                          <FontAwesomeIcon icon={faLock} className="me-1" />
+                          Complete
+                        </span>
                       )}
                       {!vote.started && !vote.ended && (
-                        <span className="ms-2 badge bg-warning text-dark">Suspended</span>
+                        <span className="ms-2 badge bg-warning text-dark">
+                          <FontAwesomeIcon icon={faLock} className="me-1" />
+                          Locked
+                        </span>
                       )}
                     </div>
-                    {!vote.started && !vote.ended && canAccessECouncilControls() && (
-                      <Button
-                        size="sm"
-                        variant="outline-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmModal({
-                            show: true,
-                            title: 'Delete Vote',
-                            message: `Are you sure you want to delete this ${vote.type}?`,
-                            onConfirm: async () => {
-                              setConfirmModal({ show: false, title: '', message: '', onConfirm: () => {} });
-                              try {
-                                await axios.delete(`/api/vote/manage?voteId=${vote._id}`);
-                                await fetchVotesList();
-                                if (selectedVoteId === vote._id) {
-                                  setSelectedVoteId(null);
-                                  setVoteInfo(null);
-                                }
-                              } catch (err: any) {
-                                setAlertModal({
-                                  show: true,
-                                  title: 'Failed to Delete Vote',
-                                  message: err?.response?.data?.error || "Failed to delete vote.",
-                                  variant: 'danger'
-                                });
-                              }
-                            }
-                          });
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faTimes} />
-                      </Button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1700,21 +1705,15 @@ export default function VotePage() {
         )}
 
         {/* Proxy unlock button when vote is suspended */}
-        {voteInfo && voteInfo.type === "Election" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && (
+        {voteInfo && voteInfo.type === "Election" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && selectedVoteId && (
           <div className="mt-3">
             <Button 
               variant="danger" 
               onClick={() => setShowProxyConfirm(true)} 
-              disabled={voted || submitting || !selectedVoteId}
-              title={!selectedVoteId ? "Please select a vote to submit a proxy ballot" : ""}
+              disabled={voted || submitting}
             >
               <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
             </Button>
-            {!selectedVoteId && (
-              <small className="d-block text-muted mt-2">
-                Select a vote from the list above to submit a proxy ballot
-              </small>
-            )}
           </div>
         )}
 
@@ -1777,21 +1776,15 @@ export default function VotePage() {
         )}
 
         {/* Proxy unlock button when pledge vote is suspended */}
-        {voteInfo && voteInfo.type === "Pledge" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && (
+        {voteInfo && voteInfo.type === "Pledge" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && selectedVoteId && (
           <div className="mt-3">
             <Button 
               variant="danger" 
               onClick={() => setShowProxyConfirm(true)} 
-              disabled={voted || submitting || !selectedVoteId}
-              title={!selectedVoteId ? "Please select a vote to submit a proxy ballot" : ""}
+              disabled={voted || submitting}
             >
               <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
             </Button>
-            {!selectedVoteId && (
-              <small className="d-block text-muted mt-2">
-                Select a vote from the list above to submit a proxy ballot
-              </small>
-            )}
           </div>
         )}
 
@@ -2008,7 +2001,7 @@ export default function VotePage() {
         )}
 
         {/* Results Container */}
-        {showResults && (
+        {showResults && selectedVoteId && (
           <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#f8f9fa" }}>
             <div className="mb-3">
               <h4 className="mb-0">
