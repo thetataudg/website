@@ -179,6 +179,7 @@ export async function GET(req: Request) {
           ended: v.ended,
           createdAt: v.createdAt,
           voteCount: v.votes?.length || 0,
+          hasVoted: v.votes?.some((vote: any) => vote.clerkId === clerkId) || false,
         }))
       });
     }
@@ -286,7 +287,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         boardResults,
         blackballResults,
-        totalVotes: validVotes.filter((v: any) => v.round === "board").length,
+        totalVotes: new Set(validVotes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
         voterListVerified: vote.voterListVerified || false,
       });
     }
