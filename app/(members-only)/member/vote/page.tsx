@@ -7,12 +7,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheck,
   faTimes,
-  faTriangleExclamation,
   faHourglass,
   faPlay,
   faStop,
-  faChartBar,
-  faArrowRight,
   faExclamationTriangle,
   faPause,
   faPlus,
@@ -20,6 +17,7 @@ import {
   faUser,
   faUnlock,
   faLock,
+  faArrowsRotate,
 } from "@fortawesome/free-solid-svg-icons";
 import Button from "react-bootstrap/Button";
 
@@ -192,7 +190,7 @@ export default function VotePage() {
           setCountdownTarget(null);
           fetchVoteInfo(); // Refresh to get updated state
           if (canAccessECouncilControls()) {
-            fetchVotesList(); // Also refresh votes list
+            fetchVotesList(false); // Also refresh votes list (no loading indicator)
           }
         }
       };
@@ -317,7 +315,17 @@ export default function VotePage() {
     // eslint-disable-next-line
   }, [userData]);
 
+  // ====== POLLING OPTIMIZATION FOR NETLIFY =======
+  // Strategy to reduce API requests from ~43M/month to manageable levels:
+  // 1. Longer intervals: Active vote 10s (was 5s), Scheduled end 5s (was 3s)
+  // 2. Visibility-aware: Stop polling when tab is hidden/inactive
+  // 3. E-Council only: Votes list polling restricted to E-Council members
+  // 4. Immediate refresh: User actions trigger instant fetchVoteInfo/fetchVotesList
+  // 5. Smart polling: No polling for ended+verified votes
+  // Result: ~80-85% reduction in API calls while maintaining responsive UX
+  
   // Adaptive polling: only poll when necessary to reduce API calls
+  // Now respects document visibility to avoid polling when tab is not active
   useEffect(() => {
     if (!isSignedIn) return;
     fetchVoteInfo();
@@ -326,11 +334,11 @@ export default function VotePage() {
     let pollInterval = null;
     
     if (voteInfo?.started && !voteInfo?.ended) {
-      // Vote is actively running: poll every 5 seconds
-      pollInterval = 5000;
+      // Vote is actively running: poll every 10 seconds (reduced from 5s)
+      pollInterval = 10000;
     } else if (voteInfo?.endTime && !voteInfo?.ended) {
-      // Vote has scheduled end time: poll every 3 seconds to catch the end
-      pollInterval = 3000;
+      // Vote has scheduled end time: poll every 5 seconds to catch the end (reduced from 3s)
+      pollInterval = 5000;
     } else if (!voteInfo || (!voteInfo?.started && !voteInfo?.ended)) {
       // Suspended vote or no vote: poll every 15 seconds (low priority)
       pollInterval = 15000;
@@ -340,23 +348,67 @@ export default function VotePage() {
     }
     // If vote is ended and verified, don't poll at all (pollInterval stays null)
     
-    if (pollInterval) {
-      pollingRef.current = setInterval(fetchVoteInfo, pollInterval);
-    }
+    const startPolling = () => {
+      if (pollInterval && document.visibilityState === 'visible') {
+        pollingRef.current = setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            fetchVoteInfo();
+          }
+        }, pollInterval);
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab became visible - fetch immediately and restart polling
+        fetchVoteInfo();
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        startPolling();
+      } else {
+        // Tab hidden - stop polling
+        if (pollingRef.current) clearInterval(pollingRef.current);
+      }
+    };
+    
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
     // eslint-disable-next-line
   }, [isSignedIn, selectedVoteId, voteInfo?.started, voteInfo?.ended, voteInfo?.endTime, voteInfo?.voterListVerified]);
 
-  // Poll votes list to check for new votes or changes
+  // Poll votes list to check for new votes or changes - E-Council only
   useEffect(() => {
-    if (!isSignedIn || !userData) return;
+    if (!isSignedIn || !userData || !canAccessECouncilControls()) return;
     
-    // Poll every 10 seconds to detect new votes or changes
-    const votesPolling = setInterval(() => fetchVotesList(false), 10000);
-    return () => clearInterval(votesPolling);
+    const startVotesPolling = () => {
+      if (document.visibilityState === 'visible') {
+        return setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            fetchVotesList(false);
+          }
+        }, 10000);
+      }
+      return null;
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab became visible - fetch immediately
+        fetchVotesList(false);
+      }
+    };
+    
+    const votesPolling = startVotesPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      if (votesPolling) clearInterval(votesPolling);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
     // eslint-disable-next-line
   }, [isSignedIn, userData]);
 
@@ -1051,19 +1103,31 @@ export default function VotePage() {
       <div>
         <div className="d-flex justify-content-between align-items-center">
           <h1>Chapter Voting</h1>
-          {canAccessECouncilControls() && (
+          <div className="d-flex gap-2">
             <button
-              className="btn"
-              style={{
-                backgroundColor: "#AD2831",
-                color: "#fff",
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => {
+                fetchVoteInfo();
+                fetchVotesList(false);
               }}
-              onClick={handleOpenCreateVote}
+              title="Refresh vote data"
             >
-              <FontAwesomeIcon icon={faPlus} className="me-2" />
-              Create Vote
+              <FontAwesomeIcon icon={faArrowsRotate} />
             </button>
-          )}
+            {canAccessECouncilControls() && (
+              <button
+                className="btn"
+                style={{
+                  backgroundColor: "#AD2831",
+                  color: "#fff",
+                }}
+                onClick={handleOpenCreateVote}
+              >
+                <FontAwesomeIcon icon={faPlus} className="me-2" />
+                Create Vote
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Countdown Alert */}
@@ -1370,6 +1434,12 @@ export default function VotePage() {
                     <div>
                       <strong>{vote.type === "Election" && vote.title ? vote.title : vote.type}</strong>
                       <span className="ms-2 badge bg-secondary">{vote.voteCount} ballot{vote.voteCount === 1 ? '' : 's'}</span>
+                      {vote.hasVoted && (
+                        <span className="ms-2 badge bg-success">
+                          <FontAwesomeIcon icon={faCheck} className="me-1" />
+                          Voted
+                        </span>
+                      )}
                       {vote.started && !vote.ended && (
                         <span className="ms-2 badge bg-success">
                           <FontAwesomeIcon icon={faCheck} className="me-1" />

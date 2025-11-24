@@ -179,6 +179,7 @@ export async function GET(req: Request) {
           ended: v.ended,
           createdAt: v.createdAt,
           voteCount: v.votes?.length || 0,
+          hasVoted: v.votes?.some((vote: any) => vote.clerkId === clerkId) || false,
         }))
       });
     }
