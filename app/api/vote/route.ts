@@ -36,6 +36,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No active vote" }, { status: 404 });
     }
     
+    // Check if vote has ended
+    if (vote.ended) {
+      return NextResponse.json({ error: "Vote has ended" }, { status: 400 });
+    }
+    
     // Check if vote should be auto-ended
     if (vote.endTime && new Date() >= vote.endTime) {
       // Auto-end vote
@@ -55,11 +60,25 @@ export async function POST(req: Request) {
       if (!vote.options.includes(choice) && choice !== "Abstain") {
         return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
       }
-      if (vote.votes.some((v: any) => v.clerkId === clerkId)) {
-        return NextResponse.json({ error: "Already voted" }, { status: 400 });
+      
+      // Use atomic update to prevent race condition (double voting)
+      const result = await Vote.updateOne(
+        {
+          _id: vote._id,
+          ended: false,
+          "votes.clerkId": { $ne: clerkId } // Ensure clerkId not already in votes array
+        },
+        {
+          $push: {
+            votes: { clerkId, choice, proxy: !!proxy }
+          }
+        }
+      );
+      
+      if (result.matchedCount === 0) {
+        return NextResponse.json({ error: "Already voted or vote has ended" }, { status: 400 });
       }
-      vote.votes.push({ clerkId, choice, proxy: !!proxy });
-      await vote.save();
+      
       return NextResponse.json({ success: true });
     } else if (vote.type === "Pledge") {
       // Support batch ballot submission with dual choices
@@ -69,15 +88,14 @@ export async function POST(req: Request) {
         if (!vote.started && !isProxy) {
           return NextResponse.json({ error: "Vote not started" }, { status: 400 });
         }
+        
+        // Build array of all votes to insert
+        const votesToInsert: any[] = [];
+        
         for (const item of body.ballot) {
           const { pledge, boardChoice, blackballChoice } = item;
           if (!vote.pledges.includes(pledge)) {
             return NextResponse.json({ error: `Invalid pledge: ${pledge}` }, { status: 400 });
-          }
-          
-          // Check if already voted for this pledge in this round
-          if (vote.votes.some((v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === vote.round)) {
-            return NextResponse.json({ error: `Already voted for ${pledge} this round` }, { status: 400 });
           }
           
           // Handle board choice
@@ -86,9 +104,9 @@ export async function POST(req: Request) {
             if (!validBoardChoices.includes(boardChoice)) {
               return NextResponse.json({ error: `Invalid board choice for ${pledge}` }, { status: 400 });
             }
-            vote.votes.push({ clerkId, pledge, choice: boardChoice, round: "board", proxy: isProxy });
+            votesToInsert.push({ clerkId, pledge, choice: boardChoice, round: "board", proxy: isProxy });
           } else {
-            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "board", proxy: isProxy });
+            votesToInsert.push({ clerkId, pledge, choice: "Abstain", round: "board", proxy: isProxy });
           }
           
           // Handle blackball choice
@@ -97,12 +115,35 @@ export async function POST(req: Request) {
             if (!validBlackballChoices.includes(blackballChoice)) {
               return NextResponse.json({ error: `Invalid blackball choice for ${pledge}` }, { status: 400 });
             }
-            vote.votes.push({ clerkId, pledge, choice: blackballChoice, round: "blackball", proxy: isProxy });
+            votesToInsert.push({ clerkId, pledge, choice: blackballChoice, round: "blackball", proxy: isProxy });
           } else {
-            vote.votes.push({ clerkId, pledge, choice: "Abstain", round: "blackball", proxy: isProxy });
+            votesToInsert.push({ clerkId, pledge, choice: "Abstain", round: "blackball", proxy: isProxy });
           }
         }
-        await vote.save();
+        
+        // Use atomic update to prevent race condition
+        // Check that none of the pledges have been voted on by this clerkId in board or blackball rounds
+        const pledgeNames = body.ballot.map((b: any) => b.pledge);
+        const result = await Vote.updateOne(
+          {
+            _id: vote._id,
+            ended: false,
+            $nor: [
+              { "votes": { $elemMatch: { clerkId, pledge: { $in: pledgeNames }, round: "board" } } },
+              { "votes": { $elemMatch: { clerkId, pledge: { $in: pledgeNames }, round: "blackball" } } }
+            ]
+          },
+          {
+            $push: {
+              votes: { $each: votesToInsert }
+            }
+          }
+        );
+        
+        if (result.matchedCount === 0) {
+          return NextResponse.json({ error: "Already voted for one or more pledges or vote has ended" }, { status: 400 });
+        }
+        
         return NextResponse.json({ success: true });
       } else {
         // Fallback: single pledge vote (legacy)
@@ -114,15 +155,29 @@ export async function POST(req: Request) {
         if (!validChoices.includes(choice)) {
           return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
         }
-        if (vote.votes.some((v: any) => v.clerkId === clerkId && v.pledge === pledge && v.round === vote.round)) {
-          return NextResponse.json({ error: "Already voted for this pledge this round" }, { status: 400 });
-        }
         const isProxySingle = !!body.proxy;
         if (!vote.started && !isProxySingle) {
           return NextResponse.json({ error: "Vote not started" }, { status: 400 });
         }
-        vote.votes.push({ clerkId, pledge, choice, round: vote.round, proxy: isProxySingle });
-        await vote.save();
+        
+        // Use atomic update to prevent race condition
+        const result = await Vote.updateOne(
+          {
+            _id: vote._id,
+            ended: false,
+            "votes": { $not: { $elemMatch: { clerkId, pledge, round: vote.round } } }
+          },
+          {
+            $push: {
+              votes: { clerkId, pledge, choice, round: vote.round, proxy: isProxySingle }
+            }
+          }
+        );
+        
+        if (result.matchedCount === 0) {
+          return NextResponse.json({ error: "Already voted for this pledge this round or vote has ended" }, { status: 400 });
+        }
+        
         return NextResponse.json({ success: true });
       }
     }
@@ -203,7 +258,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         votedPledges,
         abstainedPledges,
-        totalVotes: Math.floor(vote.votes.filter((v: any) => v.round === "board").length), // Count unique voters
+        totalVotes: new Set(vote.votes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
         voterListVerified: vote.voterListVerified || false,
       });
     }
