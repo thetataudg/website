@@ -8,7 +8,8 @@ import type { Invitation } from "@clerk/clerk-sdk-node";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faTimes, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
 
 export default function ClientInvitePanel() {
 
@@ -23,14 +24,7 @@ export default function ClientInvitePanel() {
   const [loading, setLoading] = useState(true);
 
   if (!isLoaded) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading invitations..." />;
   }
 
   if (!isSignedIn) {
@@ -76,7 +70,10 @@ export default function ClientInvitePanel() {
       </div>
       <InviteForm onSuccess={handleInviteSuccess} />
       {loading ? (
-        <div className="text-center py-4 text-muted">Loading…</div>
+        <div className="text-center py-4 text-muted">
+          <LoadingSpinner size="sm" className="me-2" />
+          Loading...
+        </div>
       ) : (
         <InvitationsList invites={invites} onRevoke={handleRevoke} />
       )}

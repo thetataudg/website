@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { LoadingSpinner } from "../../../components/LoadingState";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock } from "@fortawesome/free-solid-svg-icons";
@@ -284,7 +285,14 @@ export default function MemberEditorModal({
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "Saving…" : "Save Changes"}
+              {saving ? (
+                <>
+                  <LoadingSpinner size="sm" className="me-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </button>
           </div>
         </div>

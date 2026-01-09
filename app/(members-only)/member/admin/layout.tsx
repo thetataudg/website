@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import LoadingState from "../../components/LoadingState";
 
 const TABS = [
   { href: "/member/admin/members", label: "Manage Members" },
@@ -36,14 +37,7 @@ export default function AdminLayout({
   }, []);
 
   if (loading) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading admin console..." />;
   }
 
   if (!me || (me.role !== "admin" && me.role !== "superadmin")) {

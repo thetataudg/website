@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
 
 type Committee = {
   _id: string;
@@ -49,6 +50,8 @@ export default function CommitteeEventsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [editId, setEditId] = useState<string | null>(null);
+  const [editEvent, setEditEvent] = useState<any | null>(null);
+  const [showSeriesPrompt, setShowSeriesPrompt] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -63,6 +66,7 @@ export default function CommitteeEventsPage() {
     recurrenceFrequency: "weekly",
     recurrenceInterval: "1",
     recurrenceEndDate: "",
+    recurrenceCount: "1",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,9 +81,7 @@ export default function CommitteeEventsPage() {
       const commData = commRes.ok ? await commRes.json() : [];
       setCommittees(commData);
 
-      const evRes = await fetch("/api/events?includePast=true");
-      const evData = evRes.ok ? await evRes.json() : [];
-      setEvents(evData);
+      await reloadEvents();
 
       const memRes = await fetch("/api/members");
       const memData = memRes.ok ? await memRes.json() : [];
@@ -89,6 +91,12 @@ export default function CommitteeEventsPage() {
     }
     if (isSignedIn) init();
   }, [isSignedIn]);
+
+  async function reloadEvents() {
+    const evRes = await fetch("/api/events?includePast=true");
+    const evData = evRes.ok ? await evRes.json() : [];
+    setEvents(evData);
+  }
 
   const managedCommitteeIds = useMemo(() => {
     if (!me) return [];
@@ -167,6 +175,7 @@ export default function CommitteeEventsPage() {
       recurrenceFrequency: "weekly",
       recurrenceInterval: "1",
       recurrenceEndDate: "",
+      recurrenceCount: "1",
     });
 
   function toInputValue(value: string | Date) {
@@ -204,13 +213,18 @@ export default function CommitteeEventsPage() {
           frequency: form.recurrenceFrequency,
           interval: Number(form.recurrenceInterval) || 1,
           endDate: form.recurrenceEndDate || null,
+          count: Number(form.recurrenceCount) || 1,
         },
       }),
     });
 
     if (res.ok) {
       const created = await res.json();
-      setEvents((prev) => [created, ...prev]);
+      if (form.recurrenceEnabled && Number(form.recurrenceCount) > 1) {
+        await reloadEvents();
+      } else {
+        setEvents((prev) => [created, ...prev]);
+      }
       resetForm();
       setShowCreateModal(false);
       setFormMode("create");
@@ -221,9 +235,18 @@ export default function CommitteeEventsPage() {
     setSaving(false);
   }
 
-  async function handleSaveEdit(e: React.FormEvent) {
+  async function handleSaveEdit(
+    e: React.SyntheticEvent,
+    scope?: "single" | "series"
+  ) {
     e.preventDefault();
     if (!editId) return;
+    const isRecurring =
+      editEvent?.recurrence?.enabled || editEvent?.recurrenceParentId;
+    if (!scope && isRecurring) {
+      setShowSeriesPrompt(true);
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -245,14 +268,21 @@ export default function CommitteeEventsPage() {
     const res = await fetch(`/api/events/${editId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        applyToSeries: scope === "series" ? "series" : "single",
+      }),
     });
 
     if (res.ok) {
       const updated = await res.json();
-      setEvents((prev) =>
-        prev.map((evt) => (evt._id === updated._id ? updated : evt))
-      );
+      if (scope === "series") {
+        await reloadEvents();
+      } else {
+        setEvents((prev) =>
+          prev.map((evt) => (evt._id === updated._id ? updated : evt))
+        );
+      }
       if (selectedEvent?._id === updated._id) {
         setSelectedEvent(updated);
       }
@@ -260,6 +290,7 @@ export default function CommitteeEventsPage() {
       setShowCreateModal(false);
       setFormMode("create");
       setEditId(null);
+      setEditEvent(null);
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to update event");
@@ -273,6 +304,7 @@ export default function CommitteeEventsPage() {
     if (!event) return;
 
     setEditId(event._id);
+    setEditEvent(event);
     setForm({
       name: event.name || "",
       description: event.description || "",
@@ -291,6 +323,7 @@ export default function CommitteeEventsPage() {
       recurrenceEndDate: event.recurrence?.endDate
         ? toDateInputValue(event.recurrence.endDate)
         : event.recurrenceEndDate || "",
+      recurrenceCount: String(event.recurrence?.count || 1),
     });
     if (event.committeeId) {
       setSelectedCommitteeId(event.committeeId);
@@ -301,14 +334,7 @@ export default function CommitteeEventsPage() {
   }
 
   if (!isLoaded || loading) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading committee events..." />;
   }
 
   if (!isSignedIn) {
@@ -480,10 +506,17 @@ export default function CommitteeEventsPage() {
                 <button
                   type="button"
                   className="btn-close"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditEvent(null);
+                  }}
                 />
               </div>
-              <form onSubmit={formMode === "edit" ? handleSaveEdit : handleCreateEvent}>
+              <form
+                onSubmit={(e) =>
+                  formMode === "edit" ? handleSaveEdit(e) : handleCreateEvent(e)
+                }
+              >
                 <div className="modal-body">
                   {error && <div className="alert alert-danger">{error}</div>}
                   <div className="row g-3">
@@ -634,6 +667,22 @@ export default function CommitteeEventsPage() {
                             }
                           />
                         </div>
+                        <div className="col-md-6">
+                          <label className="form-label">Generate next N</label>
+                          <input
+                            type="number"
+                            min={1}
+                            className="form-control"
+                            value={form.recurrenceCount}
+                            onChange={(e) =>
+                              updateForm("recurrenceCount", e.target.value)
+                            }
+                          />
+                          <div className="form-text">
+                            Creates the next N occurrences now. More generate as
+                            events complete.
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -642,15 +691,28 @@ export default function CommitteeEventsPage() {
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setEditEvent(null);
+                    }}
                   >
                     Cancel
                   </button>
                   <button className="btn btn-primary" disabled={saving}>
                     {saving
                       ? formMode === "edit"
-                        ? "Saving..."
-                        : "Creating..."
+                        ? (
+                          <>
+                            <LoadingSpinner size="sm" className="me-2" />
+                            Saving...
+                          </>
+                        )
+                        : (
+                          <>
+                            <LoadingSpinner size="sm" className="me-2" />
+                            Creating...
+                          </>
+                        )
                       : formMode === "edit"
                       ? "Save Changes"
                       : "Create Event"}
@@ -824,6 +886,51 @@ export default function CommitteeEventsPage() {
                   }}
                 >
                   Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSeriesPrompt && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Apply changes</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowSeriesPrompt(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <p>Apply these changes to just this event or all future events?</p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={(e) => {
+                    setShowSeriesPrompt(false);
+                    handleSaveEdit(e, "single");
+                  }}
+                >
+                  Just this event
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={(e) => {
+                    setShowSeriesPrompt(false);
+                    handleSaveEdit(e, "series");
+                  }}
+                >
+                  All future events
                 </button>
               </div>
             </div>

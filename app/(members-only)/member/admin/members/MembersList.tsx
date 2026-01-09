@@ -7,7 +7,8 @@ import MemberEditorModal from "./MemberEditorModal";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faKey, faGavel, faCheck, faTimes, faTriangleExclamation, faHourglass, faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { faKey, faGavel, faCheck, faTimes, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
 
 export interface MemberData {
   _id: string;
@@ -52,14 +53,7 @@ export default function MembersList({
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading members..." />;
   }
 
   if (!isSignedIn) {
@@ -152,7 +146,7 @@ export default function MembersList({
               {loadingMembers ? (
                 <tr>
                   <td colSpan={4} className="text-center py-5">
-                    <FontAwesomeIcon icon={faSpinner} className="me-2 fa-spin" />
+                    <LoadingSpinner size="sm" className="me-2" />
                     Loading members...
                   </td>
                 </tr>
@@ -260,6 +254,7 @@ export default function MembersList({
                   onClick={confirmDelete}
                   disabled={deleteLoading}
                 >
+                  {deleteLoading && <LoadingSpinner size="sm" className="me-2" />}
                   {deleteLoading ? "Deleting..." : "Delete"}
                 </button>
               </div>

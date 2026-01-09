@@ -19,6 +19,7 @@ import {
   faGear,
   faUsersCog,
 } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../components/LoadingState";
 
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [showQr, setShowQr] = useState(false);
   const [qrTheme, setQrTheme] = useState("light");
+  const [qrLoading, setQrLoading] = useState(false);
   const [isCommitteeHead, setIsCommitteeHead] = useState(false);
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export default function Dashboard() {
     if (!showQr) return;
     const getTheme = () => document?.body?.dataset?.theme || "light";
     setQrTheme(getTheme());
+    setQrLoading(true);
     const observer = new MutationObserver(() => {
       setQrTheme(getTheme());
     });
@@ -102,17 +105,7 @@ export default function Dashboard() {
   }, [showQr]);
 
   if (!isLoaded || loadingUserData) {
-    return (
-      <div className="container">
-        <div
-          className="alert alert-info d-flex align-items-center mt-5"
-          role="alert"
-        >
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading dashboard..." />;
   }
 
   if (!isSignedIn) {
@@ -464,6 +457,12 @@ export default function Dashboard() {
                 />
               </div>
               <div className="modal-body text-center">
+                {qrLoading && (
+                  <div className="qr-loading">
+                    <LoadingSpinner size="2x" />
+                    <span className="text-muted">Loading QR code...</span>
+                  </div>
+                )}
                 <img
                   alt="Member QR Code"
                   className="qr-code"
@@ -472,6 +471,9 @@ export default function Dashboard() {
                   )}&size=220x220&color=${qrTheme === "dark" ? "ffffff" : "000000"}&bgcolor=${
                     qrTheme === "dark" ? "121a24" : "fffaf4"
                   }`}
+                  onLoad={() => setQrLoading(false)}
+                  onError={() => setQrLoading(false)}
+                  style={{ opacity: qrLoading ? 0 : 1 }}
                 />
                 <p className="text-muted mt-3">Show this at event check-in.</p>
               </div>

@@ -21,6 +21,7 @@ import {
   faArrowsRotate,
 } from "@fortawesome/free-solid-svg-icons";
 import Button from "react-bootstrap/Button";
+import LoadingState, { LoadingSpinner } from "../../components/LoadingState";
 
 type VoteInfo = {
   _id?: string;
@@ -1194,16 +1195,7 @@ export default function VotePage() {
   }
 
   if (!isLoaded || loadingUserData) {
-    return (
-      <div className="member-dashboard">
-        <div className="bento-card">
-          <div className="alert alert-info d-flex align-items-center" role="alert">
-            <FontAwesomeIcon icon={faHourglass} className="h2" />
-            <h2>Loading...</h2>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading voting tools..." />;
   }
 
   if (!isSignedIn) {
@@ -1277,7 +1269,7 @@ export default function VotePage() {
         <div className="vote-section">
           {voteLoading ? (
             <div className="alert alert-info d-flex align-items-center" role="alert">
-              <FontAwesomeIcon icon={faHourglass} className="me-2" />
+              <LoadingSpinner size="sm" className="me-2" />
               Loading vote info...
             </div>
           ) : voteInfo && voteInfo.type === "Election" && selectedVoteId ? (
@@ -1530,7 +1522,7 @@ export default function VotePage() {
             <h5 className="mb-3">{canAccessECouncilControls() ? 'Votes' : 'Available Votes'}</h5>
             {votesLoading ? (
               <div className="text-center py-3">
-                <FontAwesomeIcon icon={faHourglass} spin className="me-2" />
+                <LoadingSpinner size="sm" className="me-2" />
                 Loading votes...
               </div>
             ) : votesList.length === 0 ? (
@@ -1816,9 +1808,7 @@ export default function VotePage() {
 
             {voterListLoading ? (
               <div className="text-center py-4">
-                <div className="spinner-border" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
+                <LoadingSpinner size="sm" />
               </div>
             ) : (
               <>
@@ -2221,7 +2211,7 @@ export default function VotePage() {
             
             {resultsLoading ? (
               <div className="text-center">
-                <FontAwesomeIcon icon={faHourglass} className="me-2" />
+                <LoadingSpinner size="sm" className="me-2" />
                 Loading results...
               </div>
             ) : voteResults ? (
@@ -2622,9 +2612,7 @@ export default function VotePage() {
                 <div className="modal-body">
                   {pledgeConsLoading ? (
                     <div className="text-center py-4">
-                      <div className="spinner-border" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
+                      <LoadingSpinner size="sm" />
                     </div>
                   ) : (
                     <div>
@@ -2663,7 +2651,14 @@ export default function VotePage() {
                   </Button>
                   <Button variant="primary" onClick={handleSavePledgeCons} disabled={pledgeConsLoading}>
                     <FontAwesomeIcon icon={faCheck} className="me-1" />
-                    {pledgeConsLoading ? 'Saving...' : 'Save'}
+                    {pledgeConsLoading ? (
+                      <>
+                        <LoadingSpinner size="sm" className="me-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save"
+                    )}
                   </Button>
                 </div>
               </div>

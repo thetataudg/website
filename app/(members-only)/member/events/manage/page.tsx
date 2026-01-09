@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
 
 type Committee = {
   _id: string;
@@ -24,8 +25,11 @@ export default function EventCreatorPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editEvent, setEditEvent] = useState<any | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showSeriesPrompt, setShowSeriesPrompt] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -42,6 +46,7 @@ export default function EventCreatorPage() {
     recurrenceFrequency: "weekly",
     recurrenceInterval: "1",
     recurrenceEndDate: "",
+    recurrenceCount: "1",
   });
 
   const canCreate =
@@ -72,18 +77,19 @@ export default function EventCreatorPage() {
       const data = await res.json();
       setCommittees(data);
     }
-    async function loadEvents() {
-      const res = await fetch("/api/events?includePast=true");
-      if (!res.ok) return;
-      const data = await res.json();
-      setEvents(data);
-    }
     if (me) {
-      Promise.all([loadCommittees(), loadEvents()]).finally(() =>
+      Promise.all([loadCommittees(), reloadEvents()]).finally(() =>
         setLoading(false)
       );
     }
   }, [me]);
+
+  async function reloadEvents() {
+    const res = await fetch("/api/events?includePast=true");
+    if (!res.ok) return;
+    const data = await res.json();
+    setEvents(data);
+  }
 
   const updateForm = <K extends keyof typeof form>(key: K, value: any) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -104,6 +110,7 @@ export default function EventCreatorPage() {
       recurrenceFrequency: "weekly",
       recurrenceInterval: "1",
       recurrenceEndDate: "",
+      recurrenceCount: "1",
     });
 
   const normalizeEventType = (event: any, fallback?: string) => {
@@ -128,6 +135,7 @@ export default function EventCreatorPage() {
           frequency: form.recurrenceFrequency,
           interval: Number(form.recurrenceInterval) || 1,
           endDate: form.recurrenceEndDate || null,
+          count: Number(form.recurrenceCount) || 1,
         },
       }),
     });
@@ -138,7 +146,11 @@ export default function EventCreatorPage() {
         ...created,
         eventType: normalizeEventType(created, form.eventType),
       };
-      setEvents((prev) => [normalized, ...prev]);
+      if (form.recurrenceEnabled && Number(form.recurrenceCount) > 1) {
+        await reloadEvents();
+      } else {
+        setEvents((prev) => [normalized, ...prev]);
+      }
       resetForm();
       setShowModal(false);
     } else {
@@ -186,6 +198,7 @@ export default function EventCreatorPage() {
     if (!event) return;
 
     setEditId(event._id);
+    setEditEvent(event);
     setForm({
       name: event.name || "",
       description: event.description || "",
@@ -206,12 +219,19 @@ export default function EventCreatorPage() {
       recurrenceEndDate: event.recurrence?.endDate
         ? toDateInputValue(event.recurrence.endDate)
         : event.recurrenceEndDate || "",
+      recurrenceCount: String(event.recurrence?.count || 1),
     });
     setShowModal(true);
   }
 
-  async function handleSaveEdit() {
+  async function handleSaveEdit(scope?: "single" | "series") {
     if (!editId) return;
+    const isRecurring =
+      editEvent?.recurrence?.enabled || editEvent?.recurrenceParentId;
+    if (!scope && isRecurring) {
+      setShowSeriesPrompt(true);
+      return;
+    }
     setSaving(true);
     setError(null);
     const res = await fetch(`/api/events/${editId}`, {
@@ -225,24 +245,32 @@ export default function EventCreatorPage() {
           frequency: form.recurrenceFrequency,
           interval: Number(form.recurrenceInterval) || 1,
           endDate: form.recurrenceEndDate || null,
+          count: Number(form.recurrenceCount) || 1,
         },
+        applyToSeries: scope === "series" ? "series" : "single",
       }),
     });
     if (res.ok) {
       const updated = await res.json();
-      setEvents((prev) =>
-        prev.map((evt) =>
-          evt._id === editId
-            ? {
-                ...updated,
-                eventType: normalizeEventType(updated, form.eventType),
-              }
-            : evt
-        )
-      );
+      if (scope === "series") {
+        await reloadEvents();
+      } else {
+        setEvents((prev) =>
+          prev.map((evt) =>
+            evt._id === editId
+              ? {
+                  ...updated,
+                  eventType: normalizeEventType(updated, form.eventType),
+                }
+              : evt
+          )
+        );
+      }
       setEditId(null);
+      setEditEvent(null);
       resetForm();
       setShowModal(false);
+      setShowSeriesPrompt(false);
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to update event");
@@ -251,25 +279,30 @@ export default function EventCreatorPage() {
   }
 
   async function handleDeleteEvent(id: string) {
+    const isAdmin = me?.role === "admin" || me?.role === "superadmin";
+    if (!isAdmin) {
+      const res = await fetch(`/api/events/${id}`);
+      if (res.ok) {
+        const event = await res.json();
+        const hasAttendees =
+          Array.isArray(event.attendees) && event.attendees.length > 0;
+        if (event.status === "completed" && hasAttendees) {
+          setDeleteError("Only admins can delete completed events with attendees.");
+          return false;
+        }
+      }
+    }
     const res = await fetch(`/api/events/${id}`, { method: "DELETE" });
     if (res.ok) {
       setEvents((prev) => prev.filter((evt) => evt._id !== id));
       if (editId === id) setEditId(null);
+      return true;
     }
+    return false;
   }
 
   if (!isLoaded || loading) {
-    return (
-      <div className="container">
-        <div
-          className="alert alert-info d-flex align-items-center mt-5"
-          role="alert"
-        >
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading events..." />;
   }
 
   if (!isSignedIn) {
@@ -354,7 +387,10 @@ export default function EventCreatorPage() {
                     </button>
                       <button
                         className="btn btn-sm btn-outline-danger"
-                        onClick={() => setDeleteTarget(evt)}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(evt);
+                        }}
                       >
                         Delete
                       </button>
@@ -599,12 +635,29 @@ export default function EventCreatorPage() {
                     }
                   />
                 </div>
+                <div className="col-md-4">
+                  <label className="form-label">Generate next N</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="form-control"
+                    value={form.recurrenceCount}
+                    onChange={(e) =>
+                      updateForm("recurrenceCount", e.target.value)
+                    }
+                  />
+                  <div className="form-text">
+                    Creates the next N occurrences now. More generate as events
+                    complete.
+                  </div>
+                </div>
               </>
             )}
             {error && <div className="text-danger">{error}</div>}
             <div className="col-12">
               <div className="d-flex gap-2">
                 <button className="btn btn-primary" disabled={saving} type="submit">
+                  {saving && <LoadingSpinner size="sm" className="me-2" />}
                   {saving ? "Saving..." : editId ? "Save Changes" : "Create Event"}
                 </button>
                 <button
@@ -613,6 +666,7 @@ export default function EventCreatorPage() {
                   onClick={() => {
                     setShowModal(false);
                     setEditId(null);
+                    setEditEvent(null);
                     resetForm();
                     setError(null);
                   }}
@@ -640,7 +694,10 @@ export default function EventCreatorPage() {
                 <button
                   type="button"
                   className="btn-close"
-                  onClick={() => setDeleteTarget(null)}
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeleteError(null);
+                  }}
                 />
               </div>
               <div className="modal-body">
@@ -648,12 +705,16 @@ export default function EventCreatorPage() {
                   Are you sure you want to delete{" "}
                   <strong>{deleteTarget.name}</strong>?
                 </p>
+                {deleteError && <div className="text-danger">{deleteError}</div>}
               </div>
               <div className="modal-footer">
                 <button
                   type="button"
                   className="btn btn-outline-secondary"
-                  onClick={() => setDeleteTarget(null)}
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeleteError(null);
+                  }}
                 >
                   Cancel
                 </button>
@@ -661,11 +722,59 @@ export default function EventCreatorPage() {
                   type="button"
                   className="btn btn-outline-danger"
                   onClick={async () => {
-                    await handleDeleteEvent(deleteTarget._id);
-                    setDeleteTarget(null);
+                    const deleted = await handleDeleteEvent(deleteTarget._id);
+                    if (deleted) {
+                      setDeleteTarget(null);
+                      setDeleteError(null);
+                    }
                   }}
                 >
                   Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSeriesPrompt && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Apply changes</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowSeriesPrompt(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <p>Apply these changes to just this event or all future events?</p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => {
+                    setShowSeriesPrompt(false);
+                    handleSaveEdit("single");
+                  }}
+                >
+                  Just this event
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setShowSeriesPrompt(false);
+                    handleSaveEdit("series");
+                  }}
+                >
+                  All future events
                 </button>
               </div>
             </div>

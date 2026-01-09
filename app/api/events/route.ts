@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAuth, requireRole } from "@/lib/clerk";
+import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { addRecurrence } from "@/lib/recurrence";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -14,6 +15,59 @@ async function getMemberByClerk(req: Request) {
     throw new Error("Not authorized");
   }
   return member;
+}
+
+async function ensureFutureOccurrences(parentId: any) {
+  const parent = (await Event.findById(parentId).lean()) as any;
+  if (!parent || !parent.recurrence?.enabled) return;
+
+  const count = Math.max(Number(parent.recurrence?.count) || 1, 1);
+  const now = new Date();
+
+  const existing = await Event.find({
+    $or: [{ _id: parentId }, { recurrenceParentId: parentId }],
+  })
+    .sort({ startTime: 1 })
+    .lean();
+
+  const future = existing.filter((evt: any) => evt.startTime >= now);
+  if (future.length >= count) return;
+
+  let last = existing[existing.length - 1] || parent;
+  let toCreate = count - future.length;
+
+  while (toCreate > 0) {
+    const next = addRecurrence(
+      new Date(last.startTime),
+      new Date(last.endTime),
+      {
+        frequency: parent.recurrence?.frequency,
+        interval: parent.recurrence?.interval,
+        endDate: parent.recurrence?.endDate || null,
+      }
+    );
+    if (!next) break;
+
+    const created = await Event.create({
+      name: parent.name,
+      description: parent.description,
+      committeeId: parent.committeeId || null,
+      startTime: next.startTime,
+      endTime: next.endTime,
+      startedAt: null,
+      endedAt: null,
+      location: parent.location,
+      gemPointDurationMinutes: parent.gemPointDurationMinutes,
+      eventType: parent.eventType,
+      recurrence: { enabled: false },
+      status: "scheduled",
+      visibleToAlumni: parent.visibleToAlumni,
+      attendees: [],
+      recurrenceParentId: parentId,
+    });
+    last = created.toObject();
+    toCreate -= 1;
+  }
 }
 
 export async function GET(req: Request) {
@@ -125,6 +179,7 @@ export async function POST(req: Request) {
           : "weekly",
       interval: Number(recurrence?.interval) || 1,
       endDate: recurrence?.endDate ? new Date(recurrence.endDate) : null,
+      count: Math.max(Number(recurrence?.count) || 1, 1),
     };
 
     const eventDoc = {
@@ -165,6 +220,10 @@ export async function POST(req: Request) {
       await Committee.findByIdAndUpdate(committeeId, {
         $addToSet: { events: event._id },
       });
+    }
+
+    if (normalizedRecurrence.enabled && event?._id) {
+      await ensureFutureOccurrences(event._id);
     }
 
     logger.info({ eventId: event._id }, "Event created");

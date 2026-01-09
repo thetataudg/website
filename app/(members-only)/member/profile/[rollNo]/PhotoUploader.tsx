@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUpload } from "@fortawesome/free-solid-svg-icons";
+import { LoadingSpinner } from "../../../components/LoadingState";
 
 interface PhotoUploaderProps {
   show: boolean;
@@ -98,7 +99,10 @@ export default function PhotoUploader({
               disabled={!file || uploading}
             >
               {uploading ? (
-                "Uploading…"
+                <>
+                  <LoadingSpinner size="sm" className="me-2" />
+                  Uploading...
+                </>
               ) : (
                 <>
                   <FontAwesomeIcon icon={faUpload} className="me-1" />

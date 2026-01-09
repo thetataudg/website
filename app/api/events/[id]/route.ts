@@ -6,6 +6,7 @@ import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { addRecurrence, applyTimeOfDay } from "@/lib/recurrence";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -23,6 +24,59 @@ async function canManageEvent(member: any, event: any) {
   if (!event.committeeId) return false;
   const committee = await Committee.findById(event.committeeId);
   return committee?.committeeHeadId?.toString() === member._id?.toString();
+}
+
+async function ensureFutureOccurrences(parentId: any) {
+  const parent = (await Event.findById(parentId).lean()) as any;
+  if (!parent || !parent.recurrence?.enabled) return;
+
+  const count = Math.max(Number(parent.recurrence?.count) || 1, 1);
+  const now = new Date();
+
+  const existing = await Event.find({
+    $or: [{ _id: parentId }, { recurrenceParentId: parentId }],
+  })
+    .sort({ startTime: 1 })
+    .lean();
+
+  const future = existing.filter((evt: any) => evt.startTime >= now);
+  if (future.length >= count) return;
+
+  let last = existing[existing.length - 1] || parent;
+  let toCreate = count - future.length;
+
+  while (toCreate > 0) {
+    const next = addRecurrence(
+      new Date(last.startTime),
+      new Date(last.endTime),
+      {
+        frequency: parent.recurrence?.frequency,
+        interval: parent.recurrence?.interval,
+        endDate: parent.recurrence?.endDate || null,
+      }
+    );
+    if (!next) break;
+
+    const created = await Event.create({
+      name: parent.name,
+      description: parent.description,
+      committeeId: parent.committeeId || null,
+      startTime: next.startTime,
+      endTime: next.endTime,
+      startedAt: null,
+      endedAt: null,
+      location: parent.location,
+      gemPointDurationMinutes: parent.gemPointDurationMinutes,
+      eventType: parent.eventType,
+      recurrence: { enabled: false },
+      status: "scheduled",
+      visibleToAlumni: parent.visibleToAlumni,
+      attendees: [],
+      recurrenceParentId: parentId,
+    });
+    last = created.toObject();
+    toCreate -= 1;
+  }
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -134,6 +188,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const oldCommitteeId = event.committeeId?.toString();
 
     const nextStatus = updates.status ?? event.status;
+    const applyToSeries =
+      updates.applyToSeries === "series" ? "series" : "single";
 
     const normalizedEventType =
       updates.eventType === "meeting" ||
@@ -160,8 +216,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             : updates.recurrence?.endDate === null
             ? null
             : event.recurrence?.endDate || null,
+          count: Math.max(
+            Number(updates.recurrence?.count) ||
+              event.recurrence?.count ||
+              1,
+            1
+          ),
         }
       : event.recurrence;
+
+    const isRecurringInstance = !!event.recurrenceParentId;
+    const seriesParentId = isRecurringInstance ? event.recurrenceParentId : null;
 
     const updatesToApply: any = {
       name: updates.name ?? event.name,
@@ -172,7 +237,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       gemPointDurationMinutes:
         updates.gemPointDurationMinutes ?? event.gemPointDurationMinutes,
       eventType: normalizedEventType,
-      recurrence: normalizedRecurrence,
+      recurrence:
+        applyToSeries === "series" || !event.recurrenceParentId
+          ? normalizedRecurrence
+          : event.recurrence,
       status: nextStatus,
       visibleToAlumni:
         typeof updates.visibleToAlumni === "boolean"
@@ -200,8 +268,98 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (updatedEvent?._id) {
       await Event.collection.updateOne(
         { _id: updatedEvent._id },
-        { $set: { eventType: normalizedEventType, recurrence: normalizedRecurrence } }
+        {
+          $set: {
+            eventType: normalizedEventType,
+            recurrence:
+              applyToSeries === "series" || !event.recurrenceParentId
+                ? normalizedRecurrence
+                : event.recurrence,
+          },
+        }
       );
+    }
+
+    if (applyToSeries === "series") {
+      const parentId = seriesParentId || event._id;
+      const parent = seriesParentId
+        ? await Event.findById(seriesParentId).lean()
+        : updatedEvent?.toObject();
+
+      if (parent) {
+        const baseStart = updates.startTime
+          ? new Date(updates.startTime)
+          : new Date(event.startTime);
+        const baseEnd = updates.endTime
+          ? new Date(updates.endTime)
+          : new Date(event.endTime);
+        const duration = baseEnd.getTime() - baseStart.getTime();
+
+        const now = new Date();
+        const futureInstances = await Event.find({
+          recurrenceParentId: parentId,
+          startTime: { $gte: now },
+        });
+
+        for (const instance of futureInstances) {
+          const adjustedStart = applyTimeOfDay(
+            new Date(instance.startTime),
+            baseStart
+          );
+          const adjustedEnd = new Date(adjustedStart.getTime() + duration);
+          await Event.updateOne(
+            { _id: instance._id },
+            {
+              $set: {
+                name: updates.name ?? parent.name,
+                description: updates.description ?? parent.description,
+                location: updates.location ?? parent.location,
+                eventType: normalizedEventType,
+                status: nextStatus,
+                visibleToAlumni:
+                  typeof updates.visibleToAlumni === "boolean"
+                    ? updates.visibleToAlumni
+                    : parent.visibleToAlumni,
+                startTime: updates.startTime ? adjustedStart : instance.startTime,
+                endTime: updates.endTime ? adjustedEnd : instance.endTime,
+              },
+            }
+          );
+        }
+
+        if (seriesParentId) {
+          await Event.updateOne(
+            { _id: parentId },
+            {
+              $set: {
+                name: updates.name ?? parent.name,
+                description: updates.description ?? parent.description,
+                location: updates.location ?? parent.location,
+                eventType: normalizedEventType,
+                recurrence: normalizedRecurrence,
+                visibleToAlumni:
+                  typeof updates.visibleToAlumni === "boolean"
+                    ? updates.visibleToAlumni
+                    : parent.visibleToAlumni,
+              },
+            }
+          );
+        }
+
+        if (normalizedRecurrence.enabled) {
+          await ensureFutureOccurrences(parentId);
+        }
+      }
+    } else if (
+      updatedEvent?.recurrence?.enabled &&
+      nextStatus === "completed"
+    ) {
+      await ensureFutureOccurrences(updatedEvent._id);
+    } else if (
+      isRecurringInstance &&
+      nextStatus === "completed"
+    ) {
+      await ensureFutureOccurrences(seriesParentId);
     }
 
     const newCommitteeId = updatedEvent?.committeeId?.toString();
@@ -235,6 +393,19 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     if (!(await canManageEvent(member, event))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const isAdmin = member.role === "admin" || member.role === "superadmin";
+    if (
+      !isAdmin &&
+      event.status === "completed" &&
+      Array.isArray(event.attendees) &&
+      event.attendees.length > 0
+    ) {
+      return NextResponse.json(
+        { error: "Only admins can delete events with attendees" },
+        { status: 403 }
+      );
     }
 
     await Event.deleteOne({ _id: event._id });

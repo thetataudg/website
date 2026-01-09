@@ -5,7 +5,8 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGithub, faLinkedin } from "@fortawesome/free-brands-svg-icons";
-import { faUserCircle, faCheck, faTimes, faTriangleExclamation, faHourglass, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faUserCircle, faCheck, faTimes, faTriangleExclamation, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import LoadingState from "../../components/LoadingState";
 
 import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
 
@@ -40,14 +41,7 @@ export default function MembersList({
   }, []);
 
   if (!isLoaded) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading brothers..." />;
   }
 
   if (!isSignedIn) {
@@ -70,11 +64,26 @@ export default function MembersList({
       return haystack.includes(query.trim().toLowerCase());
     });
 
+  const sorted = [...filtered].sort((a, b) => {
+    const toNumber = (rollNo: string) => {
+      const cleaned = rollNo.replace(/\D/g, "");
+      const value = Number.parseInt(cleaned, 10);
+      return Number.isNaN(value) ? Number.MAX_SAFE_INTEGER : value;
+    };
+    const aNum = toNumber(a.rollNo);
+    const bNum = toNumber(b.rollNo);
+    if (aNum !== bNum) return aNum - bNum;
+    return a.rollNo.localeCompare(b.rollNo);
+  });
+
   return (
     <div className="member-dashboard">
-      <section className="bento-card admin-table-card">
+      <section className="bento-card admin-table-card brothers-hero">
         <div className="admin-members-header">
-          <h2>Brothers</h2>
+          <div>
+            <h2>Brothers</h2>
+            <p className="text-muted">Search through all brothers.</p>
+          </div>
           <div className="brothers-controls">
             <select
               className="form-select w-auto"
@@ -113,9 +122,11 @@ export default function MembersList({
             </div>
           </div>
         </div>
+      </section>
 
+      <section className="bento-card admin-table-card">
         <div className="row g-4">
-          {filtered.map((m) => {
+          {sorted.map((m) => {
             const isMe = m.rollNo === myRollNo;
             const href = isMe
               ? `/member/profile/${m.rollNo}`
@@ -180,7 +191,7 @@ export default function MembersList({
             );
           })}
 
-          {filtered.length === 0 && (
+          {sorted.length === 0 && (
             <p className="text-center text-muted">No members found.</p>
           )}
         </div>

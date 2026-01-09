@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUpload } from "@fortawesome/free-solid-svg-icons";
+import { LoadingSpinner } from "../../../components/LoadingState";
 
 interface ResumeUploaderProps {
   show: boolean;
@@ -40,7 +41,7 @@ export default function ResumeUploader({
       onClose();
       router.refresh();
     } catch (err: any) {
-      +onError(err.message || "Résumé upload failed");
+      onError(err.message || "Resume upload failed");
     } finally {
       setUploading(false);
     }
@@ -87,7 +88,10 @@ export default function ResumeUploader({
               disabled={!file || uploading}
             >
               {uploading ? (
-                "Uploading…"
+                <>
+                  <LoadingSpinner size="sm" className="me-2" />
+                  Uploading...
+                </>
               ) : (
                 <>
                   <FontAwesomeIcon icon={faUpload} className="me-1" />

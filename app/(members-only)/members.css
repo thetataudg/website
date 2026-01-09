@@ -243,6 +243,27 @@
   padding: 36px 20px 80px;
 }
 
+.loading-state {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 48px 20px;
+  color: var(--tt-ink);
+}
+
+.loading-state__text {
+  font-weight: 600;
+  color: var(--tt-ink-soft);
+}
+
+.loading-spinner {
+  color: var(--tt-red);
+}
+
+.members-shell[data-theme="dark"] .loading-spinner {
+  color: #ffc627;
+}
+
 .profile-hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -311,13 +332,21 @@
   padding: 20px 22px;
 }
 
+.brothers-hero {
+  margin-bottom: 18px;
+}
+
 .admin-members-header {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 0;
+}
+
+.admin-members-header .text-muted {
+  margin-bottom: 0;
 }
 
 .admin-members-header h2 {
@@ -925,9 +954,139 @@
   gap: 12px;
 }
 
+.events-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--tt-ink);
+}
+
+.events-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.events-toggle__track {
+  width: 56px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(139, 27, 35, 0.14);
+  border: 1px solid rgba(139, 27, 35, 0.28);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  transition: background 0.2s ease, border 0.2s ease;
+}
+
+.events-toggle__thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  transform: translateX(0);
+  transition: transform 0.2s ease;
+}
+
+.events-toggle input:checked + .events-toggle__track {
+  background: rgba(139, 27, 35, 0.72);
+  border-color: rgba(139, 27, 35, 0.75);
+}
+
+.events-toggle input:checked + .events-toggle__track .events-toggle__thumb {
+  transform: translateX(26px);
+}
+
+.events-toggle__label {
+  font-size: 0.95rem;
+}
+
+.single-member-input {
+  position: relative;
+}
+
+.single-member-input .form-control {
+  padding-right: 40px;
+}
+
+.single-member-input__clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--tt-ink-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.single-member-input__clear:hover {
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .member-dashboard .form-control,
+.members-shell[data-theme="dark"] .member-dashboard .form-select,
+.members-shell[data-theme="dark"] .member-dashboard textarea.form-control {
+  background-color: rgba(12, 17, 26, 0.9);
+  border-color: rgba(56, 80, 110, 0.5);
+  color: rgba(235, 240, 246, 0.95);
+}
+
+.members-shell[data-theme="dark"] .member-dashboard .form-control::placeholder,
+.members-shell[data-theme="dark"] .member-dashboard textarea.form-control::placeholder {
+  color: rgba(195, 208, 222, 0.65);
+}
+
 .events-section {
   display: grid;
   gap: 16px;
+}
+
+.calendar-controls .events-section__header {
+  margin-bottom: 6px;
+}
+
+.calendar-weekday {
+  font-weight: 600;
+  color: var(--tt-ink-soft);
+  letter-spacing: 0.08em;
+}
+
+.calendar-day-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--tt-ink);
+}
+
+.calendar-day-card:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.calendar-day-number {
+  font-size: 1rem;
+  color: var(--tt-ink);
+}
+
+.calendar-day-count {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(56, 80, 110, 0.16);
+  color: #2d4963;
+  font-size: 0.75rem;
+}
+
+.calendar-day-detail .list-group-item {
+  border-color: var(--tt-line);
 }
 
 .events-section__header {
@@ -1162,6 +1321,13 @@
   border-radius: 18px;
 }
 
+.qr-loading {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .members-shell[data-theme="dark"] .qr-modal {
   background: var(--tt-card);
   color: var(--tt-ink);
@@ -1358,6 +1524,85 @@
 .members-shell[data-theme="dark"] .events-section .text-muted,
 .members-shell[data-theme="dark"] .events-hero .text-muted {
   color: rgba(195, 208, 222, 0.78) !important;
+}
+
+.members-shell[data-theme="dark"] .calendar-weekday {
+  color: rgba(195, 208, 222, 0.78);
+}
+
+.members-shell[data-theme="dark"] .calendar-day-card {
+  background: rgba(18, 26, 36, 0.9);
+  border-color: rgba(56, 80, 110, 0.45);
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .calendar-day-card:hover {
+  border-color: rgba(90, 120, 160, 0.7);
+}
+
+.members-shell[data-theme="dark"] .calendar-day-number {
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .calendar-day-count {
+  background: rgba(88, 124, 164, 0.32);
+  color: #d6e6f7;
+}
+
+.members-shell[data-theme="dark"] .events-page .btn-outline-secondary {
+  color: var(--tt-ink-soft);
+  border-color: rgba(88, 124, 164, 0.5);
+}
+
+.members-shell[data-theme="dark"] .events-page .btn-outline-secondary:hover {
+  background: rgba(90, 120, 160, 0.2);
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .events-toggle {
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .events-toggle__track {
+  background: rgba(88, 124, 164, 0.25);
+  border-color: rgba(88, 124, 164, 0.45);
+}
+
+.members-shell[data-theme="dark"] .events-toggle input:checked + .events-toggle__track {
+  background: rgba(139, 27, 35, 0.7);
+  border-color: rgba(139, 27, 35, 0.8);
+}
+
+.members-shell[data-theme="dark"] .events-toggle__thumb {
+  background: rgba(235, 240, 246, 0.95);
+}
+
+.members-shell[data-theme="dark"] .calendar-day-detail .list-group-item {
+  background: rgba(12, 17, 26, 0.9);
+  border-color: rgba(56, 80, 110, 0.45);
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .member-dashboard .list-group-item {
+  background: rgba(12, 17, 26, 0.9);
+  border-color: rgba(56, 80, 110, 0.45);
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .member-dashboard .list-group-item-action {
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .member-dashboard .list-group-item-action:hover,
+.members-shell[data-theme="dark"] .member-dashboard .list-group-item-action:focus {
+  background: rgba(24, 32, 46, 0.9);
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .member-dashboard .list-group-item-action.active {
+  background: rgba(24, 32, 46, 0.95);
+  border-color: rgba(90, 120, 160, 0.65);
+  color: #f4f7fb;
 }
 
 .profile-photo {
@@ -1700,6 +1945,26 @@
   font-size: 1rem;
 }
 
+.members-shell[data-theme="dark"] .spotlight-icon {
+  background: rgba(255, 198, 39, 0.16);
+  color: #ffc627;
+  box-shadow: 0 16px 30px rgba(255, 198, 39, 0.2);
+}
+
+.members-shell[data-theme="dark"] .bento-title .icon-pill {
+  background: rgba(255, 198, 39, 0.16);
+  color: #ffc627;
+}
+
+.members-shell[data-theme="dark"] .quick-icon {
+  background: rgba(255, 198, 39, 0.16);
+  color: #ffc627;
+}
+
+.members-shell[data-theme="dark"] .perm-item .status-icon {
+  color: #ffc627;
+}
+
 .status-grid {
   display: grid;
   gap: 12px;
@@ -1887,6 +2152,10 @@
   color: var(--tt-ink-soft) !important;
 }
 
+.members-shell[data-theme="dark"] .text-muted {
+  color: rgba(195, 208, 222, 0.8) !important;
+}
+
 .members-shell[data-theme="dark"] .card .bg-light {
   background: rgba(12, 17, 26, 0.9) !important;
 }
@@ -1901,6 +2170,26 @@
 .members-shell[data-theme="dark"] .btn-outline-secondary {
   color: var(--tt-ink-soft);
   border-color: rgba(56, 80, 110, 0.4);
+}
+
+.members-shell[data-theme="dark"] .btn-outline-primary,
+.members-shell[data-theme="dark"] .btn-outline-danger {
+  color: #ffc627;
+  border-color: rgba(255, 198, 39, 0.7);
+}
+
+.members-shell[data-theme="dark"] .btn-outline-primary:hover,
+.members-shell[data-theme="dark"] .btn-outline-danger:hover {
+  background: rgba(255, 198, 39, 0.16);
+  color: #ffc627;
+  border-color: rgba(255, 198, 39, 0.9);
+}
+
+.members-shell[data-theme="dark"] .btn-primary {
+  background: #ffc627;
+  border-color: transparent;
+  color: #2c2000;
+  box-shadow: 0 10px 20px rgba(255, 198, 39, 0.18);
 }
 
 .member-dashboard .modal-content {

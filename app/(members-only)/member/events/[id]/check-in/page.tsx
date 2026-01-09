@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import LoadingState from "../../../../components/LoadingState";
 
 type Member = {
   _id: string;
@@ -145,14 +146,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const memberMap = new Map(members.map((m) => [String(m._id), m]));
 
   if (!isLoaded || loading) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading check-in tools..." />;
   }
 
   if (!isSignedIn) {
