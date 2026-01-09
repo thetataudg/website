@@ -10,7 +10,8 @@ import {
   faHourglass,
   faPlay,
   faStop,
-  faExclamationTriangle,
+  faTriangleExclamation,
+  faMinus,
   faPause,
   faPlus,
   faClock,
@@ -103,6 +104,9 @@ export default function VotePage() {
   const [showResults, setShowResults] = useState(false);
   const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
+  const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+  const [winnerPopupText, setWinnerPopupText] = useState<string | null>(null);
+  const [winnerCountdown, setWinnerCountdown] = useState(10);
 
   // Countdown state
   const [showCountdown, setShowCountdown] = useState(false);
@@ -145,6 +149,9 @@ export default function VotePage() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownVoterListRef = useRef<boolean>(false);
+  const winnerPopupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const winnerPopupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastWinnerKeyRef = useRef<string | null>(null);
 
   // Elapsed time state
   const [elapsedTime, setElapsedTime] = useState<number>(0);
@@ -491,6 +498,83 @@ export default function VotePage() {
     }
     // eslint-disable-next-line
   }, [voteInfo?._id, voteInfo?.ended, voteInfo?.voterListVerified, userData?.ecouncilPosition]);
+
+  useEffect(() => {
+    if (
+      !showResults ||
+      resultsLoading ||
+      !voteResults ||
+      voteResults.type !== "Election" ||
+      !voteResults.options?.length
+    ) {
+      return;
+    }
+
+    const results = voteResults.results || {};
+    let maxVotes = -Infinity;
+    let winners: string[] = [];
+
+    voteResults.options.forEach((opt) => {
+      const count = results[opt] ?? 0;
+      if (count > maxVotes) {
+        maxVotes = count;
+        winners = [opt];
+      } else if (count === maxVotes) {
+        winners.push(opt);
+      }
+    });
+
+    if (maxVotes < 0 || winners.length === 0) {
+      return;
+    }
+
+    const resultKey = `${selectedVoteId || "vote"}:${voteResults.options
+      .map((opt) => results[opt] ?? 0)
+      .join(",")}`;
+
+    if (lastWinnerKeyRef.current === resultKey) {
+      return;
+    }
+
+    lastWinnerKeyRef.current = resultKey;
+    setWinnerPopupText(winners.length > 1 ? `Tie: ${winners.join(", ")}` : winners[0]);
+    setShowWinnerPopup(true);
+  }, [showResults, resultsLoading, voteResults, selectedVoteId]);
+
+  useEffect(() => {
+    if (!showWinnerPopup) {
+      return;
+    }
+
+    setWinnerCountdown(10);
+
+    if (winnerPopupTimeoutRef.current) {
+      clearTimeout(winnerPopupTimeoutRef.current);
+    }
+
+    if (winnerPopupIntervalRef.current) {
+      clearInterval(winnerPopupIntervalRef.current);
+    }
+
+    winnerPopupIntervalRef.current = setInterval(() => {
+      setWinnerCountdown((prev) => (prev > 1 ? prev - 1 : 1));
+    }, 1000);
+
+    winnerPopupTimeoutRef.current = setTimeout(() => {
+      setShowWinnerPopup(false);
+    }, 10000);
+
+    return () => {
+      if (winnerPopupTimeoutRef.current) {
+        clearTimeout(winnerPopupTimeoutRef.current);
+        winnerPopupTimeoutRef.current = null;
+      }
+      if (winnerPopupIntervalRef.current) {
+        clearInterval(winnerPopupIntervalRef.current);
+        winnerPopupIntervalRef.current = null;
+      }
+    };
+  }, [showWinnerPopup]);
 
   // Fetch votes list
   const fetchVotesList = async (showLoading = false) => {
@@ -1086,7 +1170,7 @@ export default function VotePage() {
     if (blackballResults && blackballResults[pledge]) {
       if (blackballResults[pledge].blackball > 0) {
         if (blackballResults[pledge].invalidBlackball) {
-          return { variant: "primary", icon: faExclamationTriangle, text: "Invalid Blackball" };
+          return { variant: "primary", icon: faTriangleExclamation, text: "Invalid Blackball" };
         }
         return { variant: "danger", icon: faTimes, text: "Blackball" };
       }
@@ -1098,9 +1182,9 @@ export default function VotePage() {
     if (boardResults && boardResults[pledge]) {
       if (boardResults[pledge].board > 0) {
         if (boardResults[pledge].invalidBoard) {
-          return { variant: "primary", icon: faExclamationTriangle, text: "Invalid Board" };
+          return { variant: "primary", icon: faTriangleExclamation, text: "Invalid Board" };
         }
-        return { variant: "warning", icon: faExclamationTriangle, text: "Board" };
+        return { variant: "warning", icon: faTriangleExclamation, text: "Board" };
       }
       if (boardResults[pledge].continue > 0) {
         return { variant: "success", icon: faCheck, text: "Continue" };
@@ -1111,10 +1195,12 @@ export default function VotePage() {
 
   if (!isLoaded || loadingUserData) {
     return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
+      <div className="member-dashboard">
+        <div className="bento-card">
+          <div className="alert alert-info d-flex align-items-center" role="alert">
+            <FontAwesomeIcon icon={faHourglass} className="h2" />
+            <h2>Loading...</h2>
+          </div>
         </div>
       </div>
     );
@@ -1122,11 +1208,13 @@ export default function VotePage() {
 
   if (!isSignedIn) {
     return (
-      <div className="container">
-        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>You must be logged in to use this function.</h3>
-          <RedirectToSignIn />
+      <div className="member-dashboard">
+        <div className="bento-card">
+          <div className="alert alert-danger d-flex align-items-center" role="alert">
+            <FontAwesomeIcon icon={faTimes} className="h2" />
+            <h3>You must be logged in to use this function.</h3>
+            <RedirectToSignIn />
+          </div>
         </div>
       </div>
     );
@@ -1135,8 +1223,8 @@ export default function VotePage() {
   // Only allow "Active" members
   if (!userData || userData.type !== "Active") {
     return (
-      <div className="container-xxl mt-4">
-        <div>
+      <div className="member-dashboard">
+        <div className="bento-card">
           <h1>Chapter Voting</h1>
           <div className="alert alert-danger d-flex align-items-center" role="alert">
             <FontAwesomeIcon icon={faTimes} className="me-2" />
@@ -1149,40 +1237,35 @@ export default function VotePage() {
 
   // Main voting UI
   return (
-    <div className="container-xxl mt-4">
-      <div>
-        <div className="d-flex justify-content-between align-items-center">
+    <div className="member-dashboard vote-page">
+      <section className="bento-card vote-hero">
+        <div>
           <h1>Chapter Voting</h1>
-          <div className="d-flex gap-2">
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => {
-                fetchVoteInfo();
-                fetchVotesList(false);
-              }}
-              title="Refresh vote data"
-            >
-              <FontAwesomeIcon icon={faArrowsRotate} /> Refresh
-            </button>
-            {canAccessECouncilControls() && (
-              <button
-                className="btn"
-                style={{
-                  backgroundColor: "#AD2831",
-                  color: "#fff",
-                }}
-                onClick={handleOpenCreateVote}
-              >
-                <FontAwesomeIcon icon={faPlus} className="me-2" />
-                Create Vote
-              </button>
-            )}
-          </div>
         </div>
+        <div className="vote-hero__actions">
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => {
+              fetchVoteInfo();
+              fetchVotesList(false);
+            }}
+            title="Refresh vote data"
+          >
+            <FontAwesomeIcon icon={faArrowsRotate} /> Refresh
+          </button>
+          {canAccessECouncilControls() && (
+            <button className="btn btn-primary" onClick={handleOpenCreateVote}>
+              <FontAwesomeIcon icon={faPlus} className="me-2" />
+              Create Vote
+            </button>
+          )}
+        </div>
+      </section>
 
+      <section className="bento-card vote-body">
         {/* Countdown Alert */}
         {currentCountdown !== null && countdownTarget && (
-          <div className="alert alert-primary d-flex align-items-center mt-3" role="alert">
+          <div className="alert alert-primary d-flex align-items-center" role="alert">
             <FontAwesomeIcon icon={faHourglass} className="me-2" />
             <div className="flex-grow-1">
               <b>{countdownTarget} in {currentCountdown} second{currentCountdown !== 1 ? 's' : ''}...</b>
@@ -1191,7 +1274,7 @@ export default function VotePage() {
         )}
 
         {/* Vote status and options */}
-        <div className="mt-3">
+        <div className="vote-section">
           {voteLoading ? (
             <div className="alert alert-info d-flex align-items-center" role="alert">
               <FontAwesomeIcon icon={faHourglass} className="me-2" />
@@ -1231,7 +1314,7 @@ export default function VotePage() {
               
               {/* E-Council Control Panel */}
               {canAccessECouncilControls() && (
-                <div className="border rounded p-3 mb-3" style={{ backgroundColor: "#f8f9fa" }}>
+                <div className="vote-panel vote-controls">
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <h6 className="mb-0">
                       <FontAwesomeIcon icon={faUser} className="me-2" />
@@ -1353,7 +1436,7 @@ export default function VotePage() {
               
               {/* E-Council Control Panel */}
               {canAccessECouncilControls() && (
-                <div className="border rounded p-3 mb-3" style={{ backgroundColor: "#f8f9fa" }}>
+                <div className="vote-panel vote-controls">
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <h6 className="mb-0">
                       <FontAwesomeIcon icon={faUser} className="me-2" />
@@ -1413,7 +1496,7 @@ export default function VotePage() {
                         </>
                       )}
                       <Button size="sm" variant="secondary" onClick={handleShowPledgeCons} disabled={pledgeConsLoading}>
-                        <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" /> Cons
+                        <FontAwesomeIcon icon={faTriangleExclamation} className="me-1" /> Cons
                       </Button>
                       <Button size="sm" variant="outline-danger" onClick={handleDeleteVote} disabled={submitting}>
                         <FontAwesomeIcon icon={faTimes} className="me-1" /> Delete
@@ -1443,7 +1526,7 @@ export default function VotePage() {
 
         {/* Votes List */}
         {votesList.length > 0 && (
-          <div className="mt-4 border rounded p-3" style={{ backgroundColor: "#f8f9fa" }}>
+          <div className="vote-panel vote-list mt-4">
             <h5 className="mb-3">{canAccessECouncilControls() ? 'Votes' : 'Available Votes'}</h5>
             {votesLoading ? (
               <div className="text-center py-3">
@@ -1459,13 +1542,7 @@ export default function VotePage() {
                 {votesList.map((vote) => (
                   <div
                     key={vote._id}
-                    className={`list-group-item d-flex justify-content-between align-items-center`}
-                    style={{ 
-                      cursor: 'pointer',
-                      backgroundColor: selectedVoteId === vote._id ? '#f0f7ff' : 'transparent',
-                      borderLeft: selectedVoteId === vote._id ? '4px solid #0d6efd' : '4px solid transparent',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className={`list-group-item vote-list-item d-flex justify-content-between align-items-center${selectedVoteId === vote._id ? " is-active" : ""}`}
                     onClick={() => {
                       if (selectedVoteId === vote._id) {
                         // Unselect if clicking on already selected vote
@@ -1517,7 +1594,7 @@ export default function VotePage() {
 
         {/* Create Vote Container (replaced modal) */}
         {showCreateVote && (
-          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+          <div className="vote-panel vote-create mt-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 <FontAwesomeIcon icon={faPlus} className="me-2" />
@@ -1672,7 +1749,7 @@ export default function VotePage() {
 
         {/* Countdown Control Container */}
         {showCountdown && (
-          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+          <div className="vote-panel vote-countdown mt-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 <FontAwesomeIcon icon={faClock} className="me-2" />
@@ -1725,7 +1802,7 @@ export default function VotePage() {
 
         {/* Voter List Verification Panel */}
         {showVoterList && voteInfo && voteInfo.ended && (
-          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#e7f3ff" }}>
+          <div className="vote-panel vote-voterlist mt-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="mb-0">
                 <FontAwesomeIcon icon={faUser} className="me-2" />
@@ -1747,7 +1824,7 @@ export default function VotePage() {
               <>
                 {!voterListVerified && (
                   <div className="alert alert-warning mb-3">
-                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
                     Review the voter list and invalidate any ballots from members who were not present. 
                     Click "Verify Voter List" when complete to enable viewing results.
                   </div>
@@ -1909,7 +1986,7 @@ export default function VotePage() {
 
         {/* Voting options: Pledge */}
         {voteInfo && voteInfo.type === "Pledge" && ((voteInfo.started && !voteInfo.ended) || (proxyMode && !voteInfo.ended && !voteInfo.started)) && voteInfo.pledges && (
-          <div className="mt-4">
+          <div className="vote-panel mt-4">
             <h4>
               {voteInfo.round === "board"
                 ? "Pledge Vote: Vote for Each Pledge"
@@ -1977,9 +2054,15 @@ export default function VotePage() {
                                   }
                                   disabled={submitting}
                                 >
-                                  {opt === 'Continue' && <span className="me-1">✓</span>}
-                                  {opt === 'Board' && <span className="me-1">⚠</span>}
-                                  {opt === 'Abstain' && <span className="me-1">—</span>}
+                                  {opt === 'Continue' && (
+                                    <FontAwesomeIcon icon={faCheck} className="me-1" />
+                                  )}
+                                  {opt === 'Board' && (
+                                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-1" />
+                                  )}
+                                  {opt === 'Abstain' && (
+                                    <FontAwesomeIcon icon={faMinus} className="me-1" />
+                                  )}
                                   {opt}
                                 </button>
                               ))}
@@ -2014,9 +2097,15 @@ export default function VotePage() {
                                   }
                                   disabled={submitting}
                                 >
-                                  {opt === 'Continue' && <span className="me-1">✓</span>}
-                                  {opt === 'Blackball' && <span className="me-1">✕</span>}
-                                  {opt === 'Abstain' && <span className="me-1">—</span>}
+                                  {opt === 'Continue' && (
+                                    <FontAwesomeIcon icon={faCheck} className="me-1" />
+                                  )}
+                                  {opt === 'Blackball' && (
+                                    <FontAwesomeIcon icon={faTimes} className="me-1" />
+                                  )}
+                                  {opt === 'Abstain' && (
+                                    <FontAwesomeIcon icon={faMinus} className="me-1" />
+                                  )}
                                   {opt}
                                 </button>
                               ))}
@@ -2067,7 +2156,7 @@ export default function VotePage() {
                           {res.continue}
                         </span>
                         <span className="me-3">
-                          <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning me-1" />
+                          <FontAwesomeIcon icon={faTriangleExclamation} className="text-warning me-1" />
                           {res.board}
                         </span>
                         {badge && (
@@ -2121,7 +2210,7 @@ export default function VotePage() {
 
         {/* Results Container */}
         {showResults && selectedVoteId && (
-          <div className="mt-4 border rounded p-4" style={{ backgroundColor: "#f8f9fa" }}>
+          <div className="vote-panel vote-results mt-4">
             <div className="mb-3">
               <h4 className="mb-0">
                 {voteResults?.showBoardOnly ? "Board Round Results" : 
@@ -2174,7 +2263,7 @@ export default function VotePage() {
                               {res.continue}
                             </span>
                             <span className="me-3">
-                              <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
+                              <FontAwesomeIcon icon={faTriangleExclamation} className="me-1" />
                               {res.board}
                             </span>
                             {badge && (
@@ -2233,6 +2322,18 @@ export default function VotePage() {
           </div>
         )}
 
+        {showWinnerPopup && winnerPopupText && (
+          <div className="vote-winner-popup" role="status" aria-live="polite">
+            <div className="vote-winner-popup__card">
+              <div className="vote-winner-popup__label">Top Result</div>
+              <div className="vote-winner-popup__winner">{winnerPopupText}</div>
+              <div className="vote-winner-popup__timer">
+                Dismissing in {winnerCountdown} seconds
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Confirmation Dialog */}
         {showConfirmDialog && (
           <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
@@ -2294,7 +2395,7 @@ export default function VotePage() {
                     </div>
                   )}
                   <p className="text-warning mt-3">
-                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
+                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-1" />
                     This action cannot be undone.
                   </p>
                 </div>
@@ -2343,7 +2444,7 @@ export default function VotePage() {
                 <div className={`modal-header bg-${alertModal.variant} text-white`}>
                   <h5 className="modal-title">
                     <FontAwesomeIcon 
-                      icon={alertModal.variant === 'danger' ? faTimes : alertModal.variant === 'warning' ? faExclamationTriangle : faCheck} 
+                      icon={alertModal.variant === 'danger' ? faTimes : alertModal.variant === 'warning' ? faTriangleExclamation : faCheck} 
                       className="me-2" 
                     />
                     {alertModal.title}
@@ -2369,10 +2470,10 @@ export default function VotePage() {
         {confirmModal.show && (
           <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
             <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header bg-warning">
+              <div className="modal-content vote-modal">
+                <div className="modal-header vote-modal__header vote-modal__header--warning">
                   <h5 className="modal-title">
-                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
                     {confirmModal.title}
                   </h5>
                 </div>
@@ -2405,15 +2506,15 @@ export default function VotePage() {
         {showProxyConfirm && (
           <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
             <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header bg-danger text-white">
+              <div className="modal-content vote-modal">
+                <div className="modal-header vote-modal__header vote-modal__header--danger">
                   <h5 className="modal-title">
                     <FontAwesomeIcon icon={faUnlock} className="me-2" />
                     Unlock Ballot (Proxy)
                   </h5>
                   <button
                     type="button"
-                    className="btn-close btn-close-white"
+                    className="btn-close"
                     onClick={() => setShowProxyConfirm(false)}
                   ></button>
                 </div>
@@ -2439,15 +2540,15 @@ export default function VotePage() {
         {showCandidateManager && voteInfo && voteInfo.type === "Election" && (
           <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
             <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header bg-secondary text-white">
+              <div className="modal-content vote-modal">
+                <div className="modal-header vote-modal__header">
                   <h5 className="modal-title">
                     <FontAwesomeIcon icon={faUser} className="me-2" />
                     Manage Candidates
                   </h5>
                   <button
                     type="button"
-                    className="btn-close btn-close-white"
+                    className="btn-close"
                     onClick={handleCloseCandidateManager}
                   ></button>
                 </div>
@@ -2506,15 +2607,15 @@ export default function VotePage() {
         {showPledgeCons && (
           <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
             <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header bg-secondary text-white">
+              <div className="modal-content vote-modal">
+                <div className="modal-header vote-modal__header">
                   <h5 className="modal-title">
-                    <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                    <FontAwesomeIcon icon={faTriangleExclamation} className="me-2" />
                     Manage Pledge Cons
                   </h5>
                   <button
                     type="button"
-                    className="btn-close btn-close-white"
+                    className="btn-close"
                     onClick={handleClosePledgeCons}
                   ></button>
                 </div>
@@ -2569,7 +2670,7 @@ export default function VotePage() {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

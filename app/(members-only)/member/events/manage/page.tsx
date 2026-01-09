@@ -25,6 +25,7 @@ export default function EventCreatorPage() {
   const [error, setError] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -33,10 +34,14 @@ export default function EventCreatorPage() {
     startTime: "",
     endTime: "",
     location: "",
-    gemPointDurationMinutes: "0",
+    eventType: "event",
     status: "scheduled",
     visibleToAlumni: true,
     chapterWide: false,
+    recurrenceEnabled: false,
+    recurrenceFrequency: "weekly",
+    recurrenceInterval: "1",
+    recurrenceEndDate: "",
   });
 
   const canCreate =
@@ -83,6 +88,30 @@ export default function EventCreatorPage() {
   const updateForm = <K extends keyof typeof form>(key: K, value: any) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const resetForm = () =>
+    setForm({
+      name: "",
+      description: "",
+      committeeId: "",
+      startTime: "",
+      endTime: "",
+      location: "",
+      eventType: "event",
+      status: "scheduled",
+      visibleToAlumni: true,
+      chapterWide: false,
+      recurrenceEnabled: false,
+      recurrenceFrequency: "weekly",
+      recurrenceInterval: "1",
+      recurrenceEndDate: "",
+    });
+
+  const normalizeEventType = (event: any, fallback?: string) => {
+    if (event?.eventType) return event.eventType;
+    if (fallback) return fallback;
+    return event?.committeeId ? "event" : "chapter";
+  };
+
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -93,26 +122,25 @@ export default function EventCreatorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        committeeId: form.chapterWide ? null : form.committeeId,
-        gemPointDurationMinutes: Number(form.gemPointDurationMinutes) || 0,
+        committeeId: form.chapterWide ? null : form.committeeId || null,
+        recurrence: {
+          enabled: form.recurrenceEnabled,
+          frequency: form.recurrenceFrequency,
+          interval: Number(form.recurrenceInterval) || 1,
+          endDate: form.recurrenceEndDate || null,
+        },
       }),
     });
 
     if (res.ok) {
       const created = await res.json();
-      setEvents((prev) => [created, ...prev]);
-      setForm({
-        name: "",
-        description: "",
-        committeeId: "",
-        startTime: "",
-        endTime: "",
-        location: "",
-        gemPointDurationMinutes: "0",
-        status: "scheduled",
-        visibleToAlumni: true,
-        chapterWide: false,
-      });
+      const normalized = {
+        ...created,
+        eventType: normalizeEventType(created, form.eventType),
+      };
+      setEvents((prev) => [normalized, ...prev]);
+      resetForm();
+      setShowModal(false);
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to create event");
@@ -137,19 +165,49 @@ export default function EventCreatorPage() {
     )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  async function startEdit(event: any) {
+  function toDateInputValue(value: string | Date) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  async function startEdit(eventOrId: any) {
+    const eventId = typeof eventOrId === "string" ? eventOrId : eventOrId?._id;
+    let event = typeof eventOrId === "object" ? eventOrId : null;
+
+    if (eventId) {
+      const res = await fetch(`/api/events/${eventId}`);
+      if (res.ok) {
+        event = await res.json();
+      }
+    }
+
+    if (!event) return;
+
     setEditId(event._id);
     setForm({
       name: event.name || "",
       description: event.description || "",
-      committeeId: event.committeeId,
+      committeeId: event.committeeId || "",
       startTime: toInputValue(event.startTime),
       endTime: toInputValue(event.endTime),
       location: event.location || "",
-      gemPointDurationMinutes: String(event.gemPointDurationMinutes || 0),
+      eventType: event.eventType || "event",
       status: event.status || "scheduled",
       visibleToAlumni: !!event.visibleToAlumni,
+      chapterWide: event.eventType === "chapter" || !event.committeeId,
+      recurrenceEnabled: !!(event.recurrence?.enabled || event.recurrenceEnabled),
+      recurrenceFrequency:
+        event.recurrence?.frequency || event.recurrenceFrequency || "weekly",
+      recurrenceInterval: String(
+        event.recurrence?.interval || event.recurrenceInterval || 1
+      ),
+      recurrenceEndDate: event.recurrence?.endDate
+        ? toDateInputValue(event.recurrence.endDate)
+        : event.recurrenceEndDate || "",
     });
+    setShowModal(true);
   }
 
   async function handleSaveEdit() {
@@ -161,26 +219,30 @@ export default function EventCreatorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        gemPointDurationMinutes: Number(form.gemPointDurationMinutes) || 0,
+        committeeId: form.eventType === "chapter" ? null : form.committeeId || null,
+        recurrence: {
+          enabled: form.recurrenceEnabled,
+          frequency: form.recurrenceFrequency,
+          interval: Number(form.recurrenceInterval) || 1,
+          endDate: form.recurrenceEndDate || null,
+        },
       }),
     });
     if (res.ok) {
       const updated = await res.json();
       setEvents((prev) =>
-        prev.map((evt) => (evt._id === editId ? updated : evt))
+        prev.map((evt) =>
+          evt._id === editId
+            ? {
+                ...updated,
+                eventType: normalizeEventType(updated, form.eventType),
+              }
+            : evt
+        )
       );
       setEditId(null);
-      setForm({
-        name: "",
-        description: "",
-        committeeId: "",
-        startTime: "",
-        endTime: "",
-        location: "",
-        gemPointDurationMinutes: "0",
-        status: "scheduled",
-        visibleToAlumni: true,
-      });
+      resetForm();
+      setShowModal(false);
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to update event");
@@ -240,14 +302,110 @@ export default function EventCreatorPage() {
   }
 
   return (
-    <div className="container-xxl mt-4">
-      <div className="card">
-        <div className="card-body">
-          <h1 className="mb-4">Event Creator</h1>
-          <form
-            onSubmit={editId ? (e) => e.preventDefault() : handleCreateEvent}
-            className="row g-3"
+    <div className="member-dashboard event-creator">
+      <section className="bento-card admin-table-card">
+        <div className="event-creator__header">
+          <div>
+            <h1 className="mb-2">Manage Events</h1>
+            <p className="text-muted">
+              Create, edit, and organize chapter or committee events.
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setEditId(null);
+              resetForm();
+              setShowModal(true);
+            }}
           >
+            Create Event
+          </button>
+        </div>
+        <div className="table-responsive">
+          <table className="table admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Committee</th>
+                <th>Type</th>
+                <th>Start</th>
+                <th>Status</th>
+                <th className="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {managedEvents.map((evt) => {
+                const committee = committees.find((c) => c._id === evt.committeeId);
+                const eventTypeLabel = normalizeEventType(evt);
+                return (
+                  <tr key={evt._id}>
+                    <td>{evt.name}</td>
+                    <td>{committee?.name || "Unknown"}</td>
+                    <td>{eventTypeLabel}</td>
+                    <td>{new Date(evt.startTime).toLocaleString()}</td>
+                    <td>{evt.status}</td>
+                    <td className="text-end">
+                    <button
+                      className="btn btn-sm btn-outline-primary me-2"
+                      onClick={() => startEdit(evt._id)}
+                    >
+                      Edit
+                    </button>
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => setDeleteTarget(evt)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {managedEvents.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center text-muted">
+                    No events found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {showModal && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered event-modal">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">{editId ? "Edit Event" : "Create Event"}</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditId(null);
+                    resetForm();
+                    setError(null);
+                  }}
+                />
+              </div>
+              <div className="modal-body">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (editId) {
+                      handleSaveEdit();
+                    } else {
+                      handleCreateEvent(e);
+                    }
+                  }}
+                  className="row g-3"
+                >
             <div className="col-md-6">
               <label className="form-label">Event Name</label>
               <input
@@ -268,7 +426,7 @@ export default function EventCreatorPage() {
                   (!!editId &&
                     !(me?.role === "admin" || me?.role === "superadmin"))
                 }
-                required
+                required={!form.chapterWide}
               >
                 <option value="">Select committee</option>
                 {visibleCommittees.map((c) => (
@@ -278,6 +436,27 @@ export default function EventCreatorPage() {
                 ))}
               </select>
             </div>
+            <div className="col-md-6">
+              <label className="form-label">Event Type</label>
+              <select
+                className="form-select"
+                value={form.eventType}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  updateForm("eventType", value);
+                  if (value === "chapter") {
+                    updateForm("chapterWide", true);
+                    updateForm("committeeId", "");
+                  } else if (form.chapterWide) {
+                    updateForm("chapterWide", false);
+                  }
+                }}
+              >
+                <option value="meeting">Meeting</option>
+                <option value="event">Event</option>
+                <option value="chapter">Chapter</option>
+              </select>
+            </div>
             <div className="col-12">
               <div className="form-check">
                 <input
@@ -285,7 +464,14 @@ export default function EventCreatorPage() {
                   className="form-check-input"
                   type="checkbox"
                   checked={form.chapterWide}
-                  onChange={(e) => updateForm("chapterWide", e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    updateForm("chapterWide", checked);
+                    if (checked) {
+                      updateForm("eventType", "chapter");
+                      updateForm("committeeId", "");
+                    }
+                  }}
                 />
                 <label htmlFor="chapterWide" className="form-check-label">
                   Chapter-wide event (no committee)
@@ -329,19 +515,7 @@ export default function EventCreatorPage() {
                 onChange={(e) => updateForm("location", e.target.value)}
               />
             </div>
-            <div className="col-md-3">
-              <label className="form-label">Gem Point Minutes</label>
-              <input
-                type="number"
-                className="form-control"
-                min={0}
-                value={form.gemPointDurationMinutes}
-                onChange={(e) =>
-                  updateForm("gemPointDurationMinutes", e.target.value)
-                }
-              />
-            </div>
-            <div className="col-md-3">
+            <div className="col-md-6">
               <label className="form-label">Status</label>
               <select
                 className="form-select"
@@ -370,88 +544,89 @@ export default function EventCreatorPage() {
                 </label>
               </div>
             </div>
+            <div className="col-12">
+              <div className="form-check">
+                <input
+                  id="recurrenceEnabled"
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={form.recurrenceEnabled}
+                  onChange={(e) =>
+                    updateForm("recurrenceEnabled", e.target.checked)
+                  }
+                />
+                <label htmlFor="recurrenceEnabled" className="form-check-label">
+                  Repeat this event
+                </label>
+              </div>
+            </div>
+            {form.recurrenceEnabled && (
+              <>
+                <div className="col-md-4">
+                  <label className="form-label">Frequency</label>
+                  <select
+                    className="form-select"
+                    value={form.recurrenceFrequency}
+                    onChange={(e) =>
+                      updateForm("recurrenceFrequency", e.target.value)
+                    }
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Repeat every</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="form-control"
+                    value={form.recurrenceInterval}
+                    onChange={(e) =>
+                      updateForm("recurrenceInterval", e.target.value)
+                    }
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Ends on</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.recurrenceEndDate}
+                    onChange={(e) =>
+                      updateForm("recurrenceEndDate", e.target.value)
+                    }
+                  />
+                </div>
+              </>
+            )}
             {error && <div className="text-danger">{error}</div>}
             <div className="col-12">
-              {editId ? (
-                <div className="d-flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={saving}
-                    onClick={handleSaveEdit}
-                  >
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setEditId(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button className="btn btn-primary" disabled={saving}>
-                  {saving ? "Creating..." : "Create Event"}
+              <div className="d-flex gap-2">
+                <button className="btn btn-primary" disabled={saving} type="submit">
+                  {saving ? "Saving..." : editId ? "Save Changes" : "Create Event"}
                 </button>
-              )}
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditId(null);
+                    resetForm();
+                    setError(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </form>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className="card mt-4">
-        <div className="card-body">
-          <h4 className="card-title">Manage Events</h4>
-          <table className="table table-striped">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Committee</th>
-                <th>Start</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {managedEvents.map((evt) => {
-                const committee = committees.find(
-                  (c) => c._id === evt.committeeId
-                );
-                return (
-                  <tr key={evt._id}>
-                    <td>{evt.name}</td>
-                    <td>{committee?.name || "Unknown"}</td>
-                    <td>{new Date(evt.startTime).toLocaleString()}</td>
-                    <td>{evt.status}</td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-outline-primary me-2"
-                        onClick={() => startEdit(evt)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => setDeleteTarget(evt)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {managedEvents.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center text-muted">
-                    No events found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
 
       {deleteTarget && (
         <div

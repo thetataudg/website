@@ -35,6 +35,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
+    const eventId = (event as any)._id ?? (event as any).id;
+    if (!(event as any).recurrence) {
+      const raw = await Event.collection.findOne({ _id: eventId });
+      if (raw?.recurrence) {
+        (event as any).recurrence = raw.recurrence;
+      }
+    }
     if (Array.isArray((event as any).attendees)) {
       const ids = (event as any).attendees
         .map((entry: any) => {
@@ -128,26 +135,35 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const nextStatus = updates.status ?? event.status;
 
-    if (nextStatus === "cancelled" && event.status !== "scheduled") {
-      return NextResponse.json(
-        { error: "Only scheduled events can be cancelled" },
-        { status: 400 }
-      );
-    }
-    if (nextStatus === "ongoing" && event.status !== "scheduled") {
-      return NextResponse.json(
-        { error: "Only scheduled events can be started" },
-        { status: 400 }
-      );
-    }
-    if (nextStatus === "completed" && event.status !== "ongoing") {
-      return NextResponse.json(
-        { error: "Only ongoing events can be ended" },
-        { status: 400 }
-      );
-    }
+    const normalizedEventType =
+      updates.eventType === "meeting" ||
+      updates.eventType === "chapter" ||
+      updates.eventType === "event"
+        ? updates.eventType
+        : event.eventType;
 
-    Object.assign(event, {
+    const normalizedRecurrence = updates.recurrence
+      ? {
+          enabled: !!updates.recurrence?.enabled,
+          frequency:
+            updates.recurrence?.frequency === "daily" ||
+            updates.recurrence?.frequency === "weekly" ||
+            updates.recurrence?.frequency === "monthly"
+              ? updates.recurrence.frequency
+              : event.recurrence?.frequency || "weekly",
+          interval:
+            Number(updates.recurrence?.interval) ||
+            event.recurrence?.interval ||
+            1,
+          endDate: updates.recurrence?.endDate
+            ? new Date(updates.recurrence.endDate)
+            : updates.recurrence?.endDate === null
+            ? null
+            : event.recurrence?.endDate || null,
+        }
+      : event.recurrence;
+
+    const updatesToApply: any = {
       name: updates.name ?? event.name,
       description: updates.description ?? event.description,
       startTime: updates.startTime ? new Date(updates.startTime) : event.startTime,
@@ -155,33 +171,54 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       location: updates.location ?? event.location,
       gemPointDurationMinutes:
         updates.gemPointDurationMinutes ?? event.gemPointDurationMinutes,
+      eventType: normalizedEventType,
+      recurrence: normalizedRecurrence,
       status: nextStatus,
       visibleToAlumni:
         typeof updates.visibleToAlumni === "boolean"
           ? updates.visibleToAlumni
           : event.visibleToAlumni,
       committeeId: updates.committeeId ?? event.committeeId,
-    });
+    };
 
     if (nextStatus === "ongoing" && !event.startedAt) {
-      event.startedAt = new Date();
+      updatesToApply.startedAt = new Date();
     }
     if (nextStatus === "completed" && !event.endedAt) {
-      event.endedAt = new Date();
+      updatesToApply.endedAt = new Date();
     }
     if (nextStatus === "cancelled") {
-      event.endedAt = new Date();
+      updatesToApply.endedAt = new Date();
     }
 
-    await event.save();
+    const updatedEvent = await Event.findByIdAndUpdate(
+      event._id,
+      { $set: updatesToApply },
+      { new: true, runValidators: false }
+    );
 
-    const newCommitteeId = event.committeeId?.toString();
-    if (isAdmin && oldCommitteeId && newCommitteeId && oldCommitteeId !== newCommitteeId) {
-      await Committee.findByIdAndUpdate(oldCommitteeId, { $pull: { events: event._id } });
-      await Committee.findByIdAndUpdate(newCommitteeId, { $addToSet: { events: event._id } });
+    if (updatedEvent?._id) {
+      await Event.collection.updateOne(
+        { _id: updatedEvent._id },
+        { $set: { eventType: normalizedEventType, recurrence: normalizedRecurrence } }
+      );
     }
 
-    return NextResponse.json(event, { status: 200 });
+    const newCommitteeId = updatedEvent?.committeeId?.toString();
+    if (isAdmin && oldCommitteeId !== newCommitteeId) {
+      if (oldCommitteeId) {
+        await Committee.findByIdAndUpdate(oldCommitteeId, { $pull: { events: event._id } });
+      }
+      if (newCommitteeId) {
+        await Committee.findByIdAndUpdate(newCommitteeId, { $addToSet: { events: event._id } });
+      }
+    }
+
+    if (updatedEvent && normalizedRecurrence) {
+      (updatedEvent as any).recurrence = normalizedRecurrence;
+    }
+
+    return NextResponse.json(updatedEvent, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update event");
     return NextResponse.json({ error: err.message }, { status: 403 });

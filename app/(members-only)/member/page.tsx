@@ -28,6 +28,8 @@ export default function Dashboard() {
 
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [showQr, setShowQr] = useState(false);
+  const [qrTheme, setQrTheme] = useState("light");
+  const [isCommitteeHead, setIsCommitteeHead] = useState(false);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -58,6 +60,46 @@ export default function Dashboard() {
 
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!userData?.memberId) return;
+    const loadCommitteeHead = async () => {
+      try {
+        const res = await fetch(
+          `/api/committees?memberId=${encodeURIComponent(userData.memberId)}`
+        );
+        if (!res.ok) return;
+        const committees = await res.json();
+        const isHead = Array.isArray(committees)
+          ? committees.some((c: any) => {
+              const headId =
+                typeof c.committeeHeadId === "string"
+                  ? c.committeeHeadId
+                  : c.committeeHeadId?._id;
+              return headId === userData.memberId;
+            })
+          : false;
+        setIsCommitteeHead(isHead);
+      } catch (error) {
+        console.error("Committee head check failed:", error);
+      }
+    };
+    loadCommitteeHead();
+  }, [userData?.memberId]);
+
+  useEffect(() => {
+    if (!showQr) return;
+    const getTheme = () => document?.body?.dataset?.theme || "light";
+    setQrTheme(getTheme());
+    const observer = new MutationObserver(() => {
+      setQrTheme(getTheme());
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, [showQr]);
 
   if (!isLoaded || loadingUserData) {
     return (
@@ -252,6 +294,20 @@ export default function Dashboard() {
       enabled: isAdmin,
       variant: "danger",
     },
+    {
+      label: "Manage Events",
+      href: "/member/events/manage",
+      icon: faCalendar,
+      enabled: (isAdmin || isECouncil) && userHasProfile,
+      variant: "secondary",
+    },
+    {
+      label: "Committee Events",
+      href: "/member/events/committee",
+      icon: faCalendar,
+      enabled: (isAdmin || isECouncil || isCommitteeHead) && userHasProfile,
+      variant: "secondary",
+    },
   ];
 
   const statusUpdates: { type: "alert" | "info" | "success"; icon: any; text: string }[] = [];
@@ -364,7 +420,6 @@ export default function Dashboard() {
                     <FontAwesomeIcon icon={button.icon} />
                   </span>
                   <span className="quick-label">{button.label}</span>
-                  <span className="hero-subtitle">Open the tool</span>
                 </Link>
               ))}
           </div>
@@ -399,7 +454,7 @@ export default function Dashboard() {
           style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
         >
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
+            <div className="modal-content qr-modal">
               <div className="modal-header">
                 <h5 className="modal-title">My Check-In Code</h5>
                 <button
@@ -411,9 +466,12 @@ export default function Dashboard() {
               <div className="modal-body text-center">
                 <img
                   alt="Member QR Code"
+                  className="qr-code"
                   src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
                     userData.memberId
-                  )}&size=150x150`}
+                  )}&size=220x220&color=${qrTheme === "dark" ? "ffffff" : "000000"}&bgcolor=${
+                    qrTheme === "dark" ? "121a24" : "fffaf4"
+                  }`}
                 />
                 <p className="text-muted mt-3">Show this at event check-in.</p>
               </div>

@@ -23,15 +23,15 @@ export default function MemberNavbar() {
   // fetch current user's rollNo & role
   useEffect(() => {
     if (!mounted) return;
-    
+
     const fetchUserData = async () => {
       try {
         const res = await fetch("/api/members/me");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
+
         const data = await res.json();
         console.log("Navbar: Fetch success:", data);
-        
+
         setUserData({
           rollNo: data.rollNo,
           role: data.role,
@@ -46,7 +46,7 @@ export default function MemberNavbar() {
         setLoading(false);
       }
     };
-    
+
     fetchUserData();
   }, [mounted]);
 
@@ -76,7 +76,7 @@ export default function MemberNavbar() {
   // load Bootstrap's JS for mobile toggler
   useEffect(() => {
     if (!mounted) return;
-    
+
     const loadBootstrap = async () => {
       try {
         await import("bootstrap/dist/js/bootstrap.bundle.min.js");
@@ -92,15 +92,32 @@ export default function MemberNavbar() {
     if (href === "/member") {
       return pathname === "/member";
     }
+    if (href === "/member/events") {
+      return pathname === "/member/events";
+    }
     return href !== "/" && pathname.startsWith(href);
   };
 
   console.log("Navbar: Rendering - mounted:", mounted, "pathname:", pathname);
 
+  const canSeeCommitteeEvents =
+    userData &&
+    (userData.role === "admin" ||
+      userData.role === "superadmin" ||
+      userData.isECouncil ||
+      userData.isCommitteeHead ||
+      isCommitteeHead);
+  const canSeeManageEvents =
+    userData &&
+    (userData.role === "admin" ||
+      userData.role === "superadmin" ||
+      userData.isECouncil);
+  const showEventsDropdown = canSeeCommitteeEvents || canSeeManageEvents;
+
   // Don't render nav items until mounted (prevents hydration mismatch)
   if (!mounted) {
     return (
-      <nav 
+      <nav
         // style={{backgroundColor: "rgb(173, 40, 49)"}} 
         className="navbar navbar-expand-lg navbar-dark bg-dark"
       >
@@ -157,9 +174,8 @@ export default function MemberNavbar() {
             {userData && (
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${
-                    isActive("/member/profile") ? "active" : ""
-                  }`}
+                  className={`nav-link ${isActive("/member/profile") ? "active" : ""
+                    }`}
                   href={userData.rollNo ? `/member/profile/${userData.rollNo}` : "/member/profile"}
                 >
                   My Profile
@@ -170,9 +186,8 @@ export default function MemberNavbar() {
             {userData && (userData.role === "admin" || userData.role === "superadmin") && (
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${
-                    isActive("/member/admin") ? "active" : ""
-                  }`}
+                  className={`nav-link ${isActive("/member/admin") ? "active" : ""
+                    }`}
                   href="/member/admin"
                 >
                   Admin
@@ -182,9 +197,8 @@ export default function MemberNavbar() {
 
             <li className="nav-item">
               <Link
-                className={`nav-link ${
-                  isActive("/member/brothers") ? "active" : ""
-                }`}
+                className={`nav-link ${isActive("/member/brothers") ? "active" : ""
+                  }`}
                 href="/member/brothers"
               >
                 Brothers
@@ -193,14 +207,72 @@ export default function MemberNavbar() {
 
             <li className="nav-item">
               <Link
-                className={`nav-link ${
-                  isActive("/member/vote") ? "active" : ""
-                }`}
+                className={`nav-link ${isActive("/member/vote") ? "active" : ""
+                  }`}
                 href="/member/vote"
               >
                 Vote
               </Link>
             </li>
+
+            {showEventsDropdown ? (
+              <li className="nav-item dropdown">
+                <a
+                  className={`nav-link dropdown-toggle ${isActive("/member/events") ? "active" : ""
+                    }`}
+                  href="#"
+                  id="eventsDropdown"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  Events
+                </a>
+                <ul className="dropdown-menu" aria-labelledby="eventsDropdown">
+                  <li>
+                    <Link
+                      className={`dropdown-item ${isActive("/member/events") ? "active" : ""
+                        }`}
+                      href="/member/events"
+                    >
+                      All Events
+                    </Link>
+                  </li>
+                  {canSeeManageEvents && (
+                    <li>
+                      <Link
+                        className={`dropdown-item ${isActive("/member/events/manage") ? "active" : ""
+                          }`}
+                        href="/member/events/manage"
+                      >
+                        Manage Events
+                      </Link>
+                    </li>
+                  )}
+                  {canSeeCommitteeEvents && (
+                    <li>
+                      <Link
+                        className={`dropdown-item ${isActive("/member/events/committee") ? "active" : ""
+                          }`}
+                        href="/member/events/committee"
+                      >
+                        Committee Events
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              </li>
+            ) : (
+              <li className="nav-item">
+                <Link
+                  className={`nav-link ${isActive("/member/events") ? "active" : ""
+                    }`}
+                  href="/member/events"
+                >
+                  Events
+                </Link>
+              </li>
+            )}
 
             <li className="nav-item dropdown">
               <a
@@ -219,48 +291,13 @@ export default function MemberNavbar() {
               >
                 <li>
                   <Link
-                    className={`dropdown-item ${
-                      isActive("/member/minutes") ? "active" : ""
-                    }`}
+                    className={`dropdown-item ${isActive("/member/minutes") ? "active" : ""
+                      }`}
                     href="/member/minutes"
                   >
                     Minutes
                   </Link>
                 </li>
-                <li>
-                  <Link
-                    className={`dropdown-item ${
-                      isActive("/member/events") ? "active" : ""
-                    }`}
-                    href="/member/events"
-                  >
-                    Events
-                  </Link>
-                </li>
-                {userData && (userData.role === "admin" || userData.role === "superadmin" || userData.isECouncil) && (
-                  <li>
-                    <Link
-                      className={`dropdown-item ${
-                        isActive("/member/events/create") ? "active" : ""
-                      }`}
-                      href="/member/events/create"
-                    >
-                      Event Creator
-                    </Link>
-                  </li>
-                )}
-                {userData && (userData.role === "admin" || userData.role === "superadmin" || userData.isECouncil || hasCommitteeMembership || userData.isCommitteeHead || isCommitteeHead) && (
-                  <li>
-                    <Link
-                      className={`dropdown-item ${
-                        isActive("/member/events/committee") ? "active" : ""
-                      }`}
-                      href="/member/events/committee"
-                    >
-                      Committee Events
-                    </Link>
-                  </li>
-                )}
                 <li>
                   <hr className="dropdown-divider" />
                 </li>

@@ -190,123 +190,145 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="container-xxl mt-4">
-      <h1 className="mb-4">Event Check-In</h1>
-      <div className="row g-4">
-        <div className="col-md-6">
-          <div className="card">
-            <div className="card-body">
-              <h4>Scan QR Code</h4>
-              <video ref={videoRef} className="w-100 rounded" />
-              <div className="mt-3 d-flex gap-2">
-                <button className="btn btn-primary" onClick={startScanner}>
-                  Start Scanner
-                </button>
-                <button className="btn btn-secondary" onClick={stopScanner}>
-                  Stop
-                </button>
-              </div>
-              {status && <p className="mt-3">{status}</p>}
-            </div>
-          </div>
+    <div className="member-dashboard checkin-page">
+      <section className="bento-card checkin-hero">
+        <div>
+          <div className="hero-eyebrow">Event Tools</div>
+          <h1 className="hero-title">Event Check-In</h1>
+          <p className="hero-subtitle">
+            {event?.name || "Check in attendees and track participation."}
+          </p>
         </div>
-        <div className="col-md-6">
-          <div className="card">
-            <div className="card-body">
-              <h4>Manual Check-In</h4>
-              <input
-                className="form-control"
-                placeholder="Type a name or roll number"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              {matches.length > 0 && (
-                <div className="list-group mt-2">
-                  {matches.slice(0, 8).map((m) => (
-                    <button
-                      type="button"
-                      key={m._id}
-                      className="list-group-item list-group-item-action"
-                      onClick={() => {
-                        setPendingCheckIn(m);
-                      }}
-                    >
-                      {m.fName} {m.lName} (#{m.rollNo})
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="checkin-meta">
+          <span className="checkin-meta__label">Location</span>
+          <span>{event?.location || "TBD"}</span>
+          <span className="checkin-meta__label">Start</span>
+          <span>
+            {event?.startTime ? new Date(event.startTime).toLocaleString() : "TBD"}
+          </span>
         </div>
-        <div className="col-12">
-          <div className="card">
-            <div className="card-body">
-              <h4>Checked-In Attendees</h4>
-              <p className="text-muted">
-                Total checked in: {event?.attendees?.length || 0}
-              </p>
-              {event?.attendees?.length ? (
-                <ul className="list-group">
-                  {event.attendees.map((entry: any) => {
-                    const memberObj =
-                      entry?.memberId &&
-                      typeof entry.memberId === "object" &&
-                      !Array.isArray(entry.memberId) &&
-                      (entry.memberId.fName || entry.memberId.lName)
-                        ? entry.memberId
-                        : Array.isArray(entry?.memberId) && entry.memberId[0]
-                        ? entry.memberId[0]
-                        : null;
-                    let key = "";
-                    if (memberObj?._id) {
-                      key = String(memberObj._id);
-                    } else if (entry?.memberId && typeof entry.memberId === "object") {
-                      if (Array.isArray(entry.memberId) && entry.memberId[0]?._id) {
-                        key = String(entry.memberId[0]._id);
-                      } else if (entry.memberId._id) {
-                        key = String(entry.memberId._id);
-                      } else if (typeof entry.memberId.toString === "function") {
-                        key = String(entry.memberId.toString());
-                      }
-                    } else if (typeof entry?.memberId === "string") {
-                      key = entry.memberId;
-                    } else if (typeof entry === "string") {
-                      key = entry;
-                    }
-                    const fallback = key ? memberMap.get(key) : null;
-                    const fName = memberObj?.fName || fallback?.fName || "";
-                    const lName = memberObj?.lName || fallback?.lName || "";
-                    const rollNo = memberObj?.rollNo || fallback?.rollNo || "";
-                    const hasName = fName || lName || rollNo;
-                    return (
-                      <li
-                        key={key || entry.checkedInAt}
-                        className="list-group-item d-flex justify-content-between align-items-center"
-                      >
-                        <span>
-                          {hasName
-                            ? `${fName} ${lName} ${rollNo ? `(#${rollNo})` : ""}`
-                            : key
-                            ? `Member ${key}`
-                            : "Unknown member"}
-                        </span>
-                        <span className="text-muted">
-                          {entry?.checkedInAt
-                            ? new Date(entry.checkedInAt).toLocaleString()
-                            : ""}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="text-muted">No one checked in yet.</p>
-              )}
-            </div>
+      </section>
+
+      <div className="checkin-grid">
+        <div className="bento-card checkin-card">
+          <div className="checkin-card__header">
+            <h4>Scan QR Code</h4>
           </div>
+          <video ref={videoRef} className="checkin-video" />
+          <div className="checkin-actions">
+            <button className="btn btn-primary" onClick={startScanner}>
+              Start Scanner
+            </button>
+            <button className="btn btn-outline-secondary" onClick={stopScanner}>
+              Stop
+            </button>
+          </div>
+          {status && <p className="checkin-status">{status}</p>}
+        </div>
+
+        <div className="bento-card checkin-card">
+          <div className="checkin-card__header">
+            <h4>Manual Check-In</h4>
+          </div>
+          <input
+            className="form-control checkin-input"
+            placeholder="Type a name or roll number"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {matches.length > 0 && (
+            <div className="list-group checkin-matches">
+              {matches.slice(0, 8).map((m) => (
+                <button
+                  type="button"
+                  key={m._id}
+                  className="list-group-item list-group-item-action"
+                  onClick={() => {
+                    setPendingCheckIn(m);
+                  }}
+                >
+                  {m.fName} {m.lName} (#{m.rollNo})
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      <section className="bento-card checkin-attendees">
+        <div className="checkin-attendees__header">
+          <div>
+            <h4>Checked-In Attendees</h4>
+            <p className="text-muted">
+              Total checked in: {event?.attendees?.length || 0}
+            </p>
+          </div>
+        </div>
+        {event?.attendees?.length ? (
+          <div className="table-responsive">
+            <table className="table admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th className="text-end">Checked In At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {event.attendees.map((entry: any) => {
+                  const memberObj =
+                    entry?.memberId &&
+                    typeof entry.memberId === "object" &&
+                    !Array.isArray(entry.memberId) &&
+                    (entry.memberId.fName || entry.memberId.lName)
+                      ? entry.memberId
+                      : Array.isArray(entry?.memberId) && entry.memberId[0]
+                      ? entry.memberId[0]
+                      : null;
+                  let key = "";
+                  if (memberObj?._id) {
+                    key = String(memberObj._id);
+                  } else if (entry?.memberId && typeof entry.memberId === "object") {
+                    if (Array.isArray(entry.memberId) && entry.memberId[0]?._id) {
+                      key = String(entry.memberId[0]._id);
+                    } else if (entry.memberId._id) {
+                      key = String(entry.memberId._id);
+                    } else if (typeof entry.memberId.toString === "function") {
+                      key = String(entry.memberId.toString());
+                    }
+                  } else if (typeof entry?.memberId === "string") {
+                    key = entry.memberId;
+                  } else if (typeof entry === "string") {
+                    key = entry;
+                  }
+                  const fallback = key ? memberMap.get(key) : null;
+                  const fName = memberObj?.fName || fallback?.fName || "";
+                  const lName = memberObj?.lName || fallback?.lName || "";
+                  const rollNo = memberObj?.rollNo || fallback?.rollNo || "";
+                  const hasName = fName || lName || rollNo;
+                  return (
+                    <tr key={key || entry.checkedInAt}>
+                      <td>
+                        {hasName
+                          ? `${fName} ${lName} ${rollNo ? `(#${rollNo})` : ""}`
+                          : key
+                          ? `Member ${key}`
+                          : "Unknown member"}
+                      </td>
+                      <td className="text-end text-muted">
+                        {entry?.checkedInAt
+                          ? new Date(entry.checkedInAt).toLocaleString()
+                          : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-muted">No one checked in yet.</p>
+        )}
+      </section>
 
       {pendingCheckIn && (
         <div

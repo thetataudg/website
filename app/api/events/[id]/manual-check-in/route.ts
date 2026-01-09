@@ -26,7 +26,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "memberId is required" }, { status: 400 });
     }
 
-    const event = await Event.findById(params.id);
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    const eventId = new mongoose.Types.ObjectId(params.id);
+    const event = await Event.collection.findOne({ _id: eventId });
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
@@ -46,10 +50,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
+    if (event.attendees && !Array.isArray(event.attendees)) {
+      await Event.collection.updateOne(
+        { _id: eventId },
+        { $set: { attendees: [] } }
+      );
+    }
+
     const targetId = new mongoose.Types.ObjectId(memberId);
     const update = await Event.collection.updateOne(
       {
-        _id: event._id,
+        _id: eventId,
         "attendees.memberId": { $ne: targetId },
       },
       {
@@ -64,7 +75,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    logger.info({ eventId: event._id, memberId }, "Manual check-in added");
+    logger.info({ eventId, memberId }, "Manual check-in added");
     return NextResponse.json({ status: "checked-in" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to add manual check-in");

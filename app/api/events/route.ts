@@ -66,8 +66,10 @@ export async function POST(req: Request) {
       endTime,
       location = "",
       gemPointDurationMinutes = 0,
+      eventType = "event",
       status = "scheduled",
       visibleToAlumni = true,
+      recurrence = {},
     } = body;
 
     if (!name || !startTime || !endTime) {
@@ -108,7 +110,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const event = await Event.create({
+    const normalizedEventType =
+      eventType === "meeting" || eventType === "chapter" || eventType === "event"
+        ? eventType
+        : "event";
+
+    const normalizedRecurrence = {
+      enabled: !!recurrence?.enabled,
+      frequency:
+        recurrence?.frequency === "daily" ||
+        recurrence?.frequency === "weekly" ||
+        recurrence?.frequency === "monthly"
+          ? recurrence.frequency
+          : "weekly",
+      interval: Number(recurrence?.interval) || 1,
+      endDate: recurrence?.endDate ? new Date(recurrence.endDate) : null,
+    };
+
+    const eventDoc = {
       name: name.trim(),
       description,
       committeeId: committeeId || null,
@@ -118,10 +137,29 @@ export async function POST(req: Request) {
       endedAt: null,
       location,
       gemPointDurationMinutes,
+      eventType: normalizedEventType,
+      recurrence: normalizedRecurrence,
       status,
       visibleToAlumni,
       attendees: [],
-    });
+    };
+
+    let event;
+    if (!committeeId) {
+      const created = new Event(eventDoc);
+      await created.save({ validateBeforeSave: false });
+      event = created.toObject();
+    } else {
+      event = await Event.create(eventDoc);
+    }
+
+    if (event?._id) {
+      await Event.collection.updateOne(
+        { _id: event._id },
+        { $set: { eventType: normalizedEventType, recurrence: normalizedRecurrence } }
+      );
+      event.recurrence = normalizedRecurrence;
+    }
 
     if (committeeId) {
       await Committee.findByIdAndUpdate(committeeId, {
