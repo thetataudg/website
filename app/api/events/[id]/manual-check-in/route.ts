@@ -58,7 +58,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     const targetId = new mongoose.Types.ObjectId(memberId);
-    const update = await Event.collection.updateOne(
+    const update = await Event.updateOne(
       {
         _id: eventId,
         "attendees.memberId": { $ne: targetId },
