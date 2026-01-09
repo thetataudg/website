@@ -34,7 +34,10 @@ export default function BrotherDetailClient({
 
   const { isLoaded, isSignedIn } = useAuth();
 
-  const profileMemberId = (member as any)?._id;
+  const profileMemberId =
+    typeof (member as any)?._id === "string"
+      ? (member as any)._id
+      : (member as any)?._id?.toString?.() || "";
 
   const isPrivileged =
     viewer?.role === "admin" ||

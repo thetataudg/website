@@ -30,6 +30,7 @@ export default function EventCreatorPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showSeriesPrompt, setShowSeriesPrompt] = useState(false);
+  const [summaryEvent, setSummaryEvent] = useState<any | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -224,6 +225,13 @@ export default function EventCreatorPage() {
     setShowModal(true);
   }
 
+  async function viewAttendance(eventId: string) {
+    const res = await fetch(`/api/events/${eventId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setSummaryEvent(data);
+  }
+
   async function handleSaveEdit(scope?: "single" | "series") {
     if (!editId) return;
     const isRecurring =
@@ -379,6 +387,14 @@ export default function EventCreatorPage() {
                     <td>{new Date(evt.startTime).toLocaleString()}</td>
                     <td>{evt.status}</td>
                     <td className="text-end">
+                    {evt.status === "completed" && (
+                      <button
+                        className="btn btn-sm btn-outline-secondary me-2"
+                        onClick={() => viewAttendance(evt._id)}
+                      >
+                        View
+                      </button>
+                    )}
                     <button
                       className="btn btn-sm btn-outline-primary me-2"
                       onClick={() => startEdit(evt._id)}
@@ -776,6 +792,54 @@ export default function EventCreatorPage() {
                 >
                   All future events
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {summaryEvent && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Event Summary</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setSummaryEvent(null)}
+                />
+              </div>
+              <div className="modal-body">
+                <h6>{summaryEvent.name}</h6>
+                <p className="text-muted">
+                  Total checked in: {summaryEvent.attendees?.length || 0}
+                </p>
+                {summaryEvent.attendees?.length ? (
+                  <ul className="list-group">
+                    {summaryEvent.attendees.map((entry: any) => (
+                      <li
+                        key={entry.memberId?._id || entry.checkedInAt}
+                        className="list-group-item d-flex justify-content-between align-items-center"
+                      >
+                        <span>
+                          {entry.memberId?.fName} {entry.memberId?.lName} (#
+                          {entry.memberId?.rollNo})
+                        </span>
+                        <span className="text-muted">
+                          {entry.checkedInAt
+                            ? new Date(entry.checkedInAt).toLocaleString()
+                            : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted">No check-ins recorded.</p>
+                )}
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
+import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
@@ -47,15 +48,15 @@ export async function GET(req: Request) {
       range.$lte = endDate;
     }
 
-    const attendeeMatch: any = {
-      memberId: new mongoose.Types.ObjectId(memberId),
-    };
-    if (Object.keys(range).length) {
-      attendeeMatch.checkedInAt = range;
-    }
+    const memberObjectId = new mongoose.Types.ObjectId(memberId);
+    const attendeeIdMatch = { $in: [memberObjectId, memberId] };
 
-    const filter: any = {
-      attendees: { $elemMatch: attendeeMatch },
+    // Use raw collection queries to avoid schema casting errors on legacy data.
+    const rawFilter: any = {
+      $or: [
+        { "attendees.memberId": attendeeIdMatch },
+        { attendees: attendeeIdMatch },
+      ],
     };
 
     const isPrivileged =
@@ -63,34 +64,79 @@ export async function GET(req: Request) {
       viewer.role === "superadmin" ||
       viewer.isECouncil;
 
-    const events = await Event.find(filter)
-      .populate("committeeId", "name")
+    const rawEvents = await Event.collection
+      .find(rawFilter)
       .sort({ startTime: -1 })
-      .lean();
+      .toArray();
+
+    const inRange = (date: Date | null) => {
+      if (!Object.keys(range).length) return true;
+      if (!date || Number.isNaN(date.getTime())) return false;
+      if (range.$gte && date < range.$gte) return false;
+      if (range.$lte && date > range.$lte) return false;
+      return true;
+    };
+
+    const filtered = rawEvents.filter((event: any) => {
+      const attendees = Array.isArray(event.attendees) ? event.attendees : [];
+      const matchingEntry = attendees.find((entry: any) => {
+        if (entry?.memberId?.toString?.() === memberId) return true;
+        if (entry?.memberId === memberId) return true;
+        if (entry?.toString?.() === memberId) return true;
+        return false;
+      });
+      const checkedInAtRaw = matchingEntry?.checkedInAt || null;
+      const checkedInAt = checkedInAtRaw ? new Date(checkedInAtRaw) : null;
+      const eventDate = checkedInAt || (event.startTime ? new Date(event.startTime) : null);
+      return inRange(eventDate);
+    });
 
     if (!isPrivileged) {
-      return NextResponse.json(
-        {
-          total: events.length,
-        },
-        { status: 200 }
-      );
+      return NextResponse.json({ total: filtered.length }, { status: 200 });
     }
 
-    const formatted = events.map((event: any) => ({
-      _id: event._id,
-      name: event.name,
-      startTime: event.startTime,
-      eventType: event.eventType,
-      committeeId: event.committeeId?._id || event.committeeId || null,
-      committeeName: event.committeeId?.name || "Chapter",
-      checkedInAt:
-        event.attendees?.find(
-          (entry: any) =>
-            entry?.memberId?.toString?.() === memberId ||
-            entry?.memberId === memberId
-        )?.checkedInAt || null,
-    }));
+    const committeeIds = Array.from(
+      new Set(
+        filtered
+          .map((event: any) => event.committeeId)
+          .filter(Boolean)
+          .map((id: any) => id.toString())
+      )
+    ).map((id: string) => new mongoose.Types.ObjectId(id));
+
+    const committees = committeeIds.length
+      ? await Committee.find({ _id: { $in: committeeIds } }, { name: 1 }).lean()
+      : [];
+    const committeeMap = new Map(
+      committees.map((c: any) => [c._id.toString(), c.name])
+    );
+
+    const formatted = filtered.map((event: any) => {
+      const attendees = Array.isArray(event.attendees) ? event.attendees : [];
+      const checkedInEntry = attendees.find((entry: any) => {
+        if (entry?.memberId?.toString?.() === memberId) return true;
+        if (entry?.memberId === memberId) return true;
+        if (entry?.toString?.() === memberId) return true;
+        return false;
+      });
+      const checkedInAtRaw = checkedInEntry?.checkedInAt || null;
+      const committeeId =
+        event.committeeId ? event.committeeId.toString() : null;
+      const committeeName = committeeId
+        ? committeeMap.get(committeeId) || "Committee"
+        : "Chapter";
+
+      return {
+        _id: event._id,
+        name: event.name,
+        startTime: event.startTime,
+        eventType:
+          event.eventType || (event.committeeId ? "event" : "chapter"),
+        committeeId: committeeId,
+        committeeName,
+        checkedInAt: checkedInAtRaw,
+      };
+    });
 
     return NextResponse.json({ events: formatted }, { status: 200 });
   } catch (err: any) {

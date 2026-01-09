@@ -112,6 +112,11 @@ export default function EventsPage() {
     return await res.json();
   }
 
+  async function viewAttendance(eventId: string) {
+    const details = await fetchEventDetails(eventId);
+    if (details) setSummaryEvent(details);
+  }
+
   async function updateEventStatus(
     eventId: string,
     status: string,
@@ -548,6 +553,14 @@ export default function EventsPage() {
                 End Event
               </button>
             </>
+          )}
+          {evt.status === "completed" && (
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => viewAttendance(evt._id)}
+            >
+              View Attendance
+            </button>
           )}
         </div>
       )}
