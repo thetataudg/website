@@ -8,6 +8,7 @@ import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 const TABS = [
   { href: "/member/admin/members", label: "Manage Members" },
+  { href: "/member/admin/committees", label: "Manage Committees" },
   { href: "/member/admin/invite", label: "Invite Member" },
   { href: "/member/admin/pending", label: "Pending Requests" },
 ];
@@ -57,23 +58,27 @@ export default function AdminLayout({
   }
 
   return (
-    <>
-      <ul className="nav nav-tabs mb-4 bg-light">
-        {TABS.map((tab) => {
-          const active = pathname.startsWith(tab.href);
-          return (
-            <li key={tab.href} className="nav-item">
+    <div className="member-dashboard">
+      <section className="bento-card admin-tabs">
+        <div className="admin-tabs__header">
+          <h2 className="admin-tabs__title">Admin Console</h2>
+        </div>
+        <div className="admin-tabs__nav">
+          {TABS.map((tab) => {
+            const active = pathname.startsWith(tab.href);
+            return (
               <Link
+                key={tab.href}
                 href={tab.href}
-                className={`nav-link${active ? " active" : ""}`}
+                className={`admin-tab${active ? " active" : ""}`}
               >
                 {tab.label}
               </Link>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="container">{children}</div>
-    </>
+            );
+          })}
+        </div>
+      </section>
+      <div className="admin-content">{children}</div>
+    </div>
   );
 }

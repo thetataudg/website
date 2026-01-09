@@ -15,7 +15,7 @@ export default async function OnboardPage({ params }: { params: Params }) {
 
   if (!userId) {
     return (
-      <div className="d-flex justify-content-center mt-5">
+      <div className="member-dashboard">
         <SignUp routing="path" path="/member/onboard" signInUrl="/sign-in" />
       </div>
     );
@@ -30,10 +30,12 @@ export default async function OnboardPage({ params }: { params: Params }) {
   )?.emailAddress;
 
   if (!invitedEmail) return (
-      <div className="d-flex justify-content-center mt-5">
+    <div className="member-dashboard">
+      <div className="bento-card">
         <h1>401 Unauthorized</h1>
         <p>You are not invited to use this application.</p>
       </div>
+    </div>
   );
 
   const pending = (await clerk.invitations.getInvitationList()).data.find(

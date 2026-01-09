@@ -4,24 +4,15 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faHome,
-  faUser,
-  faAddressCard,
-  faNoteSticky,
-  faCheckToSlot,
-  faCalendar,
-  faGear,
-  faShop,
-  faVoteYea,
-} from "@fortawesome/free-solid-svg-icons";
+import ThemeToggle from "./ThemeToggle";
 
 export default function MemberNavbar() {
   const pathname = usePathname();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [isCommitteeHead, setIsCommitteeHead] = useState(false);
+  const [hasCommitteeMembership, setHasCommitteeMembership] = useState(false);
 
   // Force client-side mounting
   useEffect(() => {
@@ -43,11 +34,14 @@ export default function MemberNavbar() {
         
         setUserData({
           rollNo: data.rollNo,
-          role: data.role
+          role: data.role,
+          isCommitteeHead: data.isCommitteeHead,
+          memberId: data.memberId,
+          isECouncil: data.isECouncil,
         });
       } catch (error) {
         console.error("Navbar: Fetch error:", error);
-        setUserData({ rollNo: null, role: null });
+        setUserData({ rollNo: null, role: null, isCommitteeHead: false, memberId: null, isECouncil: false });
       } finally {
         setLoading(false);
       }
@@ -55,6 +49,29 @@ export default function MemberNavbar() {
     
     fetchUserData();
   }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted || !userData?.memberId) return;
+    const loadCommitteeHead = async () => {
+      try {
+        const res = await fetch(`/api/committees?memberId=${encodeURIComponent(userData.memberId)}`);
+        if (!res.ok) return;
+        const committees = await res.json();
+        const isHead = committees.some((c) => {
+          const headId =
+            typeof c.committeeHeadId === "string"
+              ? c.committeeHeadId
+              : c.committeeHeadId?._id;
+          return headId === userData.memberId;
+        });
+        setIsCommitteeHead(isHead);
+        setHasCommitteeMembership(Array.isArray(committees) && committees.length > 0);
+      } catch (error) {
+        console.error("Navbar: Committee head check failed:", error);
+      }
+    };
+    loadCommitteeHead();
+  }, [mounted, userData?.memberId]);
 
   // load Bootstrap's JS for mobile toggler
   useEffect(() => {
@@ -109,11 +126,8 @@ export default function MemberNavbar() {
   }
 
   return (
-    <nav 
-      // style={{backgroundColor: "rgb(173, 40, 49)"}} 
-      className="navbar navbar-expand-lg navbar-dark bg-dark"
-    >
-      <div className="container-fluid">
+    <nav className="members-navbar navbar navbar-expand-lg">
+      <div className="container-fluid members-navbar__inner">
         <Link className="navbar-brand" href="/member">
           ΔΓ Chapter Tools
         </Link>
@@ -130,13 +144,13 @@ export default function MemberNavbar() {
         </button>
 
         <div className="collapse navbar-collapse" id="navbarNav">
-          <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+          <ul className="navbar-nav mx-auto mb-2 mb-lg-0 members-navbar__menu">
             <li className="nav-item">
               <Link
                 className={`nav-link ${isActive("/member") ? "active" : ""}`}
                 href="/member"
               >
-                <FontAwesomeIcon icon={faHome} className="me-1" /> Home
+                Home
               </Link>
             </li>
 
@@ -148,7 +162,7 @@ export default function MemberNavbar() {
                   }`}
                   href={userData.rollNo ? `/member/profile/${userData.rollNo}` : "/member/profile"}
                 >
-                  <FontAwesomeIcon icon={faUser} className="me-1" /> My Profile
+                  My Profile
                 </Link>
               </li>
             )}
@@ -161,7 +175,7 @@ export default function MemberNavbar() {
                   }`}
                   href="/member/admin"
                 >
-                  <FontAwesomeIcon icon={faGear} className="me-1" /> Admin
+                  Admin
                 </Link>
               </li>
             )}
@@ -173,7 +187,7 @@ export default function MemberNavbar() {
                 }`}
                 href="/member/brothers"
               >
-                <FontAwesomeIcon icon={faAddressCard} className="me-1" /> Brothers
+                Brothers
               </Link>
             </li>
 
@@ -184,7 +198,7 @@ export default function MemberNavbar() {
                 }`}
                 href="/member/vote"
               >
-                <FontAwesomeIcon icon={faVoteYea} className="me-1" /> Vote
+                Vote
               </Link>
             </li>
 
@@ -200,7 +214,7 @@ export default function MemberNavbar() {
                 More
               </a>
               <ul
-                className="dropdown-menu dropdown-menu-dark"
+                className="dropdown-menu"
                 aria-labelledby="moreDropdown"
               >
                 <li>
@@ -223,6 +237,30 @@ export default function MemberNavbar() {
                     Events
                   </Link>
                 </li>
+                {userData && (userData.role === "admin" || userData.role === "superadmin" || userData.isECouncil) && (
+                  <li>
+                    <Link
+                      className={`dropdown-item ${
+                        isActive("/member/events/create") ? "active" : ""
+                      }`}
+                      href="/member/events/create"
+                    >
+                      Event Creator
+                    </Link>
+                  </li>
+                )}
+                {userData && (userData.role === "admin" || userData.role === "superadmin" || userData.isECouncil || hasCommitteeMembership || userData.isCommitteeHead || isCommitteeHead) && (
+                  <li>
+                    <Link
+                      className={`dropdown-item ${
+                        isActive("/member/events/committee") ? "active" : ""
+                      }`}
+                      href="/member/events/committee"
+                    >
+                      Committee Events
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <hr className="dropdown-divider" />
                 </li>
@@ -239,7 +277,10 @@ export default function MemberNavbar() {
             </li>
           </ul>
 
-          <ul className="navbar-nav ms-auto">
+          <ul className="navbar-nav ms-auto members-navbar__actions">
+            <li className="nav-item">
+              <ThemeToggle />
+            </li>
             <li className="nav-item d-flex align-items-center">
               <UserButton />
             </li>

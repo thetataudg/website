@@ -8,6 +8,7 @@ import logger from "@/lib/logger";
 export const runtime = "nodejs";
 
 interface MeGetResult {
+  memberId: string;
   rollNo: string;
   profilePicUrl?: string;
   resumeUrl?: string;
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead"
     )
     .lean() as any;
 
@@ -47,6 +48,7 @@ export async function GET(req: Request) {
   logger.info({ clerkId, rollNo: member.rollNo }, "Member/me GET successful");
   return NextResponse.json(
     {
+      memberId: member._id?.toString(),
       rollNo: member.rollNo,
       profilePicUrl: member.profilePicUrl,
       resumeUrl: member.resumeUrl,
@@ -54,6 +56,7 @@ export async function GET(req: Request) {
       status: member.status,
       isECouncil: member.isECouncil,
       ecouncilPosition: member.ecouncilPosition,
+      isCommitteeHead: member.isCommitteeHead,
       needsProfileReview: member.needsProfileReview,
       needsPermissionReview: member.needsPermissionReview,
     },

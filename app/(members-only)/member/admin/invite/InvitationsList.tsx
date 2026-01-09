@@ -10,37 +10,37 @@ interface Props {
 
 export default function InvitationsList({ invites, onRevoke }: Props) {
   if (invites.length === 0) {
-    return <p>No pending invitations.</p>;
+    return <p className="text-muted">No pending invitations.</p>;
   }
 
   return (
-      <div>
-        <h2>Pending Invitations</h2>
-        <ul className="list-group">
-          {invites.map((inv) => (
-            <li
-              className="list-group-item d-flex justify-content-between align-items-center"
-              key={inv.id}
-            >
-              <span>
-                {inv.emailAddress}{" "}
-                {inv.status === "accepted" ? (
-                  <span className="badge bg-success ms-2">Accepted</span>
-                ) : (
-                  <span className="badge bg-secondary ms-2">Pending</span>
-                )}
-              </span>
-              {inv.status !== "accepted" && (
-                <button
-                  className="btn btn-sm btn-danger"
-                  onClick={() => onRevoke(inv.id)}
-                >
-                  Revoke
-                </button>
+    <div>
+      <h3 className="profile-section-title">Pending Invitations</h3>
+      <ul className="list-group admin-list">
+        {invites.map((inv) => (
+          <li
+            className="list-group-item d-flex justify-content-between align-items-center"
+            key={inv.id}
+          >
+            <span>
+              {inv.emailAddress}{" "}
+              {inv.status === "accepted" ? (
+                <span className="badge bg-success ms-2">Accepted</span>
+              ) : (
+                <span className="badge bg-secondary ms-2">Pending</span>
               )}
-            </li>
-          ))}
-        </ul>
-      </div>
+            </span>
+            {inv.status !== "accepted" && (
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={() => onRevoke(inv.id)}
+              >
+                Revoke
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

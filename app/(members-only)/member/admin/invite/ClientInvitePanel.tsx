@@ -70,16 +70,16 @@ export default function ClientInvitePanel() {
   }
 
   return (
-    <>
+    <div className="bento-card admin-table-card">
+      <div className="admin-members-header">
+        <h2>Invite Members</h2>
+      </div>
       <InviteForm onSuccess={handleInviteSuccess} />
-
-      <hr />
-
       {loading ? (
-        <p>Loading…</p>
+        <div className="text-center py-4 text-muted">Loading…</div>
       ) : (
         <InvitationsList invites={invites} onRevoke={handleRevoke} />
       )}
-    </>
+    </div>
   );
 }

@@ -14,6 +14,7 @@ export interface MemberDoc {
   pledgeClass: string;
   isECouncil: boolean;
   ecouncilPosition: string;
+  isCommitteeHead: boolean;
   hometown: string;
   socialLinks?: Record<string, string>;
   status: string;

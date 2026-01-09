@@ -15,6 +15,7 @@ export default async function BrotherDetailPage({ params }: Params) {
   const host = headers().get("host")!;
   const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
   const base = `${proto}://${host}`;
+  const cookie = headers().get("cookie") ?? "";
 
   const res = await fetch(
     `${base}/api/members/${encodeURIComponent(params.rollNo)}`,
@@ -24,5 +25,17 @@ export default async function BrotherDetailPage({ params }: Params) {
 
   // cast JSON to our shared MemberDoc
   const member = (await res.json()) as MemberDoc;
-  return <BrotherDetailClient member={member} />;
+
+  const committeesRes = await fetch(
+    `${base}/api/committees?memberId=${encodeURIComponent(
+      (member as any)._id
+    )}`,
+    {
+      cache: "no-store",
+      headers: { cookie },
+    }
+  );
+  const committees = committeesRes.ok ? await committeesRes.json() : [];
+
+  return <BrotherDetailClient member={member} committees={committees} />;
 }

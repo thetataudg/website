@@ -37,25 +37,31 @@ export default function PendingList({ initialRequests }: Props) {
   }
 
   return (
-    <div>
-      <h2>Pending Onboard Requests</h2>
-      <ul className="list-group">
+    <div className="bento-card admin-table-card">
+      <div className="admin-members-header">
+        <h2>Pending Requests</h2>
+      </div>
+      <ul className="list-group admin-list">
         {requests.map((r) => (
           <li className="list-group-item" key={r._id}>
-            <strong>#{r.rollNo}</strong> — {r.fName} {r.lName}
-            <div className="mt-2">
-              <button
-                className="btn btn-sm btn-success me-2"
-                onClick={() => review(r._id, "approve")}
-              >
-                Approve
-              </button>
-              <button
-                className="btn btn-sm btn-danger"
-                onClick={() => review(r._id, "reject")}
-              >
-                Reject
-              </button>
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div>
+                <strong>#{r.rollNo}</strong> — {r.fName} {r.lName}
+              </div>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => review(r._id, "approve")}
+                >
+                  Approve
+                </button>
+                <button
+                  className="btn btn-sm btn-outline-danger"
+                  onClick={() => review(r._id, "reject")}
+                >
+                  Reject
+                </button>
+              </div>
             </div>
           </li>
         ))}

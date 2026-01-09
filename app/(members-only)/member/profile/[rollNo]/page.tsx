@@ -14,6 +14,7 @@ export default async function ProfilePage({ params }: Props) {
   const host = headers().get("host")!;
   const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
   const base = `${proto}://${host}`;
+  const cookie = headers().get("cookie") ?? "";
 
   const res = await fetch(`${base}/api/members/${params.rollNo}`, {
     cache: "no-store",
@@ -21,5 +22,16 @@ export default async function ProfilePage({ params }: Props) {
   if (!res.ok) return notFound();
   const member = (await res.json()) as MemberDoc;
 
-  return <ProfileClient member={member} />;
+  const committeesRes = await fetch(
+    `${base}/api/committees?memberId=${encodeURIComponent(
+      (member as any)._id
+    )}`,
+    {
+      cache: "no-store",
+      headers: { cookie },
+    }
+  );
+  const committees = committeesRes.ok ? await committeesRes.json() : [];
+
+  return <ProfileClient member={member} committees={committees} />;
 }
