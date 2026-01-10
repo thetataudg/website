@@ -1,11 +1,17 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { Bungee } from "next/font/google";
 import Professional_ChiLine from "/public/Professional-ChiLine.jpg";
 import Service_BikeSaviors from "/public/Service-BikeSaviors.jpg";
 import Brotherhood_Cookout from "/public/Brotherhood-Cookout.jpg";
 import { SlArrowLeft, SlArrowRight } from "react-icons/sl";
-import Carousel from "react-bootstrap/Carousel";
+
+const bungee = Bungee({
+  subsets: ["latin"],
+  display: "swap",
+  weight: "400",
+});
 
 export default function Pillars() {
   useEffect(() => {
@@ -22,6 +28,27 @@ export default function Pillars() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
+  }, []);
+
+  useEffect(() => {
+    const elements = Array.from(document.querySelectorAll(".reveal"));
+    if (!elements.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-in");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
   }, []);
 
   const gallerySlides = [
@@ -69,6 +96,14 @@ export default function Pillars() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev === gallerySlides.length - 1 ? 0 : prev + 1));
+    }, 5500);
+
+    return () => clearInterval(interval);
+  }, [gallerySlides.length]);
+
   const prevSlide = () => {
     const isFirstSlide = currentIndex === 0;
     const newIndex = isFirstSlide ? gallerySlides.length - 1 : currentIndex - 1;
@@ -82,132 +117,126 @@ export default function Pillars() {
   };
 
   return (
-    <>
-      <div
-        className="relative w-screen h-[400px] bg-red-parallax bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l
-      text-white flex flex-col items-start justify-end h-[100%] pb-10 font-sans"
-      >
-        <h1
-          className={`text-white text-[13vw] md:text-[95px] ml-[5%] font-bold`}
-        >
-          Pillars
-        </h1>
-        <h2 className="text-white text-[4vw] md:text-[30px] ml-[5%]">
-          Theta Tau's Core Values
-        </h2>
-      </div>
+    <main className="bg-[#120a0a] pb-16 text-white">
+      <section className="relative h-[420px] w-screen">
+        <Image
+          src="/Brotherhood-Beach.png"
+          fill
+          priority
+          alt="Theta Tau members at the beach"
+          className="object-cover object-[70%_35%]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/60 to-[#120a0a]" />
+        <div className="relative z-10 flex h-full flex-col items-start justify-end px-6 pb-10 sm:px-12">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+            Our Core Values
+          </p>
+          <h1 className={`${bungee.className} mt-3 text-4xl text-[#b3202a] sm:text-6xl`}>
+            Pillars
+          </h1>
+          <p className="mt-3 max-w-xl text-lg text-white/80">
+            Professionalism, Brotherhood, and Service define who we are and how we grow.
+          </p>
+        </div>
+      </section>
 
-      <div className="w-[100%]">
-        <div
-          className="w-[100%] flex lg:flex-row lg:gap-10 lg:p-10 md:p-10 sm:p-5 flex-col"
-          id="professionalism"
-        >
-          <div className="lg:w-[60%] flex flex-col gap-3 items-left justify-center w-[100%] p-5 lg:p-0 md:p-0">
-            <h1 className="text-[30px] font-extrabold text-[#7a0104]">
-              Professionalism
-            </h1>
-            <p className="text-[13px] xl:text-[20px] font-light">
-              In Theta Tau we are dedicated to growing our members both in and
-              outside the classroom, and jump starting our members’ careers. We
-              seek to develop our members into leaders in engineering and our
-              community, and building personal and professional networks which
-              will last a lifetime.
-            </p>
-          </div>
-          <div className="lg:w-[40%] w-[100%] p-5 lg:p-0 lg:flex lg:flex-row lg:justify-end lg:items-center  lg:border-l-8 lg:border-[#7a0104]">
+      <section className="mx-4 mt-12 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
+        <div className="text-center">
+          <h2 className={`${bungee.className} text-4xl text-[#7a0104]`}>
+            The Pillars
+          </h2>
+          <p className="mt-3 text-base text-[#1b0f0f]/80">
+            Three commitments that shape our chapter and guide every member’s journey.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-10 lg:grid-cols-3">
+          <div className="rounded-[28px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]" id="professionalism">
             <Image
               src={Professional_ChiLine}
-              alt="Chiline"
-              className=" lg:w-[90%] lg:h-[auto] md:w-[80%] w-[100%]"
+              alt="Professionalism"
+              className="h-[200px] w-full rounded-[22px] object-cover"
             />
+            <h3 className={`${bungee.className} mt-6 text-2xl text-[#b3202a]`}>
+              Professionalism
+            </h3>
+            <p className="mt-3 text-base text-white/85">
+              We develop members into leaders through career preparation, strong
+              communication, and lifelong professional networks.
+            </p>
           </div>
-        </div>
 
-        <div
-          className="w-[100%] flex lg:flex-row lg:gap-10 lg:p-10 md:p-10 sm:p-5 flex-col-reverse bg-[#e0e0e0]"
-          id="brotherhood"
-        >
-          <div className="lg:w-[40%] w-[100%] p-5 lg:p-0 lg:flex lg:flex-row lg:justify-start lg:items-center lg:border-r-8 lg:border-[#7a0104]">
+          <div className="rounded-[28px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]" id="brotherhood">
             <Image
               src={Brotherhood_Cookout}
-              alt="Service"
-              className=" lg:w-[90%] lg:h-[auto] w-[100%]"
+              alt="Brotherhood"
+              className="h-[200px] w-full rounded-[22px] object-cover"
             />
-          </div>
-          <div className="lg:w-[60%] flex flex-col gap-3 items-left justify-center w-[100%] p-5 lg:p-0 md:p-0">
-            <h1 className="text-[30px] font-extrabold text-[#7a0104]">
+            <h3 className={`${bungee.className} mt-6 text-2xl text-[#b3202a]`}>
               Brotherhood
-            </h1>
-            <p className="text-[13px] xl:text-[20px] font-light">
-              Joining Theta Tau is like joining a family of over 40,000 honest,
-              talented, and dependable men and women who all have an engineering
-              mindset. You will form bonds and friendships which will last your
-              entire life. You have friends you have never met in any city you
-              move to. Your brothers will be there when times are hard, and your
-              brothers will be there at your wedding. Your brothers will always
-              be there, because your brothers in Theta Tau are your family.
+            </h3>
+            <p className="mt-3 text-base text-white/85">
+              Our brotherhood is a family of engineers who grow together, celebrate
+              together, and support each other for life.
             </p>
           </div>
-        </div>
 
-        <div
-          className="w-[100%] flex lg:flex-row lg:gap-10 lg:p-10 md:p-10 sm:p-5 flex-col"
-          id="service"
-        >
-          <div className="lg:w-[60%] flex flex-col gap-3 items-left justify-center w-[100%] p-5 lg:p-0 md:p-0">
-            <h1 className="text-[30px] font-extrabold text-[#7a0104]">
-              Service
-            </h1>
-            <p className="text-[13px] xl:text-[20px] font-light">
-              Our members love giving back to the community. Every year there
-              are national efforts where brothers from across the nation unite
-              to help our communities. These efforts include activities like
-              Habitat for Humanity and participating in clothing and food
-              drives.
-            </p>
-          </div>
-          <div className="lg:w-[40%] w-[100%] p-5 lg:p-0 lg:flex lg:flex-row lg:justify-end lg:items-center lg:border-l-8 lg:border-[#7a0104]">
+          <div className="rounded-[28px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]" id="service">
             <Image
               src={Service_BikeSaviors}
               alt="Service"
-              className=" lg:w-[90%] lg:h-[auto] w-[100%]"
+              className="h-[200px] w-full rounded-[22px] object-cover"
             />
-          </div>
-        </div>
-
-        <div className="w-[100%] flex flex-col lg:gap-10 lg:p-20 md:p-10 sm:p-5 bg-[#e0e0e0]">
-          <div className=" flex flex-col gap-3 items-left justify-center w-[100%] p-5 lg:p-0 md:p-0">
-            <h1 className="text-[30px] font-extrabold text-[#7a0104]">
-              Gallery
-            </h1>
-            <p className="text-[13px] xl:text-[20px] font-light">
-              Discover the vibrant life of Theta Tau through our gallery. From
-              professional events and service projects to brotherhood
-              gatherings, see the moments that define our fraternity.
+            <h3 className={`${bungee.className} mt-6 text-2xl text-[#b3202a]`}>
+              Service
+            </h3>
+            <p className="mt-3 text-base text-white/85">
+              We give back through outreach, philanthropy, and projects that create
+              meaningful impact in our community.
             </p>
           </div>
-          <div className=" h-[70vh] relative flex justify-center items-center group pt-5 lg:pt-0">
-            <div
-              style={{
-                backgroundImage: `url(${gallerySlides[currentIndex].slide})`,
-              }}
-              className="w-[100%] h-full bg-center bg-cover lg:rounded-xl duration-500"
-            >
-              <div className="flex flex-col items-center lg:items-start justify-end gap-5 w-[100%] h-[100%] p-10 duration-500 relative">
-                <p className="text-center text-white text-5xl backdrop-blur-3xl bg-black/30 font-light border-4 border-[#e8b119] border-spacing-y-3 p-3 ">
-                  {gallerySlides[currentIndex].info}
-                </p>
-              </div>
-            </div>
-            <div className="group-hover:block absolute top-[45%] -translate-x-0 translate-y-[45%] left-5 text-2xl rounded-full p-2 bg-transparent text-white cursor-pointer duration-200">
-              <SlArrowLeft size={40} onClick={prevSlide} />
-            </div>
-            <div className="group-hover:block absolute top-[45%] -translate-x-0 translate-y-[45%] right-5 text-2xl rounded-full p-2 bg-transparent text-white cursor-pointer duration-200">
-              <SlArrowRight size={40} onClick={nextSlide} />
+        </div>
+      </section>
+
+      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal">
+        <div className="flex flex-col gap-4">
+          <h2 className={`${bungee.className} text-3xl text-[#b3202a]`}>
+            Gallery
+          </h2>
+          <p className="text-lg text-white/80">
+            Discover the vibrant life of Theta Tau through professional events,
+            service projects, and brotherhood gatherings.
+          </p>
+        </div>
+        <div className="mt-8 h-[70vh] relative flex justify-center items-center group">
+          <div
+            style={{
+              backgroundImage: `url(${gallerySlides[currentIndex].slide})`,
+            }}
+            className="w-full h-full bg-center bg-cover rounded-[28px] duration-500"
+          >
+            <div className="flex flex-col items-center lg:items-start justify-end gap-5 w-full h-full p-10 duration-500 relative">
+              <p className={`${bungee.className} text-center text-white text-4xl backdrop-blur-3xl bg-black/40 border-2 border-[#e8b119] px-6 py-3 rounded-full`}>
+                {gallerySlides[currentIndex].info}
+              </p>
             </div>
           </div>
+          <button
+            className="absolute left-5 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-3 text-white transition hover:bg-black/70"
+            onClick={prevSlide}
+            aria-label="Previous slide"
+          >
+            <SlArrowLeft size={26} />
+          </button>
+          <button
+            className="absolute right-5 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-3 text-white transition hover:bg-black/70"
+            onClick={nextSlide}
+            aria-label="Next slide"
+          >
+            <SlArrowRight size={26} />
+          </button>
         </div>
-      </div>
-    </>
+      </section>
+    </main>
   );
 }

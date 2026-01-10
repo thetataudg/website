@@ -1,11 +1,8 @@
 "use client";
-import React from "react";
-import { useEffect } from "react";
+
+import React, { useEffect } from "react";
 import Image from "next/image";
-import mission from "/public/mission.png";
-import randPic1 from "/public/randPic1.jpg";
-import randPic2 from "/public/randPic2.jpg";
-import randPic3 from "/public/randPic3.jpg";
+import { Bungee } from "next/font/google";
 
 import AWS from "/public/company_carousel/amazon-web-services-2.svg";
 import Disney from "/public/company_carousel/disney.svg";
@@ -13,8 +10,8 @@ import Ford from "/public/company_carousel/ford-1.svg";
 import DOD from "/public/company_carousel/us-department-of-defense.svg";
 import PS from "/public/company_carousel/playstation-6.svg";
 import MKB from "/public/company_carousel/milwaukee-brewers-1.svg";
-import NG from "/public/company_carousel/northrop-grumman-1.svg";
-import LHM from "/public/company_carousel/lockheed-martin.svg";
+import NG from "/public/company_carousel/Northrop_Grumman.png";
+import LHM from "/public/company_carousel/Lockheed_Martin_logo.png";
 import Intel from "/public/company_carousel/intel.svg";
 import HW from "/public/company_carousel/honeywell-logo.svg";
 import Boeing from "/public/company_carousel/boeing-3.svg";
@@ -22,165 +19,300 @@ import Apple from "/public/company_carousel/apple-14.svg";
 import AllS from "/public/company_carousel/allstate-logo.svg";
 import Accent from "/public/company_carousel/accenture-7.svg";
 
+const bungee = Bungee({
+  subsets: ["latin"],
+  display: "swap",
+  weight: "400",
+});
+
 export default function About() {
   useEffect(() => {
-    const handleScroll = () => {
-      const parallax = document.querySelector(".parallax-bg") as HTMLElement;
-      if (parallax) {
-        const offset = window.scrollY;
-        parallax.style.backgroundPositionY = `calc(50% + ${-offset * 0.5}px)`;
+    const elements = Array.from(document.querySelectorAll(".reveal"));
+    if (!elements.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-in");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const marquee = document.querySelector(".logo-marquee");
+    const track = marquee?.querySelector(".logo-marquee__track") as HTMLElement | null;
+    if (!marquee || !track) return;
+
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+
+    let rafId = 0;
+    let lastTime = performance.now();
+    let offset = 0;
+    let speed = 40;
+    const slowSpeed = 18;
+    const baseSpeed = 40;
+
+    const update = (time: number) => {
+      const delta = time - lastTime;
+      lastTime = time;
+      const totalWidth = track.scrollWidth / 2;
+      if (totalWidth) {
+        offset = (offset + (speed * delta) / 1000) % totalWidth;
+        track.style.transform = `translateX(${-offset}px)`;
       }
+      rafId = requestAnimationFrame(update);
     };
 
-    window.addEventListener("scroll", handleScroll);
+    const handleEnter = () => {
+      speed = slowSpeed;
+    };
+    const handleLeave = () => {
+      speed = baseSpeed;
+    };
+
+    marquee.addEventListener("mouseenter", handleEnter);
+    marquee.addEventListener("mouseleave", handleLeave);
+
+    rafId = requestAnimationFrame(update);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
+      cancelAnimationFrame(rafId);
+      marquee.removeEventListener("mouseenter", handleEnter);
+      marquee.removeEventListener("mouseleave", handleLeave);
     };
   }, []);
 
   return (
-    <>
-      <div className="relative w-screen h-[400px] bg-grey-parallax bg-fixed bg-no-repeat bg-cover bg-center z-0 parallax-bg align-l
-      text-white flex flex-col items-start justify-end h-[100%] pb-10 font-sans">
-        <h1 className={"text-black text-[13vw] md:text-[95px] ml-[5%] font-bold"}>
-          About
-        </h1>
-        <h2 className="text-black text-[4vw] md:text-[30px] ml-[5%]">
-          Learn more about the Delta Gamma Chapter
-        </h2>
-      </div>
-
-      <div className="w-[100%] bg-white flex flex-col">
-        <div className="w-[100%] flex flex-col lg:flex-row gap-3  items-center py-5 px-10">
-          <div className="lg:w-[40%]  flex flex-col gap-3 w-[100%]">
-            <h1 className="text-2xl font-bold text-[#7a0104]">
-              Theta Tau - Delta Gamma Chapter at ASU
-            </h1>
-            <p className="w-[100%] text-lg lg:text-xl">
-              Welcome to the Delta Gamma chapter of Theta Tau, the nation's
-              oldest and largest professional engineering fraternity, here at
-              Arizona State University. Established in 1904, Theta Tau is
-              dedicated to fostering the personal and professional development
-              of its members through academic support, leadership opportunities,
-              and a strong sense of brotherhood.
-            </p>
-            <p className="w-[100%] text-lg lg:text-xl">
-              The Delta Gamma chapter was founded May 6th, 1995 at Arizona State
-              University (ASU). We have over 50 active student members, and
-              over 400 total members.
-            </p>
-          </div>
-          <div className="lg:w-[60%] flex flex-row justify-center items-center gap-2 w-[100%]">
-            <Image alt="costco" src={randPic3} className="w-[48%] h-[auto]" />
-            <div className="w-[48%] flex flex-col gap-4 justify-start">
-              <Image
-                alt="beach pic"
-                src={randPic2}
-                className="w-[100%] h-[auto]"
-              />
-              <Image
-                alt="hot chicken"
-                src={randPic1}
-                className="w-[100%] h-[auto]"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="w-[100%] py-5 px-10  flex flex-col gap-5 bg-[#e0e0e0]">
-          <div className="flex flex-col gap-3">
-            <h1 className="text-2xl font-bold text-[#7a0104] text-center lg:text-left">
-              Our Mission
-            </h1>
-            <p className="text-lg lg:text-xl">
-              Theta Tau’s mission is to develop engineering leaders for service,
-              profession, and society. At the Delta Gamma chapter, we strive to
-              equip our members with the skills and resources needed to thrive
-              both in their careers and in life.
-            </p>
-            <ul className="flex flex-col gap-3">
-              <li>
-                <p className="text-lg lg:text-xl">
-                  <span className="font-bold text-[#7a0104]">
-                    Professional Development:
-                  </span>{" "}
-                  We offer career-building workshops, mentorship, and networking
-                  opportunities to help members excel in their chosen fields.
-                </p>
-              </li>
-              <li>
-                <p className="text-lg lg:text-xl">
-                  <span className="font-bold text-[#7a0104]">
-                    Brotherhood and Friendship:
-                  </span>{" "}
-                  Beyond professional growth, we cultivate a supportive
-                  environment that encourages strong bonds among members.
-                </p>
-              </li>
-              <li>
-                <p className="text-lg lg:text-xl">
-                  <span className="font-bold text-[#7a0104]">
-                    Community Service:
-                  </span>{" "}
-                  Our chapter actively participates in service projects, giving
-                  back to the campus and the local community.
-                </p>
-              </li>
-            </ul>
-            <div className="w-[100%] flex justify-center items-center">
-              <Image
-                alt="mission"
-                src={mission}
-                className="lg:w-[40%] h-[auto] w-[70%]"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="w-[100%] py-5 px-10 flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold text-[#7a0104] text-center lg:text-left">
-              Purpose
-            </h1>
-            <p className="text-lg lg:text-xl">
-              The purpose of Theta Tau is to develop and maintain a high
-              standard of professional interest among its members and to unite
-              them in a strong bond of fraternal fellowship.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold text-[#7a0104] text-center lg:text-left ">
-              Open Motto
-            </h1>
-            <p className="italic font-bold text-center lg:text-left">
-              "Whatsoever thy hand findeth to do, do it with thy might;…"
-              --Ecclesiastes 9:10
-            </p>
-          </div>
-        </div>
-        <div className="w-[100%] flex flex-col gap-5 justify-center items-center bg-[#e0e0e0] py-5 px-10">
-          <h1 className="text-2xl font-bold text-[#7a0104]">
-            We Work At
+    <main className="bg-[#120a0a] pb-16 text-white">
+      <section className="relative min-h-[65vh] w-full">
+        <Image
+          src="/prof_1.JPG"
+          fill
+          priority
+          alt="Theta Tau members in professional attire"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/60 to-[#120a0a]" />
+        <div className="relative z-10 flex min-h-[65vh] flex-col items-start justify-end px-6 pb-12 sm:px-12">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+            Delta Gamma Chapter
+          </p>
+          <h1 className={`${bungee.className} mt-3 text-4xl text-[#b3202a] sm:text-6xl`}>
+            About Theta Tau
           </h1>
-          <div className="logos">
-            <div className="logos-slide">
-              <AWS className="logo-slide-item" />
-              <Disney className="logo-slide-item" />
-              <Ford className="logo-slide-item" />
-              <DOD className="logo-slide-item" />
-              <PS className="logo-slide-item" />
-              <MKB className="logo-slide-item" />
-              <NG className="logo-slide-item" />
-              <LHM className="logo-slide-item" />
-              <Intel className="logo-slide-item" />
-              <HW className="logo-slide-item" />
-              <Boeing className="logo-slide-item" />
-              <Apple className="logo-slide-item" />
-              <AllS className="logo-slide-item" />
-              <Accent className="logo-slide-item" />
+          <p className="mt-4 max-w-2xl text-lg text-white/85">
+            Learn more about the Delta Gamma Chapter at Arizona State University.
+          </p>
+        </div>
+      </section>
+
+      <section className="mx-4 mt-12 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.1fr,1fr]">
+          <div className="space-y-4">
+            <h2 className={`${bungee.className} text-3xl text-[#7a0104]`}>
+              Who We Are
+            </h2>
+            <p className="text-lg">
+              Theta Tau is the nation’s oldest and largest professional engineering
+              fraternity. Our Delta Gamma chapter at Arizona State University is a
+              close-knit brotherhood built on professional growth, community impact,
+              and lifelong friendships.
+            </p>
+            <p className="text-lg">
+              Established in 1995, we are home to active members who support one
+              another in academics, leadership development, and service while building
+              relationships that last well beyond graduation.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Image
+              alt="Chapter group photo"
+              src="/group_1.jpg"
+              width={520}
+              height={640}
+              className="h-full w-full rounded-[28px] object-cover"
+            />
+            <div className="flex flex-col gap-4">
+              <Image
+                alt="Chapter event"
+                src="/group_2.jpg"
+                width={520}
+                height={320}
+                className="h-full w-full rounded-[28px] object-cover"
+              />
+              <Image
+                alt="Brotherhood moment"
+                src="/group_3.jpg"
+                width={520}
+                height={320}
+                className="h-full w-full rounded-[28px] object-cover"
+              />
             </div>
           </div>
         </div>
-      </div>
-    </>
+      </section>
+
+      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal">
+        <div className="text-center">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+            Our Pillars
+          </p>
+          <h2 className={`${bungee.className} mt-3 text-4xl text-[#b3202a]`}>
+            Brotherhood, Professionalism, Service
+          </h2>
+        </div>
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-3">
+          <div className="rounded-[28px] bg-[#1b0f0f] p-6 shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
+            <Image
+              src="/fun.jpg"
+              alt="Brotherhood"
+              width={520}
+              height={320}
+              className="h-[190px] w-full rounded-[22px] object-cover"
+            />
+            <h3 className={`${bungee.className} mt-6 text-2xl text-[#b3202a]`}>
+              Brotherhood
+            </h3>
+            <p className="mt-3 text-base text-white/85">
+              Pledge classes, big-little bonds, and family lineages create a support
+              system that feels like home throughout college and beyond.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-white/75">
+              <li>• Pledge classes grow and bond together.</li>
+              <li>• Big-little mentorships guide every member.</li>
+              <li>• Families connect alumni and actives.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-[28px] bg-[#1b0f0f] p-6 shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
+            <Image
+              src="/ec.JPG"
+              alt="Professionalism"
+              width={520}
+              height={320}
+              className="h-[190px] w-full rounded-[22px] object-cover"
+            />
+            <h3 className={`${bungee.className} mt-6 text-2xl text-[#b3202a]`}>
+              Professionalism
+            </h3>
+            <p className="mt-3 text-base text-white/85">
+              We invest in our members with mentorship, networking, and skill-building
+              opportunities that prepare brothers for their careers.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-white/75">
+              <li>• Resume reviews and interview prep.</li>
+              <li>• Alumni guidance and career connections.</li>
+              <li>• Projects that build real-world experience.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-[28px] bg-[#1b0f0f] p-6 shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
+            <Image
+              src="/service.jpg"
+              alt="Service"
+              width={520}
+              height={320}
+              className="h-[190px] w-full rounded-[22px] object-cover"
+            />
+            <h3 className={`${bungee.className} mt-6 text-2xl text-[#b3202a]`}>
+              Service
+            </h3>
+            <p className="mt-3 text-base text-white/85">
+              As engineers, we give back to the community that shapes us through
+              philanthropy, outreach, and hands-on service projects.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-white/75">
+              <li>• Community cleanups and STEM outreach.</li>
+              <li>• Philanthropy supporting local causes.</li>
+              <li>• Campus partnerships and volunteer events.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-4 mt-10 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
+        <div className="text-center">
+          <h2 className={`${bungee.className} text-3xl text-[#7a0104]`}>
+            Where We’ve Worked
+          </h2>
+          <p className="mt-3 text-base text-[#1b0f0f]/80">
+            Our brothers bring their skills to leading companies across industries.
+          </p>
+        </div>
+        <div className="mt-8">
+          <div className="logo-marquee">
+            <div className="logo-marquee__track">
+              <div className="logo-marquee__row">
+                <AWS className="logo-marquee__logo" />
+                <Disney className="logo-marquee__logo" />
+                <Ford className="logo-marquee__logo" />
+                <DOD className="logo-marquee__logo" />
+                <PS className="logo-marquee__logo" />
+                <MKB className="logo-marquee__logo" />
+                <Image
+                  src={NG}
+                  alt="Northrop Grumman"
+                  width={220}
+                  height={64}
+                  className="logo-marquee__logo logo-marquee__logo--wide"
+                />
+                <Image
+                  src={LHM}
+                  alt="Lockheed Martin"
+                  width={220}
+                  height={64}
+                  className="logo-marquee__logo logo-marquee__logo--wide"
+                />
+                <Intel className="logo-marquee__logo" />
+                <HW className="logo-marquee__logo" />
+                <Boeing className="logo-marquee__logo" />
+                <Apple className="logo-marquee__logo" />
+                <AllS className="logo-marquee__logo" />
+                <Accent className="logo-marquee__logo" />
+              </div>
+              <div className="logo-marquee__row" aria-hidden="true">
+                <AWS className="logo-marquee__logo" />
+                <Disney className="logo-marquee__logo" />
+                <Ford className="logo-marquee__logo" />
+                <DOD className="logo-marquee__logo" />
+                <PS className="logo-marquee__logo" />
+                <MKB className="logo-marquee__logo" />
+                <Image
+                  src={NG}
+                  alt="Northrop Grumman"
+                  width={220}
+                  height={64}
+                  className="logo-marquee__logo logo-marquee__logo--wide"
+                />
+                <Image
+                  src={LHM}
+                  alt="Lockheed Martin"
+                  width={220}
+                  height={64}
+                  className="logo-marquee__logo logo-marquee__logo--wide"
+                />
+                <Intel className="logo-marquee__logo" />
+                <HW className="logo-marquee__logo" />
+                <Boeing className="logo-marquee__logo" />
+                <Apple className="logo-marquee__logo" />
+                <AllS className="logo-marquee__logo" />
+                <Accent className="logo-marquee__logo" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
