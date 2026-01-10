@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { Bungee } from "next/font/google";
 
@@ -235,6 +236,55 @@ export default function Rush() {
           </div>
         </div>
       </section>
+
+      {/* <section className="mx-4 mt-10 rounded-[36px] bg-white px-6 py-10 text-[#1b0f0f] lg:mx-10 reveal">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.05fr,0.95fr]">
+          <div className="flex flex-col justify-center">
+            <p className="text-xs uppercase tracking-[0.35em] text-[#7a0104]">
+              Our Standards
+            </p>
+            <h2 className={`${bungee.className} mt-3 text-3xl text-[#1b0f0f]`}>
+              DEI & Anti-Hazing
+            </h2>
+            <p className="mt-4 text-base text-[#1b0f0f]/80">
+              Theta Tau is an anti-hazing fraternity that prioritizes safety,
+              respect, and belonging. We are committed to diversity, equity, and
+              inclusion across our membership and events. Learn more about our
+              expectations and how we uphold these values.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-[24px] bg-[#fbf6dc] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.12)]">
+              <h3 className={`${bungee.className} text-xl text-[#7a0104]`}>
+                Anti-Hazing
+              </h3>
+              <p className="mt-3 text-sm text-[#1b0f0f]/75">
+                Our expectations, reporting, and the culture we protect.
+              </p>
+              <Link
+                href="/anti-hazing"
+                className="mt-4 inline-flex text-sm font-semibold uppercase tracking-[0.2em] text-[#7a0104] underline underline-offset-4"
+              >
+                Learn More
+              </Link>
+            </div>
+            <div className="rounded-[24px] bg-[#fbf6dc] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.12)]">
+              <h3 className={`${bungee.className} text-xl text-[#7a0104]`}>
+                DEI Commitment
+              </h3>
+              <p className="mt-3 text-sm text-[#1b0f0f]/75">
+                How we build a welcoming, inclusive experience for members.
+              </p>
+              <Link
+                href="/dei"
+                className="mt-4 inline-flex text-sm font-semibold uppercase tracking-[0.2em] text-[#7a0104] underline underline-offset-4"
+              >
+                Learn More
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section> */}
 
       <section className="mx-4 mt-10 rounded-[36px] bg-white p-6 text-[#1b0f0f] lg:mx-10 reveal">
         <div className="relative overflow-hidden rounded-[28px]">
