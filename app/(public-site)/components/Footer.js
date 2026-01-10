@@ -1,125 +1,151 @@
 "use client"; // ref: https://stackoverflow.com/questions/74965849/youre-importing-a-component-that-needs-usestate-it-only-works-in-a-client-comp
 
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from '@clerk/nextjs'
-
-
-
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Bungee } from "next/font/google";
 import Link from "next/link";
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
-import Socials from "./Socials.js";
+
+const bungee = Bungee({
+  subsets: ["latin"],
+  display: "swap",
+  weight: "400",
+});
 
 const Footer = () => {
   return (
-    <footer className="p-4 bg-black text-white sm:p-6">
-      <div className="mx-auto max-w-screen-xl">
-        <div className="md:flex md:justify-between">
-          <div className="flex items-center mb-6 md:mb-0">
+    <footer className="bg-[#120a0a] px-4 pb-0 pt-12 text-[#1b0f0f]">
+      <div className="mx-auto w-full max-w-[1400px] rounded-[32px] bg-[#fbf6dc] px-8 py-12 shadow-[0_14px_32px_rgba(0,0,0,0.4)] sm:px-12">
+        <div className="grid gap-10 lg:grid-cols-[auto,1fr] lg:items-start">
+          <div className="flex items-center gap-6">
             <Image
-              src={"/crest-transparent.png"}
-              width={128}
-              height={128}
-              className="relative left-[-28px]"
+              src="/crest-transparent.png"
+              width={160}
+              height={160}
+              alt="Theta Tau crest"
+              className="h-auto w-[120px] sm:w-[150px]"
             />
             <div>
               <Link href="/" className="flex items-center">
-                <span className="self-center text-2xl font-semibold whitespace-nowrap">
+                <span className={`${bungee.className} text-3xl uppercase tracking-[0.2em] text-[#7a0104]`}>
                   Theta Tau
                 </span>
               </Link>
-              <h3 className="text-base text-neutral-400">
+              <p className={`${bungee.className} mt-2 text-base uppercase text-[#1b0f0f]`}>
                 Delta Gamma Chapter
-              </h3>
-              <h3 className="text-base text-neutral-500">
+              </p>
+              <p className={`${bungee.className} text-base uppercase text-[#1b0f0f]`}>
                 Arizona State University
-              </h3>
+              </p>
             </div>
           </div>
-          <div className="mb-5">
-            <h2 className="mb-6 text-sm font-semibold text-neutral-100 uppercase">
-              Contacts
-            </h2>
-            <ul className="text-neutral-400 space-y-2">
-              <li>Regent - Robert Morones</li>
-              <li>Vice Regent - Anirudh Rao</li>
-              <li>Rush Chair - Andres Valdes</li>
-              <li>
-                <a
-                  className="underline underline-offset-4 text-neutral-200"
-                  href="mailto:general@thetatau-dg.org"
-                >
-                  Email Us
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div className="mb-4">
-            <h2 className="mb-6 text-sm font-semibold text-neutral-100 uppercase">
-              Links{" "}
-            </h2>
-            <ul className="text-neutral-400 space-y-2">
-              <li>
-                <Link href="/about" className="hover:underline">
-                  About
-                </Link>
-              </li>
-              <li>
-                <Link href="/rush" className="hover:underline">
-                  Rush
-                </Link>
-              </li>
-              <li>
-                <Link href="/regionals" className="hover:underline">
-                  Regionals
-                </Link>
-              </li>
-              <li>
-              <h2 className="mb-2 mt-5 text-sm font-semibold text-neutral-100 uppercase">
-                Members Only{" "}
+
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.4fr,0.85fr,0.75fr,0.85fr] lg:gap-6">
+            <div>
+              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
+                Contacts
               </h2>
+              <ul className={`${bungee.className} space-y-3 text-base text-[#1b0f0f] whitespace-nowrap`}>
+                <li>Regent - Roen Wainscoat</li>
+                <li>Vice Regent - Kyler Eenhuis</li>
+                <li>Rush Chair - Pari Pandey</li>
+                <li>
+                  <a
+                    className="underline underline-offset-4"
+                    href="mailto:general@thetatau-dg.org"
+                  >
+                    Email Us
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
+                Links
+              </h2>
+              <ul className={`${bungee.className} space-y-3 text-base text-[#1b0f0f]`}>
+                <li>
+                  <Link href="/about" className="underline underline-offset-4">
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/rush" className="underline underline-offset-4">
+                    Rush
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/regionals" className="underline underline-offset-4">
+                    Regionals
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
+                Members Only
+              </h2>
+              <div className={`${bungee.className} text-base text-[#1b0f0f]`}>
                 <SignedOut>
-                  <SignInButton /> <br />
+                  <SignInButton />
                 </SignedOut>
                 <SignedIn>
                   <UserButton />
                 </SignedIn>
-            </li>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-6 text-sm font-semibold text-neutral-100 uppercase">
-              Pillars{" "}
-            </h2>
-            <ul className="space-y-4 text-neutral-400">
-              <li>
-                <Link href="/pillars#brotherhood" className="hover:underline ">
-                  Brotherhood
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/pillars#professionalism"
-                  className="hover:underline"
-                >
-                  Professionalism
-                </Link>
-              </li>
-              <li>
-                <Link href="/pillars#service" className="hover:underline">
-                  Service
-                </Link>
-              </li>
-            </ul>
+              </div>
+            </div>
+
+            <div>
+              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
+                Pillars
+              </h2>
+              <ul className={`${bungee.className} space-y-3 text-base text-[#1b0f0f]`}>
+                <li>
+                  <Link
+                    href="/pillars#brotherhood"
+                    className="underline underline-offset-4"
+                  >
+                    Brotherhood
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/pillars#professionalism"
+                    className="underline underline-offset-4"
+                  >
+                    Professionalism
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/pillars#service"
+                    className="underline underline-offset-4"
+                  >
+                    Service
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
-        <Socials />
+      </div>
+
+      <div className="mt-10 bg-[#4a0b0b] px-4 py-4 text-[#fbf6dc]">
+        <div className={`${bungee.className} mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-4 text-xs uppercase tracking-[0.2em] sm:flex-row`}>
+          <span>Copyright © 2025 Theta Tau Delta Gamma. All rights reserved.</span>
+          <div className="flex items-center gap-6">
+            <a href="https://www.instagram.com/thetataudg/" target="_blank">
+              Instagram
+            </a>
+            <a href="mailto:general@thetatau-dg.org">Email</a>
+            <a href="https://github.com/roenw/ThetaTau-Website" target="_blank">
+              GitHub
+            </a>
+          </div>
+          <Link href="/privacy-policy">Privacy Policy</Link>
+        </div>
       </div>
     </footer>
   );
