@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { LoadingSpinner } from "../../../components/LoadingState";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock } from "@fortawesome/free-solid-svg-icons";
@@ -14,6 +15,7 @@ export interface MemberData {
   role: "superadmin" | "admin" | "member";
   isECouncil: boolean;
   ecouncilPosition: string;
+  isCommitteeHead: boolean;
   familyLine: string;
   bigs: string[];
   littles: string[];
@@ -33,6 +35,7 @@ interface Props {
   onSave: (updates: {
     isECouncil: boolean;
     ecouncilPosition: string;
+    isCommitteeHead: boolean;
     familyLine: string;
     bigs: string[];
     littles: string[];
@@ -52,6 +55,7 @@ export default function MemberEditorModal({
   const [form, setForm] = useState({
     isECouncil: member.isECouncil,
     ecouncilPosition: member.ecouncilPosition,
+    isCommitteeHead: member.isCommitteeHead,
     familyLine: member.familyLine,
     big: member.bigs[0] || "",
     little: member.littles[0] || "",
@@ -68,6 +72,7 @@ export default function MemberEditorModal({
       setForm({
         isECouncil: member.isECouncil,
         ecouncilPosition: member.ecouncilPosition,
+        isCommitteeHead: member.isCommitteeHead,
         familyLine: member.familyLine,
         big: member.bigs[0] || "",
         little: member.littles[0] || "",
@@ -103,6 +108,7 @@ export default function MemberEditorModal({
       await onSave({
         isECouncil: form.isECouncil,
         ecouncilPosition: form.ecouncilPosition,
+        isCommitteeHead: form.isCommitteeHead,
         status: form.status,
         familyLine: form.familyLine,
         bigs: form.big ? [form.big] : [],
@@ -177,6 +183,18 @@ export default function MemberEditorModal({
               />
               <label htmlFor="isECouncil" className="form-check-label">
                 E-Council
+              </label>
+            </div>
+            <div className="form-check mb-3">
+              <input
+                id="isCommitteeHead"
+                type="checkbox"
+                className="form-check-input"
+                checked={form.isCommitteeHead}
+                onChange={(e) => update("isCommitteeHead", e.target.checked)}
+              />
+              <label htmlFor="isCommitteeHead" className="form-check-label">
+                Committee Head
               </label>
             </div>
             {form.isECouncil && (
@@ -267,7 +285,14 @@ export default function MemberEditorModal({
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "Saving…" : "Save Changes"}
+              {saving ? (
+                <>
+                  <LoadingSpinner size="sm" className="me-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </button>
           </div>
         </div>

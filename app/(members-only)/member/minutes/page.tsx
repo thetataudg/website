@@ -1,24 +1,12 @@
 "use client";
 
 import React from "react";
-import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
-
+import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+import { faHourglass, faTimes } from "@fortawesome/free-solid-svg-icons";
 
-// Grab this information from the user's MongoDB entry (if there is one)
-const userData = {
-  userHasProfile: true, // Create userData but set this to false if the user is not found in MongoDB
-  needsProfileReview: false,
-  needsPermissionReview: false,
-  type: "Active", // enum ["Active", "Alumni", "Removed", "Deceased"]
-  isECouncil: false,
-  isAdmin: false,
-};
-
-export default function ProfilePage() {
+export default function MinutesPage() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
 
   if (!isLoaded) {
     return (
@@ -43,24 +31,19 @@ export default function ProfilePage() {
     );
   }
 
-  const { userHasProfile, type, isECouncil, isAdmin, needsPermissionReview, needsProfileReview } = userData;
-
-  // Determine display text and color
-  const userTypeColor = type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
-  const userTypeDetails = [
-    isAdmin && "Admin",
-    isECouncil && "E-Council",
-  ]
-    .filter(Boolean)
-    .join(", ");
-
   return (
-    <div className="container-xxl mt-4">
-      <div>
-            <h1>
-                Meeting Minutes
-            </h1>
+    <div className="member-dashboard events-page">
+      <section className="bento-card events-hero">
+        <div>
+          <div className="hero-eyebrow">Chapter Records</div>
+          <h1 className="hero-title">Meeting Minutes</h1>
+          <p className="hero-subtitle">
+            There are currently no minutes available. Please reach out to the
+            scribe for more details or check emails from{" "}
+            <a href="mailto:scribe@thetatau-dg.org">scribe@thetatau-dg.org</a>.
+          </p>
         </div>
+      </section>
     </div>
   );
 }

@@ -76,33 +76,30 @@ export default function OnboardForm({
   const lName = user?.lastName ?? "";
 
   return (
-    <div className="container py-5">
-      <h1 className="mb-4">Welcome, {fName}</h1>
-
-      <form onSubmit={submit} className="card p-4 shadow-sm">
-        {/* ── Read-only Clerk fields ─────────────────────────────── */}
-        <div className="mb-3 row">
-          <label className="col-sm-2 col-form-label">First&nbsp;Name</label>
-          <div className="col-sm-10">
-            <input className="form-control-plaintext" readOnly value={fName} />
-          </div>
+    <div className="member-dashboard">
+      <section className="bento-card profile-hero onboard-hero">
+        <div>
+          <div className="hero-eyebrow">Delta Gamma Onboarding</div>
+          <h1 className="hero-title">Welcome, {fName}</h1>
+          <p className="hero-subtitle">
+            Complete your profile to unlock member tools.
+          </p>
         </div>
+      </section>
 
-        <div className="mb-3 row">
-          <label className="col-sm-2 col-form-label">Last&nbsp;Name</label>
-          <div className="col-sm-10">
-            <input className="form-control-plaintext" readOnly value={lName} />
+      <form onSubmit={submit} className="bento-card onboard-form">
+        <div className="onboard-stats">
+          <div className="onboard-stat">
+            <div className="onboard-stat-label">First Name</div>
+            <div className="onboard-stat-value">{fName}</div>
           </div>
-        </div>
-
-        <div className="mb-3 row">
-          <label className="col-sm-2 col-form-label">E-mail</label>
-          <div className="col-sm-10">
-            <input
-              className="form-control-plaintext"
-              readOnly
-              value={invitedEmail}
-            />
+          <div className="onboard-stat">
+            <div className="onboard-stat-label">Last Name</div>
+            <div className="onboard-stat-value">{lName}</div>
+          </div>
+          <div className="onboard-stat">
+            <div className="onboard-stat-label">E-mail</div>
+            <div className="onboard-stat-value">{invitedEmail}</div>
           </div>
         </div>
 

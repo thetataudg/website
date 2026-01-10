@@ -21,9 +21,10 @@ import {
 
 interface ProfileClientProps {
   member: MemberDoc;
+  committees: { name: string }[];
 }
 
-export default function ProfileClient({ member }: ProfileClientProps) {
+export default function ProfileClient({ member, committees }: ProfileClientProps) {
   const [editing, setEditing] = useState(false);
   const [showPicModal, setShowPicModal] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
@@ -61,83 +62,68 @@ export default function ProfileClient({ member }: ProfileClientProps) {
 
   return (
     <>
-      {/* ── HEADER ── */}
-      <div className="bg-light border">
-        <div className="container py-4">
-          <div className="row align-items-center gy-3">
-            {/* Photo + action buttons */}
-            <div className="col-auto text-center">
-              {member.profilePicUrl ? (
-                <img
-                  src={member.profilePicUrl}
-                  alt="Profile"
-                  className="rounded-circle shadow-sm"
-                  style={{ width: 120, height: 120, objectFit: "cover" }}
+      <div className="member-dashboard">
+        <section className="bento-card profile-hero">
+          <div className="profile-identity text-center">
+            {member.profilePicUrl ? (
+              <img
+                src={member.profilePicUrl}
+                alt="Profile"
+                className="profile-photo"
+              />
+            ) : (
+              <div className="profile-photo-placeholder">
+                <FontAwesomeIcon
+                  icon={faUserCircle}
+                  size="4x"
+                  className="text-muted"
                 />
-              ) : (
-                <div
-                  className="rounded-circle shadow-sm bg-light d-flex align-items-center justify-content-center"
-                  style={{ width: 120, height: 120 }}
+              </div>
+            )}
+            {canEdit && (
+              <div className="profile-actions mt-2 justify-content-center">
+                <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={() => setShowPicModal(true)}
                 >
-                  <FontAwesomeIcon
-                    icon={faUserCircle}
-                    size="6x"
-                    className="text-secondary"
-                  />
-                </div>
-              )}
-              <div className="mt-2 d-flex justify-content-center gap-2 flex-wrap">
-                {canEdit && (
-                  <button
-                    className="btn btn-outline-secondary btn-sm"
-                    onClick={() => setShowPicModal(true)}
-                  >
-                    Edit Photo
-                  </button>
-                )}
+                  Edit Photo
+                </button>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Name & hometown */}
-            <div className="col text-center text-md-start">
-              <h2 className="mb-1">
-                {member.fName} {member.lName}
-              </h2>
-              <p className="text-muted mb-0">{member.hometown}</p>
-            </div>
+          <div>
+            <h2 className="profile-title">
+              {member.fName} {member.lName}
+            </h2>
+            <p className="profile-subtitle">{member.hometown}</p>
+          </div>
 
-            {/* Stats: RollNo / Status / Family */}
-            <div className="col-12 col-md-auto d-flex justify-content-center">
-              <div className="text-center px-3">
-                <h5 className="mb-0">#{member.rollNo}</h5>
-                <small className="text-muted">Roll No</small>
-              </div>
-              <div className="text-center px-3">
-                <h5 className="mb-0">{member.status}</h5>
-                <small className="text-muted">Status</small>
-              </div>
-              <div className="text-center px-3">
-                <h5 className="mb-0">{member.familyLine}</h5>
-                <small className="text-muted">Family Line</small>
-              </div>
+          <div className="profile-stats">
+            <div className="profile-stat">
+              <div className="fw-semibold">#{member.rollNo}</div>
+              <small className="text-muted">Roll No</small>
+            </div>
+            <div className="profile-stat">
+              <div className="fw-semibold">{member.status}</div>
+              <small className="text-muted">Status</small>
+            </div>
+            <div className="profile-stat">
+              <div className="fw-semibold">{member.familyLine}</div>
+              <small className="text-muted">Family Line</small>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* ── MAIN CONTENT ── */}
-      <div className="container my-4">
-        <div className="card bg-white shadow-sm">
-          <div className="card-body text-dark">
-            {/* About */}
+        <section className="bento-card mt-4">
+          <div className="card-body">
             <section className="mb-4">
-              <h4>About</h4>
+              <h4 className="profile-section-title">About</h4>
               <p>{member.bio}</p>
             </section>
 
-            {/* Education */}
             <section className="mb-4">
-              <h4>Education</h4>
+              <h4 className="profile-section-title">Education</h4>
               <p>
                 <strong>Majors:</strong> {member.majors.join(", ")}
               </p>
@@ -146,13 +132,12 @@ export default function ProfileClient({ member }: ProfileClientProps) {
               </p>
             </section>
 
-            {/* Fraternity Info */}
             <section className="mb-4">
-              <h4>Fraternity Info</h4>
+              <h4 className="profile-section-title">Fraternity Info</h4>
               <p>
                 <strong>Committees:</strong>{" "}
-                {member.committees.length
-                  ? member.committees.join(", ")
+                {committees.length
+                  ? committees.map((c) => c.name).join(", ")
                   : "None"}
               </p>
               <p>
@@ -194,7 +179,6 @@ export default function ProfileClient({ member }: ProfileClientProps) {
                 </button>
               )}
 
-              {/* résumé area */}
               {member.resumeUrl ? (
                 <div className="d-flex flex-wrap gap-2 mt-3">
                   <a
@@ -242,7 +226,7 @@ export default function ProfileClient({ member }: ProfileClientProps) {
               )}
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* ── MODALS ── */}
@@ -296,14 +280,33 @@ export default function ProfileClient({ member }: ProfileClientProps) {
       )}
 
       {editing && canEdit && (
-        <ProfileInfoEditor
-          member={member}
-          onDone={() => {
-            setEditing(false);
-            router.refresh();
-          }}
-        />
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Edit Profile</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setEditing(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <ProfileInfoEditor
+                  member={member}
+                  onDone={() => {
+                    setEditing(false);
+                    router.refresh();
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
-      </>
+    </>
   );
 }

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import type { MemberDoc } from "@/types/member";
+import { LoadingSpinner } from "../../../components/LoadingState";
 
 export default function ProfileInfoEditor({
   member,
@@ -125,7 +126,14 @@ export default function ProfileInfoEditor({
 
       {/* Save Button */}
       <button className="btn btn-primary" disabled={loading}>
-        {loading ? "Saving…" : "Save Info"}
+        {loading ? (
+          <>
+            <LoadingSpinner size="sm" className="me-2" />
+            Saving...
+          </>
+        ) : (
+          "Save Info"
+        )}
       </button>
     </form>
   );

@@ -1,0 +1,90 @@
+import { NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { requireAuth } from "@/lib/clerk";
+import { connectDB } from "@/lib/db";
+import Committee from "@/lib/models/Committee";
+import Event from "@/lib/models/Event";
+import Member from "@/lib/models/Member";
+import logger from "@/lib/logger";
+
+async function getMemberByClerk(req: Request) {
+  const clerkId = await requireAuth(req as any);
+  await connectDB();
+  const member = await Member.findOne({ clerkId }).lean();
+  if (!member || Array.isArray(member)) {
+    throw new Error("Not authorized");
+  }
+  return member;
+}
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  try {
+    const actor = await getMemberByClerk(req);
+    const { memberId } = await req.json();
+
+    if (!memberId) {
+      return NextResponse.json({ error: "memberId is required" }, { status: 400 });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    const eventId = new mongoose.Types.ObjectId(params.id);
+    const event = await Event.collection.findOne({ _id: eventId });
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (event.status !== "ongoing") {
+      return NextResponse.json(
+        { error: "Event is not accepting check-ins" },
+        { status: 400 }
+      );
+    }
+
+    const isAdmin = actor.role === "admin" || actor.role === "superadmin";
+    if (!isAdmin) {
+      const committee = await Committee.findById(event.committeeId);
+      const isHead =
+        committee?.committeeHeadId?.toString() === actor._id?.toString();
+      if (!isHead) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    const targetMember = await Member.findById(memberId).lean();
+    if (!targetMember) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    if (event.attendees && !Array.isArray(event.attendees)) {
+      await Event.collection.updateOne(
+        { _id: eventId },
+        { $set: { attendees: [] } }
+      );
+    }
+
+    const targetId = new mongoose.Types.ObjectId(memberId);
+    const update = await Event.collection.updateOne(
+      {
+        _id: eventId,
+        "attendees.memberId": { $ne: targetId },
+      },
+      {
+        $push: { attendees: { memberId: targetId, checkedInAt: new Date() } },
+      } as any
+    );
+
+    if (update.matchedCount === 0) {
+      return NextResponse.json(
+        { status: "already-checked-in" },
+        { status: 200 }
+      );
+    }
+
+    logger.info({ eventId, memberId }, "Checked in member");
+    return NextResponse.json({ status: "checked-in" }, { status: 200 });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to check in member");
+    return NextResponse.json({ error: err.message }, { status: 403 });
+  }
+}

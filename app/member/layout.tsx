@@ -4,6 +4,7 @@ export const metadata = {
 };
 
 import "bootstrap/dist/css/bootstrap.min.css";
+import "../(members-only)/members.css";
 
 export default function RootLayout({
   children,
@@ -12,7 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="members-shell" data-theme="light">
+        {children}
+      </body>
     </html>
   );
 }

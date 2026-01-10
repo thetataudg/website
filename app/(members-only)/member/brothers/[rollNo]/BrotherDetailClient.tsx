@@ -4,7 +4,7 @@
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
 
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUserCircle,
@@ -16,14 +16,110 @@ import type { MemberDoc } from "@/types/member";
 
 interface BrotherDetailClientProps {
   member: MemberDoc;
+  committees: { name: string }[];
 }
 
 export default function BrotherDetailClient({
   member,
+  committees,
 }: BrotherDetailClientProps) {
   const [showPreview, setShowPreview] = useState(false);
+  const [viewer, setViewer] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"profile" | "events">("profile");
+  const [attendanceEvents, setAttendanceEvents] = useState<any[]>([]);
+  const [attendanceTotal, setAttendanceTotal] = useState(0);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceStart, setAttendanceStart] = useState("");
+  const [attendanceEnd, setAttendanceEnd] = useState("");
 
   const { isLoaded, isSignedIn } = useAuth();
+
+  const profileMemberId =
+    typeof (member as any)?._id === "string"
+      ? (member as any)._id
+      : (member as any)?._id?.toString?.() || "";
+
+  const isPrivileged =
+    viewer?.role === "admin" ||
+    viewer?.role === "superadmin" ||
+    viewer?.isECouncil;
+
+  useEffect(() => {
+    async function loadViewer() {
+      try {
+        const res = await fetch("/api/members/me");
+        if (!res.ok) return;
+        const data = await res.json();
+        setViewer(data);
+      } catch {
+        setViewer(null);
+      }
+    }
+    if (isSignedIn) loadViewer();
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    const now = new Date();
+    const start = new Date();
+    start.setDate(now.getDate() - 30);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setAttendanceStart(
+      `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
+    );
+    setAttendanceEnd(
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isSignedIn || !profileMemberId || !attendanceStart || !attendanceEnd)
+      return;
+    const loadAttendance = async () => {
+      setAttendanceLoading(true);
+      const params = new URLSearchParams({
+        memberId: profileMemberId,
+        start: attendanceStart,
+        end: attendanceEnd,
+      });
+      const res = await fetch(`/api/events/attendance?${params.toString()}`);
+      const data = res.ok ? await res.json() : null;
+      if (data?.events) {
+        setAttendanceEvents(data.events);
+        setAttendanceTotal(data.events.length);
+      } else {
+        setAttendanceEvents([]);
+        setAttendanceTotal(data?.total || 0);
+      }
+      setAttendanceLoading(false);
+    };
+    loadAttendance();
+  }, [isSignedIn, profileMemberId, attendanceStart, attendanceEnd]);
+
+  const attendanceByCommittee = useMemo(() => {
+    if (!isPrivileged) return [];
+    const tally = new Map<string, number>();
+    attendanceEvents.forEach((evt) => {
+      const key = evt.committeeName || "Chapter";
+      tally.set(key, (tally.get(key) || 0) + 1);
+    });
+    return Array.from(tally.entries()).map(([name, count]) => ({
+      name,
+      count,
+    }));
+  }, [attendanceEvents, isPrivileged]);
+
+  const attendanceByType = useMemo(() => {
+    if (!isPrivileged) return [];
+    const tally = new Map<string, number>();
+    attendanceEvents.forEach((evt) => {
+      const key = evt.eventType || "event";
+      tally.set(key, (tally.get(key) || 0) + 1);
+    });
+    return Array.from(tally.entries()).map(([type, count]) => ({
+      type,
+      count,
+    }));
+  }, [attendanceEvents, isPrivileged]);
 
   if (!isLoaded) {
     return (
@@ -38,154 +134,297 @@ export default function BrotherDetailClient({
 
   if (!isSignedIn) {
     return (
-        <div className="container">
-            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-            <FontAwesomeIcon icon={faTimes} className="h2" />
-            <h3>You must be logged into use this function.</h3>
-            <RedirectToSignIn />
-            </div>
+      <div className="container">
+        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
+          <FontAwesomeIcon icon={faTimes} className="h2" />
+          <h3>You must be logged into use this function.</h3>
+          <RedirectToSignIn />
         </div>
+      </div>
     );
   }
 
   return (
     <>
-      {/* ── HEADER ── */}
-      <div className="bg-light border-bottom">
-        <div className="container py-4">
-          <div className="row align-items-center gy-3">
-            <div className="col-auto text-center">
-              {member.profilePicUrl ? (
-                <img
-                  src={member.profilePicUrl}
-                  alt="Profile"
-                  className="rounded-circle shadow-sm"
-                  style={{ width: 120, height: 120, objectFit: "cover" }}
+      <div className="member-dashboard">
+        <section className="bento-card profile-hero">
+          <div className="profile-identity text-center">
+            {member.profilePicUrl ? (
+              <img
+                src={member.profilePicUrl}
+                alt="Profile"
+                className="profile-photo"
+              />
+            ) : (
+              <div className="profile-photo-placeholder">
+                <FontAwesomeIcon
+                  icon={faUserCircle}
+                  size="4x"
+                  className="text-muted"
                 />
-              ) : (
-                <div
-                  className="rounded-circle shadow-sm bg-light d-flex align-items-center justify-content-center"
-                  style={{ width: 120, height: 120 }}
-                >
-                  <FontAwesomeIcon
-                    icon={faUserCircle}
-                    size="6x"
-                    className="text-secondary"
-                  />
-                </div>
-              )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="profile-title">
+              {member.fName} {member.lName}
+            </h2>
+            <p className="profile-subtitle">{member.hometown}</p>
+          </div>
+
+          <div className="profile-stats">
+            <div className="profile-stat">
+              <div className="fw-semibold">#{member.rollNo}</div>
+              <small className="text-muted">Roll No</small>
             </div>
-            <div className="col text-center text-md-start">
-              <h2 className="mb-1">
-                {member.fName} {member.lName}
-              </h2>
-              <p className="text-muted mb-0">{member.hometown}</p>
+            <div className="profile-stat">
+              <div className="fw-semibold">{member.status}</div>
+              <small className="text-muted">Status</small>
             </div>
-            <div className="col-12 col-md-auto d-flex justify-content-center">
-              <div className="text-center px-3">
-                <h5 className="mb-0">#{member.rollNo}</h5>
-                <small className="text-muted">Roll No</small>
-              </div>
-              <div className="text-center px-3">
-                <h5 className="mb-0">{member.status}</h5>
-                <small className="text-muted">Status</small>
-              </div>
-              <div className="text-center px-3">
-                <h5 className="mb-0">{member.familyLine}</h5>
-                <small className="text-muted">Family Line</small>
-              </div>
+            <div className="profile-stat">
+              <div className="fw-semibold">{member.familyLine}</div>
+              <small className="text-muted">Family Line</small>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* ── MAIN CONTENT ── */}
-      <div className="container my-4">
-        <div className="card bg-white shadow-sm">
-          <div className="card-body text-dark">
-            {/* About */}
-            {member.bio && (
-              <section className="mb-4">
-                <h4>About</h4>
-                <p>{member.bio}</p>
+        <section className="bento-card mt-4">
+          <div className="card-body">
+            {isPrivileged && (
+              <div className="profile-tabs">
+                <button
+                  type="button"
+                  className={`profile-tab ${activeTab === "profile" ? "is-active" : ""}`}
+                  onClick={() => setActiveTab("profile")}
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  className={`profile-tab ${activeTab === "events" ? "is-active" : ""}`}
+                  onClick={() => setActiveTab("events")}
+                >
+                  Events
+                </button>
+              </div>
+            )}
+
+            {(!isPrivileged || activeTab === "profile") && (
+              <>
+                {member.bio && (
+                  <section className="mb-4">
+                    <h4 className="profile-section-title">About</h4>
+                    <p>{member.bio}</p>
+                  </section>
+                )}
+
+                <section className="mb-4">
+                  <h4 className="profile-section-title">Education</h4>
+                  <p>
+                    <strong>Majors:</strong> {member.majors.join(", ")}
+                  </p>
+                  <p>
+                    <strong>Graduation Year:</strong> {member.gradYear}
+                  </p>
+                </section>
+
+                <section className="mb-4">
+                  <h4 className="profile-section-title">Fraternity Info</h4>
+                  <p>
+                    <strong>Committees:</strong>{" "}
+                    {committees.length
+                      ? committees.map((c) => c.name).join(", ")
+                      : "None"}
+                  </p>
+                  <p>
+                    <strong>Pledge Class:</strong> {member.pledgeClass || "—"}
+                  </p>
+                  {member.bigs?.length > 0 && (
+                    <p className="mb-1">
+                      <strong>Big{member.bigs.length > 1 ? "s" : ""}:</strong>{" "}
+                      {member.bigs
+                        .map((b: any) =>
+                          typeof b === "string"
+                            ? b
+                            : `${b.fName ?? ""} ${b.lName ?? ""}`.trim()
+                        )
+                        .join(", ")}
+                    </p>
+                  )}
+                  {member.littles?.length > 0 && (
+                    <p>
+                      <strong>
+                        Little{member.littles.length > 1 ? "s" : ""}:
+                      </strong>{" "}
+                      {member.littles
+                        .map((l: any) =>
+                          typeof l === "string"
+                            ? l
+                            : `${l.fName ?? ""} ${l.lName ?? ""}`.trim()
+                        )
+                        .join(", ")}
+                    </p>
+                  )}
+                </section>
+
+                {member.resumeUrl ? (
+                  <div className="mt-4 d-flex flex-wrap gap-2">
+                    <a
+                      href={member.resumeUrl}
+                      download
+                      className="btn btn-outline-secondary"
+                    >
+                      <FontAwesomeIcon icon={faDownload} className="me-1" />
+                      Download Résumé
+                    </a>
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => setShowPreview(true)}
+                    >
+                      <FontAwesomeIcon icon={faEye} className="me-1" />
+                      Preview Résumé
+                    </button>
+                  </div>
+                ) : (
+                  <div className="alert alert-warning mt-4" role="alert">
+                    {member.fName} hasn't uploaded a resume yet.
+                  </div>
+                )}
+              </>
+            )}
+
+            {(isPrivileged && activeTab === "events") && (
+              <section className="mt-3">
+                <h4 className="profile-section-title">Event Attendance</h4>
+                <div className="row g-3 align-items-end">
+                  <div className="col-md-4">
+                    <label className="form-label">Start date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={attendanceStart}
+                      onChange={(e) => setAttendanceStart(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">End date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={attendanceEnd}
+                      onChange={(e) => setAttendanceEnd(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <div className="profile-stat">
+                      <div className="fw-semibold">{attendanceTotal}</div>
+                      <small className="text-muted">Events attended</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="profile-section-title">Committee totals</div>
+                  <div className="d-flex flex-wrap gap-2 mt-2">
+                    {attendanceByCommittee.length ? (
+                      attendanceByCommittee.map((item) => (
+                        <span key={item.name} className="event-pill">
+                          {item.name} ({item.count})
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-muted">No attendance yet.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="profile-section-title">Event types</div>
+                  <div className="d-flex flex-wrap gap-2 mt-2">
+                    {attendanceByType.length ? (
+                      attendanceByType.map((item) => (
+                        <span key={item.type} className="event-pill event-pill--type">
+                          {item.type} ({item.count})
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-muted">No attendance yet.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="profile-section-title">Events</div>
+                  {attendanceLoading ? (
+                    <p className="text-muted">Loading attendance…</p>
+                  ) : attendanceEvents.length ? (
+                    <div className="table-responsive">
+                      <table className="table admin-table">
+                        <thead>
+                          <tr>
+                            <th>Event</th>
+                            <th>Committee</th>
+                            <th>Type</th>
+                            <th className="text-end">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {attendanceEvents.map((evt) => (
+                            <tr key={evt._id}>
+                              <td>{evt.name}</td>
+                              <td>{evt.committeeName || "Chapter"}</td>
+                              <td>{evt.eventType || "event"}</td>
+                              <td className="text-end">
+                                {evt.startTime
+                                  ? new Date(evt.startTime).toLocaleDateString()
+                                  : ""}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-muted">No attendance in this range.</p>
+                  )}
+                </div>
               </section>
             )}
 
-            {/* Education */}
-            <section className="mb-4">
-              <h4>Education</h4>
-              <p>
-                <strong>Majors:</strong> {member.majors.join(", ")}
-              </p>
-              <p>
-                <strong>Graduation Year:</strong> {member.gradYear}
-              </p>
-            </section>
-
-            {/* Fraternity Info */}
-            <section className="mb-4">
-              <h4>Fraternity Info</h4>
-              <p>
-                <strong>Committees:</strong>{" "}
-                {member.committees.length
-                  ? member.committees.join(", ")
-                  : "None"}
-              </p>
-              <p>
-                <strong>Pledge Class:</strong> {member.pledgeClass || "—"}
-              </p>
-              {member.bigs?.length > 0 && (
-                <p className="mb-1">
-                  <strong>Big{member.bigs.length > 1 ? "s" : ""}:</strong>{" "}
-                  {member.bigs
-                    .map((b: any) =>
-                      typeof b === "string"
-                        ? b
-                        : `${b.fName ?? ""} ${b.lName ?? ""}`.trim()
-                    )
-                    .join(", ")}
-                </p>
-              )}
-              {member.littles?.length > 0 && (
-                <p>
-                  <strong>Little{member.littles.length > 1 ? "s" : ""}:</strong>{" "}
-                  {member.littles
-                    .map((l: any) =>
-                      typeof l === "string"
-                        ? l
-                        : `${l.fName ?? ""} ${l.lName ?? ""}`.trim()
-                    )
-                    .join(", ")}
-                </p>
-              )}
-            </section>
-
-            {/* Résumé Actions */}
-            {member.resumeUrl ? (
-              <div className="mt-4 d-flex flex-wrap gap-2">
-                <a
-                  href={member.resumeUrl}
-                  download
-                  className="btn btn-outline-secondary"
-                >
-                  <FontAwesomeIcon icon={faDownload} className="me-1" />
-                  Download Résumé
-                </a>
-                <button
-                  className="btn btn-outline-secondary"
-                  onClick={() => setShowPreview(true)}
-                >
-                  <FontAwesomeIcon icon={faEye} className="me-1" />
-                  Preview Résumé
-                </button>
-              </div>
-            ) : (
-              <div className="alert alert-warning mt-4" role="alert">
-                {member.fName} hasn't uploaded a resume yet.
-              </div>
+            {!isPrivileged && (
+              <section className="mt-4">
+                <h4 className="profile-section-title">Event Attendance</h4>
+                <div className="row g-3 align-items-end">
+                  <div className="col-md-4">
+                    <label className="form-label">Start date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={attendanceStart}
+                      onChange={(e) => setAttendanceStart(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">End date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={attendanceEnd}
+                      onChange={(e) => setAttendanceEnd(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <div className="profile-stat">
+                      <div className="fw-semibold">{attendanceTotal}</div>
+                      <small className="text-muted">Total events attended</small>
+                    </div>
+                  </div>
+                </div>
+              </section>
             )}
           </div>
-        </div>
+        </section>
       </div>
 
       {/* ── PREVIEW MODAL ── */}

@@ -7,7 +7,8 @@ import MemberEditorModal from "./MemberEditorModal";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faKey, faGavel, faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
+import { faKey, faGavel, faCheck, faTimes, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
 
 export interface MemberData {
   _id: string;
@@ -18,6 +19,7 @@ export interface MemberData {
   status?: "Active" | "Alumni" | "Removed" | "Deceased";
   isECouncil: boolean;
   ecouncilPosition: string;
+  isCommitteeHead: boolean;
   familyLine: string;
   bigs: string[];
   littles: string[];
@@ -33,25 +35,25 @@ export default function MembersList({
   const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
   const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [query, setQuery] = useState("");
+  const [loadingMembers, setLoadingMembers] = useState(true);
 
   useEffect(() => {
     fetch("/api/members/me")
       .then((r) => r.json())
       .then((d) => setMe({ role: d.role, rollNo: d.rollNo }))
       .catch(() => setMe(null));
+    fetch("/api/members")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: MemberData[]) => setMembers(data))
+      .catch(() => setMembers(initialMembers))
+      .finally(() => setLoadingMembers(false));
   }, []);
 
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading members..." />;
   }
 
   if (!isSignedIn) {
@@ -68,6 +70,17 @@ export default function MembersList({
 
   // filter out superadmins only
   const visible = members.filter((m) => m.role !== "superadmin");
+  const filtered = query.trim()
+    ? visible.filter((m) => {
+        const haystack = `${m.rollNo} ${m.fName} ${m.lName} ${m.status ?? ""}`.toLowerCase();
+        return haystack.includes(query.trim().toLowerCase());
+      })
+    : visible;
+  const sorted = [...filtered].sort((a, b) => {
+    const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
+    const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
+    return aNum - bNum;
+  });
 
   const editing = editingRollNo
     ? members.find((m) => m.rollNo === editingRollNo) || null
@@ -107,64 +120,94 @@ export default function MembersList({
 
   return (
     <>
-      <h2>Manage Members</h2>
-      <table className="table table-striped">
-        <thead>
-          <tr>
-            <th>Roll No</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((m) => (
-            <tr key={m._id}>
-              <td>#{m.rollNo}</td>
-              <td>
-                {m.fName} {m.lName}{" "}
-                {me && m.rollNo === me.rollNo && (
-                  <span className="badge bg-primary ms-1">You</span>
-                )}
-              </td>
-              <td>
-                {m.status || "Unknown"}
-                {m.role === "admin" && (
-                  <FontAwesomeIcon
-                    icon={faKey}
-                    className="ms-2 text-warning"
-                    title="This user has admin privileges"
-                  />
-                )}
-                  {m.isECouncil && (
-                    <FontAwesomeIcon
-                      icon={faGavel}
-                      className="ms-2 text-secondary"
-                      title="E-Council Member"
-                    />
-                  )}
-              </td>
-              <td>
-                <button
-                  className="btn btn-sm btn-outline-primary me-2"
-                  onClick={() => setEditingRollNo(m.rollNo)}
-                >
-                  Edit
-                </button>
+      <div className="bento-card admin-table-card">
+        <div className="admin-members-header">
+          <h2>Manage Members</h2>
+          <div className="admin-search">
+            <input
+              className="form-control"
+              placeholder="Search members..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="table-responsive">
+          <table className="table admin-table">
+            <thead>
+              <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th className="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingMembers ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-5">
+                    <LoadingSpinner size="sm" className="me-2" />
+                    Loading members...
+                  </td>
+                </tr>
+              ) : (
+                sorted.map((m) => (
+                  <tr key={m._id}>
+                    <td>#{m.rollNo}</td>
+                    <td>
+                      {m.fName} {m.lName}{" "}
+                    {me && m.rollNo === me.rollNo && (
+                      <span className="badge bg-primary ms-1">You</span>
+                    )}
+                  </td>
+                  <td>
+                    {m.status || "Unknown"}
+                    {m.role === "admin" && (
+                      <FontAwesomeIcon
+                        icon={faKey}
+                        className="ms-2 text-warning"
+                        title="This user has admin privileges"
+                      />
+                    )}
+                    {m.isECouncil && (
+                      <FontAwesomeIcon
+                        icon={faGavel}
+                        className="ms-2 text-secondary"
+                        title="E-Council Member"
+                      />
+                    )}
+                  </td>
+                  <td className="text-end">
+                    <button
+                      className="btn btn-sm btn-outline-primary me-2"
+                      onClick={() => setEditingRollNo(m.rollNo)}
+                    >
+                      Edit
+                    </button>
 
-                {me?.role === "superadmin" && m.role !== "superadmin" && (
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => setDeletingRollNo(m.rollNo)}
-                  >
-                    Delete
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                    {me?.role === "superadmin" && m.role !== "superadmin" && (
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => setDeletingRollNo(m.rollNo)}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                ))
+              )}
+              {!loadingMembers && sorted.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center text-muted py-4">
+                    No members found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {editing && (
         <MemberEditorModal
@@ -211,6 +254,7 @@ export default function MembersList({
                   onClick={confirmDelete}
                   disabled={deleteLoading}
                 >
+                  {deleteLoading && <LoadingSpinner size="sm" className="me-2" />}
                   {deleteLoading ? "Deleting..." : "Delete"}
                 </button>
               </div>

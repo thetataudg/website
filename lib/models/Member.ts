@@ -17,6 +17,7 @@ const MemberSchema = new Schema(
     pledgeClass: { type: String },
     isECouncil: { type: Boolean, required: true },
     ecouncilPosition: { type: String },
+    isCommitteeHead: { type: Boolean, required: true, default: false },
     hometown: { type: String },
     resumeUrl: { type: String },
     profilePicUrl: { type: String },

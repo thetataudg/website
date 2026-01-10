@@ -39,9 +39,9 @@ export default function InviteForm({ onSuccess }: Props) {
   }
 
   return (
-    <form onSubmit={handleInvite} className="mb-4">
-      <h2>Send a new invitation</h2>
-      <div className="input-group">
+    <form onSubmit={handleInvite} className="mb-4 admin-invite-form">
+      <h3 className="profile-section-title">Send a new invitation</h3>
+      <div className="admin-invite-row">
         <input
           type="email"
           className="form-control"

@@ -6,6 +6,7 @@ import "@fortawesome/fontawesome-svg-core/styles.css";
 config.autoAddCss = false;
 
 import "bootstrap/dist/css/bootstrap.min.css";
+import "./members.css";
 
 import { useEffect } from "react";
 
@@ -17,7 +18,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body>
+        <body className="members-shell" data-theme="light">
           <Navbar />
 
           {children}

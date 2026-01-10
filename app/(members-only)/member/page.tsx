@@ -19,6 +19,7 @@ import {
   faGear,
   faUsersCog,
 } from "@fortawesome/free-solid-svg-icons";
+import LoadingState, { LoadingSpinner } from "../components/LoadingState";
 
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -27,6 +28,10 @@ export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
 
   const [loadingUserData, setLoadingUserData] = useState(true);
+  const [showQr, setShowQr] = useState(false);
+  const [qrTheme, setQrTheme] = useState("light");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [isCommitteeHead, setIsCommitteeHead] = useState(false);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -44,6 +49,7 @@ export default function Dashboard() {
           isECouncil: data.isECouncil,
           isAdmin: data.role === "admin" || data.role === "superadmin",
           rollNo: data.rollNo,
+          memberId: data.memberId,
         });
 
       } catch (error) {
@@ -57,18 +63,49 @@ export default function Dashboard() {
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
 
+  useEffect(() => {
+    if (!userData?.memberId) return;
+    const loadCommitteeHead = async () => {
+      try {
+        const res = await fetch(
+          `/api/committees?memberId=${encodeURIComponent(userData.memberId)}`
+        );
+        if (!res.ok) return;
+        const committees = await res.json();
+        const isHead = Array.isArray(committees)
+          ? committees.some((c: any) => {
+              const headId =
+                typeof c.committeeHeadId === "string"
+                  ? c.committeeHeadId
+                  : c.committeeHeadId?._id;
+              return headId === userData.memberId;
+            })
+          : false;
+        setIsCommitteeHead(isHead);
+      } catch (error) {
+        console.error("Committee head check failed:", error);
+      }
+    };
+    loadCommitteeHead();
+  }, [userData?.memberId]);
+
+  useEffect(() => {
+    if (!showQr) return;
+    const getTheme = () => document?.body?.dataset?.theme || "light";
+    setQrTheme(getTheme());
+    setQrLoading(true);
+    const observer = new MutationObserver(() => {
+      setQrTheme(getTheme());
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, [showQr]);
+
   if (!isLoaded || loadingUserData) {
-    return (
-      <div className="container">
-        <div
-          className="alert alert-info d-flex align-items-center mt-5"
-          role="alert"
-        >
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading dashboard..." />;
   }
 
   if (!isSignedIn) {
@@ -100,65 +137,79 @@ export default function Dashboard() {
     ];
 
     return (
-      <div className="container-xxl mt-4">
-        <div>
-          {user ? (
-            <h1>Welcome, {user.firstName}</h1>
-          ) : (
-            <h2>Welcome, please enter your name in your profile</h2>
-          )}
-
-          <div className="row mt-4">
-            <div className="col-md-8">
-              <p>
-                User Type:{" "}
-                <b className="text-dark">
-                  Pending
-                </b>
-              </p>
-
-              <div className="mt-3">
-                  <div>
-                    <div
-                      className="alert alert-primary d-flex align-items-center"
-                      role="alert"
-                    >
-                      <FontAwesomeIcon
-                        icon={faHourglass}
-                        className="me-2"
-                      />
-                      Your profile is not yet approved. Please contact an
-                      officer if you believe this is an error.
-                    </div>
-                  </div>
-              </div>
+      <div className="member-dashboard">
+        <section className="member-hero bento-card">
+          <div className="hero-copy">
+            <div className="hero-eyebrow">
+              <FontAwesomeIcon icon={faUsersCog} />
+              Delta Gamma Member Hub
             </div>
-
-            <div className="col-md-4">
-              <h4>My Permissions</h4>
-              <table className="table">
-                <thead className="thead-dark">
-                  <tr>
-                    <th>Privilege</th>
-                    <th className="text-center">Access</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {privileges.map((priv, index) => (
-                    <tr key={index}>
-                      <td>{priv.label}</td>
-                      <td className="text-center">
-                        <FontAwesomeIcon
-                          icon={priv.access ? faCheck : faTimes}
-                          className={priv.access ? "text-success" : "text-danger"}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {user ? (
+              <h1 className="hero-title">Welcome, {user.firstName}</h1>
+            ) : (
+              <h2 className="hero-title">Welcome, please enter your name</h2>
+            )}
+            <p className="hero-subtitle">
+              Your membership access is still being verified.
+            </p>
+            <div className="hero-tags">
+              <span className="tt-tag">Status: Pending</span>
+              <span className="tt-tag">Profile review in progress</span>
             </div>
           </div>
+          <div className="hero-spotlight bento-card">
+            <div className="spotlight-icon">
+              <FontAwesomeIcon icon={faHourglass} />
+            </div>
+            <div>
+              <div className="spotlight-title">Awaiting approval</div>
+              <div className="spotlight-meta">
+                An officer will confirm your profile shortly.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bento-card status-bar">
+          <div className="bento-title">
+            <span className="icon-pill">
+              <FontAwesomeIcon icon={faTriangleExclamation} />
+            </span>
+            Status updates
+          </div>
+          <div className="status-grid">
+            <div className="status-card info">
+              <FontAwesomeIcon icon={faHourglass} />
+              <div>
+                Your profile is not yet approved. Please contact an officer if
+                you believe this is an error.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="bento-grid">
+          <section className="bento-card bento-permissions">
+            <div className="bento-title">
+              <span className="icon-pill">
+                <FontAwesomeIcon icon={faCheck} />
+              </span>
+              My permissions
+            </div>
+            <div className="perm-list">
+              {privileges.map((priv, index) => (
+                <div className="perm-item" key={index}>
+                  <span>{priv.label}</span>
+                  <FontAwesomeIcon
+                    icon={priv.access ? faCheck : faTimes}
+                    className={`status-icon ${
+                      priv.access ? "text-success" : "text-danger"
+                    }`}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     );
@@ -174,8 +225,6 @@ export default function Dashboard() {
     rollNo,
   } = userData;
 
-  const userTypeColor =
-    type === "Active" ? "text-primary" : type === "Alumni" ? "text-info" : "";
   const userTypeDetails = [
     isAdmin && "Admin",
     isECouncil && "E-Council",
@@ -224,13 +273,13 @@ export default function Dashboard() {
       enabled: userHasProfile && type === "Active",
       variant: "warning",
     },
-    // {
-    //   label: "Events",
-    //   href: "/member/events",
-    //   icon: faCalendar,
-    //   enabled: userHasProfile,
-    //   variant: "secondary",
-    // },
+    {
+       label: "Events",
+       href: "/member/events",
+       icon: faCalendar,
+       enabled: userHasProfile,
+       variant: "secondary",
+    }, 
     {
       label: "Admin",
       href: "/member/admin",
@@ -238,132 +287,200 @@ export default function Dashboard() {
       enabled: isAdmin,
       variant: "danger",
     },
+    {
+      label: "Manage Events",
+      href: "/member/events/manage",
+      icon: faCalendar,
+      enabled: (isAdmin || isECouncil) && userHasProfile,
+      variant: "secondary",
+    },
+    {
+      label: "Committee Events",
+      href: "/member/events/committee",
+      icon: faCalendar,
+      enabled: (isAdmin || isECouncil || isCommitteeHead) && userHasProfile,
+      variant: "secondary",
+    },
   ];
 
+  const statusUpdates: { type: "alert" | "info" | "success"; icon: any; text: string }[] = [];
+  if (!userHasProfile) {
+    statusUpdates.push({
+      type: "alert",
+      icon: faTriangleExclamation,
+      text: "You do not have access to this tool yet. Please contact an admin if you believe this is an error.",
+    });
+  }
+  if (needsPermissionReview) {
+    statusUpdates.push({
+      type: "info",
+      icon: faHourglass,
+      text: "Since you marked yourself as E-Council, your extended permissions are being verified.",
+    });
+  }
+  if (needsProfileReview && !needsPermissionReview) {
+    statusUpdates.push({
+      type: "info",
+      icon: faHourglass,
+      text: "Your profile changes are awaiting review.",
+    });
+  }
+  if (userHasProfile && !needsPermissionReview && !needsProfileReview) {
+    statusUpdates.push({
+      type: "success",
+      icon: faCheck,
+      text: `Your profile is ${
+        type === "Active" ? "active" : type.toLowerCase()
+      }, granting ${
+        isAdmin
+          ? "admin privileges"
+          : isECouncil
+          ? "extended privileges"
+          : "normal privileges"
+      } on the chapter tool.`,
+    });
+  }
+
   return (
-    <div className="container-xxl mt-4">
-      <div>
-        {user ? (
-          <h1>Welcome, {user.firstName}</h1>
-        ) : (
-          <h2>Welcome, please enter your name in your profile</h2>
-        )}
-
-        <div className="row mt-4">
-          <div className="col-md-8">
-            <p>
-              User Type:{" "}
-              <b className={userTypeColor}>
-                {type}
-                {userTypeDetails && <span> ({userTypeDetails})</span>}
-              </b>
-            </p>
-
-            <div className="mt-3">
-              {!userHasProfile ? (
-                <div>
-                  <div
-                    className="alert alert-warning d-flex align-items-center"
-                    role="alert"
-                  >
-                    <FontAwesomeIcon
-                      icon={faTriangleExclamation}
-                      className="me-2"
-                    />
-                    You do not have access to this tool yet. Please contact an
-                    admin if you believe this is an error.
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {needsPermissionReview && (
-                    <div
-                      className="alert alert-info d-flex align-items-center mt-2"
-                      role="alert"
-                    >
-                      <FontAwesomeIcon icon={faHourglass} className="me-2" />
-                      Since you marked yourself as E-Council, your extended
-                      permissions are being verified.
-                    </div>
-                  )}
-
-                  {needsProfileReview && !needsPermissionReview && (
-                    <div
-                      className="alert alert-info d-flex align-items-center mt-2"
-                      role="alert"
-                    >
-                      <FontAwesomeIcon icon={faHourglass} className="me-2" />
-                      Your profile changes are awaiting review.
-                    </div>
-                  )}
-
-                  <div
-                    className="alert alert-success d-flex align-items-center"
-                    role="alert"
-                  >
-                    <FontAwesomeIcon icon={faCheck} className="me-2" />
-                    {`Your profile is ${
-                      type === "Active" ? "active" : type.toLowerCase()
-                    }, granting ${
-                      isAdmin
-                        ? "admin privileges"
-                        : isECouncil
-                        ? "extended privileges"
-                        : "normal privileges"
-                    } on the chapter tool.`}
-                  </div>
-
-                  {/* Instant Access Buttons */}
-                  <div className="mt-4">
-                    <h4>Quick Access</h4>
-                    <div className="row g-3">
-                      {quickAccessButtons
-                        .filter(button => button.enabled)
-                        .map((button, index) => (
-                          <div className="col-sm-6 col-md-4" key={index}>
-                            <Link
-                              href={button.href}
-                              className={`btn btn-${button.variant} w-100 d-flex align-items-center justify-content-center`}
-                              style={{ minHeight: "50px" }}
-                            >
-                              <FontAwesomeIcon icon={button.icon} className="me-2" />
-                              {button.label}
-                            </Link>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+    <div className="member-dashboard">
+      <section className="member-hero bento-card">
+        <div className="hero-copy">
+          <div className="hero-eyebrow">
+            <FontAwesomeIcon icon={faUsersCog} />
+            Delta Gamma Member Hub
           </div>
-
-          <div className="col-md-4">
-            <h4>Permissions</h4>
-            <table className="table">
-              <thead className="thead-dark">
-                <tr>
-                  <th>Privilege</th>
-                  <th className="text-center">Access</th>
-                </tr>
-              </thead>
-              <tbody>
-                {privileges.map((priv, index) => (
-                  <tr key={index}>
-                    <td>{priv.label}</td>
-                    <td className="text-center">
-                      <FontAwesomeIcon
-                        icon={priv.access ? faCheck : faTimes}
-                        className={priv.access ? "text-success" : "text-danger"}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {user ? (
+            <h1 className="hero-title">Welcome, {user.firstName}</h1>
+          ) : (
+            <h2 className="hero-title">Welcome, please enter your name</h2>
+          )}
+          <div className="hero-tags">
+            <span className="tt-tag">Status: {type}</span>
+            {userTypeDetails && <span className="tt-tag">{userTypeDetails}</span>}
           </div>
         </div>
+        <div className="hero-spotlight bento-card">
+          {userData?.memberId ? (
+            <button
+              className="tt-btn tt-btn-primary tt-btn-compact"
+              onClick={() => setShowQr(true)}
+              type="button"
+            >
+              <FontAwesomeIcon icon={faCheckToSlot} />
+              My Check-In Code
+            </button>
+          ) : (
+            <div className="spotlight-meta">
+              Check-in code unlocks after your profile is verified.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {statusUpdates.length > 0 && (
+        <section className="bento-card status-bar">
+          <div className="bento-title">
+            <span className="icon-pill">
+              <FontAwesomeIcon icon={faNoteSticky} />
+            </span>
+            Status updates
+          </div>
+          <div className="status-grid">
+            {statusUpdates.map((update, index) => (
+              <div className={`status-card ${update.type}`} key={index}>
+                <FontAwesomeIcon icon={update.icon} />
+                <div>{update.text}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="bento-grid">
+        <section className="bento-card bento-quick">
+          <div className="bento-title">
+            <span className="icon-pill">
+              <FontAwesomeIcon icon={faAddressCard} />
+            </span>
+            Quick access
+          </div>
+          <div className="quick-grid">
+            {quickAccessButtons
+              .filter((button) => button.enabled)
+              .map((button, index) => (
+                <Link href={button.href} className="quick-card" key={index}>
+                  <span className="quick-icon">
+                    <FontAwesomeIcon icon={button.icon} />
+                  </span>
+                  <span className="quick-label">{button.label}</span>
+                </Link>
+              ))}
+          </div>
+        </section>
+
+        <section className="bento-card bento-permissions">
+          <div className="bento-title">
+            <span className="icon-pill">
+              <FontAwesomeIcon icon={faGear} />
+            </span>
+            Permissions
+          </div>
+          <div className="perm-list">
+            {privileges.map((priv, index) => (
+              <div className="perm-item" key={index}>
+                <span>{priv.label}</span>
+                <FontAwesomeIcon
+                  icon={priv.access ? faCheck : faTimes}
+                  className={`status-icon ${
+                    priv.access ? "text-success" : "text-danger"
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
+
+      {showQr && userData?.memberId && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content qr-modal">
+              <div className="modal-header">
+                <h5 className="modal-title">My Check-In Code</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowQr(false)}
+                />
+              </div>
+              <div className="modal-body text-center">
+                {qrLoading && (
+                  <div className="qr-loading">
+                    <LoadingSpinner size="2x" />
+                    <span className="text-muted">Loading QR code...</span>
+                  </div>
+                )}
+                <img
+                  alt="Member QR Code"
+                  className="qr-code"
+                  src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+                    userData.memberId
+                  )}&size=220x220&color=${qrTheme === "dark" ? "ffffff" : "000000"}&bgcolor=${
+                    qrTheme === "dark" ? "121a24" : "fffaf4"
+                  }`}
+                  onLoad={() => setQrLoading(false)}
+                  onError={() => setQrLoading(false)}
+                  style={{ opacity: qrLoading ? 0 : 1 }}
+                />
+                <p className="text-muted mt-3">Show this at event check-in.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
