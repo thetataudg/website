@@ -26,11 +26,25 @@ export default function ProfileInfoEditor({
 }) {
   const socials = member.socialLinks || {};
   const pledgeClassOptions = [
+    "Zeta Gamma",
+    "Eta Gamma",
+    "Theta Gamma",
+    "Iota Gamma",
+    "Kappa Gamma",
+    "Lambda Gamma",
+    "Mu Gamma",
+    "Nu Gamma",
+    "Xi Gamma",
+    "Omicron Gamma",
+    "Pi Gamma",
+    "Rho Gamma",
+    "Sigma Gamma",
     "Tau Gamma",
-    "Alpha Omicron",
-    "Beta Theta",
-    "Tau Theta",
-    "Delta Alpha",
+    "Upsilon Gamma",
+    "Phi Gamma",
+    "Chi Gamma",
+    "Psi Gamma",
+    "Omega Gamma",
   ];
 
   const [form, setForm] = useState({
