@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Bungee } from "next/font/google";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { FaUsers, FaGraduationCap, FaBuilding } from "react-icons/fa"
 
@@ -14,6 +14,10 @@ const bungee = Bungee({
 });
 
 export default function Home() {
+  const [stats, setStats] = useState({ actives: 0, alumni: 0, chapters: 0 });
+  const statsStartedRef = useRef(false);
+  const statsRafRef = useRef<number | null>(null);
+
   useEffect(() => {
     const elements = Array.from(document.querySelectorAll(".reveal"));
     if (!elements.length) return;
@@ -35,6 +39,50 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const statsSection = document.querySelector(".stats-counter");
+    if (!statsSection) return;
+
+    const targets = { actives: 60, alumni: 400, chapters: 90 };
+    const durationMs = 2000;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || statsStartedRef.current) return;
+          statsStartedRef.current = true;
+
+          const start = performance.now();
+          const step = (now: number) => {
+            const progress = Math.min((now - start) / durationMs, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setStats({
+              actives: Math.round(targets.actives * eased),
+              alumni: Math.round(targets.alumni * eased),
+              chapters: Math.round(targets.chapters * eased),
+            });
+
+            if (progress < 1) {
+              statsRafRef.current = requestAnimationFrame(step);
+            }
+          };
+
+          statsRafRef.current = requestAnimationFrame(step);
+          observer.disconnect();
+        });
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(statsSection);
+
+    return () => {
+      observer.disconnect();
+      if (statsRafRef.current !== null) {
+        cancelAnimationFrame(statsRafRef.current);
+      }
+    };
+  }, []);
   return (
     <main className="bg-[#120a0a] pb-16 text-white">
       <section className="relative min-h-[85vh] w-full">
@@ -66,21 +114,21 @@ export default function Home() {
       </section>
 
       {/* Who We Are Section */}
-      <section className="bg-[#120a0a] py-20 reveal">
-        <h2 className={`${bungee.className} text-center text-5xl text-[#b3202a]`}>
+      <section className="bg-[#120a0a] py-28 reveal">
+        <h2 className={`${bungee.className} text-center text-6xl text-[#b3202a]`}>
           Who We Are
         </h2>
 
-        <div className="mx-auto mt-12 grid w-full max-w-7xl grid-cols-1 gap-12 px-6 lg:grid-cols-2">
+        <div className="mx-auto mt-14 grid w-full max-w-[1320px] grid-cols-1 gap-14 px-6 lg:grid-cols-2">
           <div>
-            <div className="flex items-center gap-4 text-base uppercase tracking-[0.35em] text-white/80">
-              <span className="h-[2px] w-20 bg-white/80" />
+            <div className="flex items-center gap-4 text-lg uppercase tracking-[0.45em] text-white/80">
+              <span className="h-[8px] w-24 bg-white/80" />
               <span>Since 1904</span>
             </div>
-            <h3 className={`${bungee.className} mt-6 text-5xl text-[#b3202a]`}>
+            <h3 className={`${bungee.className} mt-6 text-6xl text-[#b3202a]`}>
               We Are Theta Tau
             </h3>
-            <p className="mt-5 text-lg text-white/85">
+            <p className="mt-5 text-xl text-white/85">
               Theta Tau is a co-ed professional engineering fraternity at Arizona
               State University. We are a close-knit brotherhood that pushes our
               members to excel professionally and give back to the community.
@@ -96,7 +144,7 @@ export default function Home() {
           </div>
           <div className="flex items-center justify-center reveal">
             <Image
-              className="h-auto w-[90%] max-w-[620px]"
+              className="h-auto w-full max-w-[720px]"
               src="/Polaroids.png"
               width="583"
               height="454"
@@ -115,7 +163,7 @@ export default function Home() {
         <div className="mx-auto mt-14 flex w-full max-w-7xl flex-col gap-12 px-6">
           <div className="rounded-[32px] bg-[#120a0a] px-10 py-16 shadow-[0_12px_32px_rgba(0,0,0,0.35)] sm:px-14 reveal">
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="order-2 lg:order-1">
+              <div className="order-2 lg:order-1 lg:text-left">
                 <h3 className={`${bungee.className} text-4xl text-[#b3202a]`}>
                   Brotherhood
                 </h3>
@@ -153,7 +201,7 @@ export default function Home() {
                   className="rounded-[44px] w-[95%] max-w-[620px]"
                 />
               </div>
-              <div>
+              <div className="lg:text-right">
                 <h3 className={`${bungee.className} text-4xl text-[#b3202a]`}>
                   Service
                 </h3>
@@ -173,8 +221,8 @@ export default function Home() {
 
           <div className="rounded-[32px] bg-[#120a0a] px-10 py-16 shadow-[0_12px_32px_rgba(0,0,0,0.35)] sm:px-14 reveal">
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="order-2 lg:order-1">
-                <h3 className={`${bungee.className} text-4xl text-[#b3202a]`}>
+              <div className="order-2 text-center lg:order-1 lg:text-left">
+                <h3 className={`${bungee.className} text-3xl sm:text-4xl text-[#b3202a] text-balance`}>
                   Professionalism
                 </h3>
                 <p className="mt-5 text-xl text-white/85">
@@ -201,12 +249,12 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mx-auto mt-14 w-full max-w-5xl rounded-[28px] bg-[#120a0a] px-8 py-12 reveal">
+        <div className="mx-auto mt-14 w-full max-w-5xl rounded-[28px] bg-[#120a0a] px-8 py-12 reveal stats-counter">
           <div className="grid grid-cols-1 gap-10 text-center sm:grid-cols-3">
             <div>
               <FaUsers className="mx-auto" color="#e2ab16" size={72} />
               <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-                70+
+                {stats.actives}+
               </h3>
               <p className="text-sm uppercase tracking-[0.25em] text-white/80">
                 Actives
@@ -215,7 +263,7 @@ export default function Home() {
             <div>
               <FaGraduationCap className="mx-auto" color="#e2ab16" size={72} />
               <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-                200+
+                {stats.alumni}+
               </h3>
               <p className="text-sm uppercase tracking-[0.25em] text-white/80">
                 Alumni
@@ -224,7 +272,7 @@ export default function Home() {
             <div>
               <FaBuilding className="mx-auto" color="#e2ab16" size={72} />
               <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-                90+
+                {stats.chapters}+
               </h3>
               <p className="text-sm uppercase tracking-[0.25em] text-white/80">
                 Chapters

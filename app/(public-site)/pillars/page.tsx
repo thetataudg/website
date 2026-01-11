@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Bungee } from "next/font/google";
 import Professional_ChiLine from "/public/Professional-ChiLine.jpg";
-import Service_BikeSaviors from "/public/Service-BikeSaviors.jpg";
+import Service from "/public/service_4.jpg";
 import Brotherhood_Cookout from "/public/Brotherhood-Cookout.jpg";
 import { SlArrowLeft, SlArrowRight } from "react-icons/sl";
 
@@ -124,7 +124,7 @@ export default function Pillars() {
           fill
           priority
           alt="Theta Tau members at the beach"
-          className="object-cover object-[70%_35%]"
+          className="object-cover object-[80%_30%]"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/60 to-[#120a0a]" />
         <div className="relative z-10 flex h-full flex-col items-start justify-end px-6 pb-10 sm:px-12">
@@ -183,7 +183,7 @@ export default function Pillars() {
 
           <div className="rounded-[28px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]" id="service">
             <Image
-              src={Service_BikeSaviors}
+              src={Service}
               alt="Service"
               className="h-[200px] w-full rounded-[22px] object-cover"
             />

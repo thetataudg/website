@@ -1669,6 +1669,68 @@
   margin-bottom: 10px;
 }
 
+.profile-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 24px;
+}
+
+.profile-content-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-card {
+  border-radius: 1.5rem;
+  border: 1px solid var(--tt-line);
+  background: rgba(255, 255, 255, 0.88);
+  padding: 18px;
+}
+
+.profile-card .border {
+  border-color: var(--tt-line) !important;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 1.25rem !important;
+}
+
+.profile-card .rounded {
+  border-radius: 1.25rem !important;
+}
+
+.profile-card p:last-child {
+  margin-bottom: 0;
+}
+
+.profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tt-line);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--tt-ink);
+}
+
+.members-shell[data-theme="dark"] .profile-card {
+  background: rgba(18, 26, 36, 0.9);
+  border-color: rgba(56, 80, 110, 0.4);
+}
+
+.members-shell[data-theme="dark"] .profile-card .border {
+  background: rgba(12, 17, 26, 0.9);
+  border-color: rgba(56, 80, 110, 0.45) !important;
+}
+
+.members-shell[data-theme="dark"] .profile-pill {
+  background: rgba(15, 22, 33, 0.9);
+  border-color: rgba(56, 80, 110, 0.4);
+  color: var(--tt-ink);
+}
+
 .profile-tabs {
   display: flex;
   gap: 10px;
@@ -1721,6 +1783,10 @@
 
   .profile-stats {
     justify-content: center;
+  }
+
+  .profile-content-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2167,6 +2233,10 @@
   color: var(--tt-ink);
 }
 
+.members-shell[data-theme="dark"] .form-control::placeholder {
+  color: rgba(231, 238, 246, 0.6);
+}
+
 .members-shell[data-theme="dark"] .btn-outline-secondary {
   color: var(--tt-ink-soft);
   border-color: rgba(56, 80, 110, 0.4);
@@ -2248,6 +2318,33 @@
 
 .members-shell[data-theme="dark"] .modal-header .btn-close:hover {
   opacity: 1;
+}
+
+.profile-editor-modal {
+  max-width: 1100px;
+}
+
+.profile-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-editor__section {
+  border-radius: 18px;
+  border: 1px solid var(--tt-line);
+  background: rgba(255, 255, 255, 0.85);
+  padding: 18px;
+}
+
+.members-shell[data-theme="dark"] .profile-editor__section {
+  background: rgba(12, 17, 26, 0.9);
+  border-color: rgba(56, 80, 110, 0.4);
+}
+
+.members-shell[data-theme="dark"] .profile-editor__section .border {
+  background: rgba(9, 14, 22, 0.9);
+  border-color: rgba(56, 80, 110, 0.4) !important;
 }
 
 .members-shell[data-theme="dark"] .modal-footer {

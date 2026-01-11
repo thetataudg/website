@@ -167,7 +167,7 @@ export default function About() {
           <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
             Our Pillars
           </p>
-          <h2 className={`${bungee.className} mt-3 text-4xl text-[#b3202a]`}>
+          <h2 className={`${bungee.className} mt-3 text-3xl text-[#b3202a] sm:text-4xl`}>
             Brotherhood, Professionalism, Service
           </h2>
         </div>
