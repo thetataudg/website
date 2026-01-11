@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Brothers",
   description:
-    "Meet active members, alumni, and chapter leadership of Theta Tau Delta Gamma.",
+    "Meet active members, alumni, and chapter officers of Theta Tau Delta Gamma.",
 };
 
 export default function BrothersLayout({

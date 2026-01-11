@@ -50,7 +50,7 @@ export default function BrothersPage() {
   const [committeeHeadMap, setCommitteeHeadMap] = useState<
     Record<string, string[]>
   >({});
-  const [filter, setFilter] = useState<"Active" | "Alumni" | "Leaders">(
+  const [filter, setFilter] = useState<"Active" | "Alumni" | "Officers">(
     "Active"
   );
   const router = useRouter();
@@ -125,7 +125,7 @@ export default function BrothersPage() {
       (m) => ["Active", "Alumni"].includes(m.status || "") && m.role !== "superadmin"
     );
     const filtered = normalized.filter((member) => {
-      if (filter === "Leaders") {
+      if (filter === "Officers") {
         return (
           member.isECouncil ||
           member.isCommitteeHead
@@ -141,17 +141,17 @@ export default function BrothersPage() {
   }, [members, filter]);
 
   const leadersEcouncil = useMemo(() => {
-    if (filter !== "Leaders") return [];
+    if (filter !== "Officers") return [];
     return filteredMembers.filter((m) => m.isECouncil);
   }, [filteredMembers, filter]);
 
   const leadersCommitteeHeads = useMemo(() => {
-    if (filter !== "Leaders") return [];
+    if (filter !== "Officers") return [];
     return filteredMembers.filter((m) => m.isCommitteeHead && !m.isECouncil);
   }, [filteredMembers, filter]);
 
   const emptyCopy =
-    filter === "Leaders"
+    filter === "Officers"
       ? "No leaders found yet."
       : `No ${filter.toLowerCase()} members found.`;
 
@@ -203,12 +203,12 @@ export default function BrothersPage() {
               Chapter Directory
             </h2>
             <p className="mt-2 text-base text-[#1b0f0f]/75">
-              Browse active members, alumni, or chapter leadership.
+              Browse active members, alumni, or chapter officers.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex rounded-full bg-[#120a0a] p-1 text-xs uppercase tracking-[0.3em] text-[#f5d79a]">
-              {(["Active", "Alumni", "Leaders"] as const).map((option) => (
+              {(["Active", "Alumni", "Officers"] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
@@ -237,7 +237,7 @@ export default function BrothersPage() {
           </div>
         ) : (
           <>
-            {filter === "Leaders" ? (
+            {filter === "Officers" ? (
               <div className="space-y-10">
                 <div>
                   <div className="mb-5 flex items-center justify-between">
