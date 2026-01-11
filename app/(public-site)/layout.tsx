@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
-import Head from 'next/head';
 import Script from 'next/script';
 import { ClerkProvider } from "@clerk/nextjs";
 
@@ -22,9 +21,32 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "ASU Theta Tau - Delta Gamma Chapter",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "http://localhost:3000"
+  ),
+  title: {
+    default: "ASU Theta Tau - Delta Gamma Chapter",
+    template: "%s | ASU Theta Tau - Delta Gamma Chapter",
+  },
   description:
     "Theta Tau, Delta Gamma chapter is a coed professional engineering fraternity at Arizona State University in Tempe, AZ.",
+  openGraph: {
+    title: "ASU Theta Tau - Delta Gamma Chapter",
+    description:
+      "Theta Tau, Delta Gamma chapter is a coed professional engineering fraternity at Arizona State University in Tempe, AZ.",
+    url: "/",
+    siteName: "ASU Theta Tau - Delta Gamma Chapter",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ASU Theta Tau - Delta Gamma Chapter",
+    description:
+      "Theta Tau, Delta Gamma chapter is a coed professional engineering fraternity at Arizona State University in Tempe, AZ.",
+  },
 };
 
 export default function RootLayout({
