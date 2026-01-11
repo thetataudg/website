@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { Types } from "mongoose";
 
 export async function GET(
   _req: Request,
@@ -13,9 +14,9 @@ export async function GET(
 
     const member = await Member.findOne({ rollNo: params.rollNo })
       .select("_id")
-      .lean();
+      .lean<{ _id: Types.ObjectId }>();
 
-    if (!member?._id) {
+    if (!member) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
