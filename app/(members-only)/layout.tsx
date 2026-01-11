@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Navbar from "./components/Navbar.js";
 import { ClerkProvider } from "@clerk/nextjs";
 
@@ -9,6 +10,12 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./members.css";
 
 import { useEffect } from "react";
+
+export const metadata: Metadata = {
+  title: "Members",
+  description:
+    "Theta Tau Delta Gamma Chapter Tools for active members and leadership.",
+};
 
 export default function RootLayout({
   children,

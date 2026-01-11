@@ -166,11 +166,11 @@ export default function Rush() {
     <main className="bg-[#120a0a] pb-16 text-white">
       <section className="relative min-h-[70vh] w-full">
         <Image
-          src="/tabling_1.jpg"
+          src="/mth.jpg"
           fill
           priority
-          alt="Theta Tau rush events"
-          className="object-cover object-[50%_20%]"
+          alt="Theta Tau rush tabling"
+          className="object-cover object-[40%_40%]"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/55 to-[#120a0a]" />
         <div className="relative z-10 flex min-h-[70vh] flex-col items-start justify-end px-6 pb-12 sm:px-12">

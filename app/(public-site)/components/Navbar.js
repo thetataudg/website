@@ -45,6 +45,11 @@ const Navbar = () => {
       linkname: "Merch",
       target: "/merch",
     },
+    {
+      id: 6,
+      linkname: "Brothers",
+      target: "/brothers",
+    },
   ];
 
   const handleMemberNavigation = () => {

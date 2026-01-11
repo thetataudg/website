@@ -33,6 +33,12 @@ export default function BrotherDetailClient({
   const [attendanceEnd, setAttendanceEnd] = useState("");
 
   const { isLoaded, isSignedIn } = useAuth();
+  const skills = (member.skills || []).filter(Boolean);
+  const projects = (member.projects || []).filter((p) => p?.title || p?.description || p?.link);
+  const work = (member.work || []).filter((w) => w?.title || w?.organization || w?.description);
+  const awards = (member.awards || []).filter((a) => a?.title || a?.issuer || a?.description);
+  const funFacts = (member.funFacts || []).filter(Boolean);
+  const customSections = (member.customSections || []).filter((s) => s?.title || s?.body);
 
   const profileMemberId =
     typeof (member as any)?._id === "string"
@@ -171,6 +177,12 @@ export default function BrotherDetailClient({
               {member.fName} {member.lName}
             </h2>
             <p className="profile-subtitle">{member.hometown}</p>
+            {member.headline && (
+              <p className="text-muted mb-1">{member.headline}</p>
+            )}
+            {member.pronouns && (
+              <span className="profile-pill">{member.pronouns}</span>
+            )}
           </div>
 
           <div className="profile-stats">
@@ -212,85 +224,197 @@ export default function BrotherDetailClient({
 
             {(!isPrivileged || activeTab === "profile") && (
               <>
-                {member.bio && (
-                  <section className="mb-4">
-                    <h4 className="profile-section-title">About</h4>
-                    <p>{member.bio}</p>
-                  </section>
-                )}
+                <div className="profile-content-grid">
+                  <div className="profile-content-stack">
+                    <section className="profile-card">
+                      <h4 className="profile-section-title">About</h4>
+                      <p>{member.bio || "This brother is still building their profile."}</p>
+                    </section>
 
-                <section className="mb-4">
-                  <h4 className="profile-section-title">Education</h4>
-                  <p>
-                    <strong>Majors:</strong> {member.majors.join(", ")}
-                  </p>
-                  <p>
-                    <strong>Graduation Year:</strong> {member.gradYear}
-                  </p>
-                </section>
+                    {projects.length > 0 && (
+                      <section className="profile-card">
+                        <h4 className="profile-section-title">Projects</h4>
+                        <div className="d-flex flex-column gap-3">
+                          {projects.map((project, idx) => (
+                            <div key={`project-${idx}`} className="border rounded p-3">
+                              <div className="fw-semibold">{project.title || "Project"}</div>
+                              {project.description && <p className="mb-2">{project.description}</p>}
+                              {project.link && (
+                                <a href={project.link} target="_blank" rel="noreferrer">
+                                  {project.link}
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
-                <section className="mb-4">
-                  <h4 className="profile-section-title">Fraternity Info</h4>
-                  <p>
-                    <strong>Committees:</strong>{" "}
-                    {committees.length
-                      ? committees.map((c) => c.name).join(", ")
-                      : "None"}
-                  </p>
-                  <p>
-                    <strong>Pledge Class:</strong> {member.pledgeClass || "—"}
-                  </p>
-                  {member.bigs?.length > 0 && (
-                    <p className="mb-1">
-                      <strong>Big{member.bigs.length > 1 ? "s" : ""}:</strong>{" "}
-                      {member.bigs
-                        .map((b: any) =>
-                          typeof b === "string"
-                            ? b
-                            : `${b.fName ?? ""} ${b.lName ?? ""}`.trim()
-                        )
-                        .join(", ")}
-                    </p>
-                  )}
-                  {member.littles?.length > 0 && (
-                    <p>
-                      <strong>
-                        Little{member.littles.length > 1 ? "s" : ""}:
-                      </strong>{" "}
-                      {member.littles
-                        .map((l: any) =>
-                          typeof l === "string"
-                            ? l
-                            : `${l.fName ?? ""} ${l.lName ?? ""}`.trim()
-                        )
-                        .join(", ")}
-                    </p>
-                  )}
-                </section>
+                    {work.length > 0 && (
+                      <section className="profile-card">
+                        <h4 className="profile-section-title">Work & Internships</h4>
+                        <div className="d-flex flex-column gap-3">
+                          {work.map((item, idx) => (
+                            <div key={`work-${idx}`} className="border rounded p-3">
+                              <div className="fw-semibold">
+                                {item.title || "Role"} {item.organization ? `• ${item.organization}` : ""}
+                              </div>
+                              {(item.start || item.end) && (
+                                <div className="text-muted">
+                                  {[item.start, item.end].filter(Boolean).join(" - ")}
+                                </div>
+                              )}
+                              {item.description && <p className="mb-2">{item.description}</p>}
+                              {item.link && (
+                                <a href={item.link} target="_blank" rel="noreferrer">
+                                  {item.link}
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
-                {member.resumeUrl ? (
-                  <div className="mt-4 d-flex flex-wrap gap-2">
-                    <a
-                      href={member.resumeUrl}
-                      download
-                      className="btn btn-outline-secondary"
-                    >
-                      <FontAwesomeIcon icon={faDownload} className="me-1" />
-                      Download Résumé
-                    </a>
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => setShowPreview(true)}
-                    >
-                      <FontAwesomeIcon icon={faEye} className="me-1" />
-                      Preview Résumé
-                    </button>
+                    {awards.length > 0 && (
+                      <section className="profile-card">
+                        <h4 className="profile-section-title">Awards & Certifications</h4>
+                        <div className="d-flex flex-column gap-3">
+                          {awards.map((award, idx) => (
+                            <div key={`award-${idx}`} className="border rounded p-3">
+                              <div className="fw-semibold">
+                                {award.title || "Award"} {award.issuer ? `• ${award.issuer}` : ""}
+                              </div>
+                              {award.date && <div className="text-muted">{award.date}</div>}
+                              {award.description && <p className="mb-0">{award.description}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    {customSections.length > 0 && (
+                      <section className="profile-card">
+                        <h4 className="profile-section-title">More</h4>
+                        <div className="d-flex flex-column gap-3">
+                          {customSections.map((section, idx) => (
+                            <div key={`section-${idx}`} className="border rounded p-3">
+                              <div className="fw-semibold">{section.title || "Section"}</div>
+                              {section.body && <p className="mb-0">{section.body}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
                   </div>
-                ) : (
-                  <div className="alert alert-warning mt-4" role="alert">
-                    {member.fName} hasn't uploaded a resume yet.
+
+                  <div className="profile-content-stack">
+                    <section className="profile-card">
+                      <h4 className="profile-section-title">Education</h4>
+                      <p>
+                        <strong>Majors:</strong> {member.majors.join(", ")}
+                      </p>
+                      {member.minors?.length ? (
+                        <p>
+                          <strong>Minors:</strong> {member.minors.join(", ")}
+                        </p>
+                      ) : null}
+                      <p>
+                        <strong>Graduation Year:</strong> {member.gradYear}
+                      </p>
+                    </section>
+
+                    <section className="profile-card">
+                      <h4 className="profile-section-title">Fraternity Info</h4>
+                      <p>
+                        <strong>Committees:</strong>{" "}
+                        {committees.length
+                          ? committees.map((c) => c.name).join(", ")
+                          : "None"}
+                      </p>
+                      <p>
+                        <strong>Pledge Class:</strong> {member.pledgeClass || "—"}
+                      </p>
+                      {member.bigs?.length > 0 && (
+                        <p className="mb-1">
+                          <strong>Big{member.bigs.length > 1 ? "s" : ""}:</strong>{" "}
+                          {member.bigs
+                            .map((b: any) =>
+                              typeof b === "string"
+                                ? b
+                                : `${b.fName ?? ""} ${b.lName ?? ""}`.trim()
+                            )
+                            .join(", ")}
+                        </p>
+                      )}
+                      {member.littles?.length > 0 && (
+                        <p>
+                          <strong>
+                            Little{member.littles.length > 1 ? "s" : ""}:
+                          </strong>{" "}
+                          {member.littles
+                            .map((l: any) =>
+                              typeof l === "string"
+                                ? l
+                                : `${l.fName ?? ""} ${l.lName ?? ""}`.trim()
+                            )
+                            .join(", ")}
+                        </p>
+                      )}
+                    </section>
+
+                    {skills.length > 0 && (
+                      <section className="profile-card">
+                        <h4 className="profile-section-title">Skills</h4>
+                        <div className="d-flex flex-wrap gap-2">
+                          {skills.map((skill, idx) => (
+                            <span key={`${skill}-${idx}`} className="profile-pill">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    {funFacts.length > 0 && (
+                      <section className="profile-card">
+                        <h4 className="profile-section-title">Fun Facts</h4>
+                        <ul className="mb-0">
+                          {funFacts.map((fact, idx) => (
+                            <li key={`fact-${idx}`}>{fact}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    <section className="profile-card">
+                      <h4 className="profile-section-title">Resume</h4>
+                      {member.resumeUrl ? (
+                        <div className="d-flex flex-wrap gap-2">
+                          <a
+                            href={member.resumeUrl}
+                            download
+                            className="btn btn-outline-secondary"
+                          >
+                            <FontAwesomeIcon icon={faDownload} className="me-1" />
+                            Download Résumé
+                          </a>
+                          <button
+                            className="btn btn-outline-secondary"
+                            onClick={() => setShowPreview(true)}
+                          >
+                            <FontAwesomeIcon icon={faEye} className="me-1" />
+                            Preview Résumé
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="alert alert-warning mt-2" role="alert">
+                          {member.fName} hasn&apos;t uploaded a resume yet.
+                        </div>
+                      )}
+                    </section>
                   </div>
-                )}
+                </div>
               </>
             )}
 

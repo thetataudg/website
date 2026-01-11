@@ -36,7 +36,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks"
     )
     .lean() as any;
 
@@ -79,10 +79,35 @@ export async function PATCH(req: Request) {
   const updates = await req.json();
   logger.info({ clerkId, updates }, "Self-profile update requested");
 
+  const sanitized: any = {};
+  const assignIf = (key: string, value: any) => {
+    if (value !== undefined) sanitized[key] = value;
+  };
+
+  const ensureArray = (value: any) => (Array.isArray(value) ? value : undefined);
+
+  assignIf("headline", updates.headline);
+  assignIf("pronouns", updates.pronouns);
+  assignIf("majors", ensureArray(updates.majors));
+  assignIf("minors", ensureArray(updates.minors));
+  assignIf("gradYear", updates.gradYear);
+  assignIf("pledgeClass", updates.pledgeClass);
+  assignIf("bio", updates.bio);
+  assignIf("hometown", updates.hometown);
+  assignIf("skills", ensureArray(updates.skills));
+  assignIf("funFacts", ensureArray(updates.funFacts));
+  assignIf("projects", ensureArray(updates.projects));
+  assignIf("work", ensureArray(updates.work));
+  assignIf("awards", ensureArray(updates.awards));
+  assignIf("customSections", ensureArray(updates.customSections));
+  assignIf("socialLinks", updates.socialLinks);
+
   await connectDB();
-  const member = await Member.findOneAndUpdate({ clerkId }, updates, {
-    new: true,
-  }).lean();
+  const member = await Member.findOneAndUpdate(
+    { clerkId },
+    { $set: sanitized },
+    { new: true, runValidators: true, strict: false }
+  ).lean();
 
   if (!member) {
     logger.error({ clerkId }, "Self‐profile update failed: not found");

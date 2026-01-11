@@ -34,7 +34,7 @@ const Footer = () => {
               <p className={`${bungee.className} mt-2 text-base uppercase text-[#1b0f0f]`}>
                 Delta Gamma Chapter
               </p>
-              <p className={`${bungee.className} text-base uppercase text-[#1b0f0f]`}>
+              <p className={`${bungee.className} mt-2 text-base uppercase text-[#1b0f0f]`}>
                 Arizona State University
               </p>
             </div>
@@ -45,7 +45,7 @@ const Footer = () => {
               <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
                 Contacts
               </h2>
-              <ul className={`${bungee.className} space-y-3 text-base text-[#1b0f0f] whitespace-nowrap`}>
+              <ul className="space-y-3 text-base text-[#1b0f0f] whitespace-nowrap">
                 <li>Regent - Roen Wainscoat</li>
                 <li>Vice Regent - Kyler Eenhuis</li>
                 <li>Rush Chair - Pari Pandey</li>
@@ -64,7 +64,7 @@ const Footer = () => {
               <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
                 Links
               </h2>
-              <ul className={`${bungee.className} space-y-3 text-base text-[#1b0f0f]`}>
+              <ul className="space-y-3 text-base text-[#1b0f0f]">
                 <li>
                   <Link href="/about" className="underline underline-offset-4">
                     About
@@ -76,8 +76,8 @@ const Footer = () => {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/regionals" className="underline underline-offset-4">
-                    Regionals
+                  <Link href="/merch" className="underline underline-offset-4">
+                    Merch
                   </Link>
                 </li>
               </ul>
@@ -87,7 +87,7 @@ const Footer = () => {
               <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
                 Members Only
               </h2>
-              <div className={`${bungee.className} text-base text-[#1b0f0f]`}>
+              <div className="text-base text-[#1b0f0f]">
                 <SignedOut>
                   <SignInButton />
                 </SignedOut>
@@ -101,7 +101,7 @@ const Footer = () => {
               <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
                 Pillars
               </h2>
-              <ul className={`${bungee.className} space-y-3 text-base text-[#1b0f0f]`}>
+              <ul className="space-y-3 text-base text-[#1b0f0f]">
                 <li>
                   <Link
                     href="/pillars#brotherhood"
