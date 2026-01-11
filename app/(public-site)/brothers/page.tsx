@@ -140,19 +140,19 @@ export default function BrothersPage() {
     });
   }, [members, filter]);
 
-  const leadersEcouncil = useMemo(() => {
+  const officersEcouncil = useMemo(() => {
     if (filter !== "Officers") return [];
     return filteredMembers.filter((m) => m.isECouncil);
   }, [filteredMembers, filter]);
 
-  const leadersCommitteeHeads = useMemo(() => {
+  const officersCommitteeHeads = useMemo(() => {
     if (filter !== "Officers") return [];
     return filteredMembers.filter((m) => m.isCommitteeHead && !m.isECouncil);
   }, [filteredMembers, filter]);
 
   const emptyCopy =
     filter === "Officers"
-      ? "No leaders found yet."
+      ? "No Officers found yet."
       : `No ${filter.toLowerCase()} members found.`;
 
   const getHeadCommittees = (rollNo: string) =>
@@ -245,11 +245,11 @@ export default function BrothersPage() {
                       E-Council
                     </h3>
                     <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
-                      {leadersEcouncil.length} members
+                      {officersEcouncil.length} members
                     </span>
                   </div>
                   <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {leadersEcouncil.map((member, index) => (
+                    {officersEcouncil.map((member, index) => (
                       <div
                         key={member.rollNo}
                         role="link"
@@ -340,11 +340,11 @@ export default function BrothersPage() {
                       Committee Heads
                     </h3>
                     <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
-                      {leadersCommitteeHeads.length} members
+                      {officersCommitteeHeads.length} members
                     </span>
                   </div>
                   <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {leadersCommitteeHeads.map((member, index) => (
+                    {officersCommitteeHeads.map((member, index) => (
                       <div
                         key={member.rollNo}
                         role="link"
