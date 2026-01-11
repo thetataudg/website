@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+
 export const metadata = {
   title: "Member Portal",
   description:
@@ -6,6 +8,7 @@ export const metadata = {
 
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../(members-only)/members.css";
+import Navbar from "../(members-only)/components/Navbar.js";
 
 export default function RootLayout({
   children,
@@ -13,10 +16,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="members-shell" data-theme="light">
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body className="members-shell" data-theme="light">
+          <Navbar />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
