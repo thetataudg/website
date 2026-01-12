@@ -7,6 +7,7 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import { NextResponse } from "next/server";
 import logger from "@/lib/logger";
+import { maybePresignUrl } from "@/lib/garage";
 
 export async function GET() {
   try {
@@ -15,7 +16,15 @@ export async function GET() {
 
     logger.info(`Fetched ${members.length} members from database`);
 
-    return NextResponse.json(members, {
+    const signedMembers = await Promise.all(
+      members.map(async (member: any) => ({
+        ...member,
+        profilePicUrl: await maybePresignUrl(member.profilePicUrl),
+        resumeUrl: await maybePresignUrl(member.resumeUrl),
+      }))
+    );
+
+    return NextResponse.json(signedMembers, {
       status: 200,
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",

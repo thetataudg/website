@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { clerkClient } from "@clerk/clerk-sdk-node";
+import { maybePresignUrl } from "@/lib/garage";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,11 @@ export async function GET(
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
-  return NextResponse.json(member);
+  return NextResponse.json({
+    ...member,
+    profilePicUrl: await maybePresignUrl((member as any).profilePicUrl),
+    resumeUrl: await maybePresignUrl((member as any).resumeUrl),
+  });
 }
 
 export async function PATCH(

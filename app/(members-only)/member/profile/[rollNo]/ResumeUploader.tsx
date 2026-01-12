@@ -20,24 +20,60 @@ export default function ResumeUploader({
   onClose,
   onError,
 }: ResumeUploaderProps) {
+  const maxBytes = 5 * 1024 * 1024;
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const router = useRouter();
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFile(e.target.files?.[0] ?? null);
+    const f = e.target.files?.[0] ?? null;
+    if (f && f.size > maxBytes) {
+      setFile(null);
+      onError("File too large. Max size is 5 MB.");
+      return;
+    }
+    setFile(f);
   };
 
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    const fd = new FormData();
-    fd.append("resume", file);
 
     try {
-      const res = await fetch("/api/upload-file", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
-      await res.json();
+      const presignRes = await fetch("/api/upload-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "presign",
+          kind: "resume",
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+        }),
+      });
+      if (!presignRes.ok) {
+        throw new Error(`Upload failed: ${await presignRes.text()}`);
+      }
+      const presignData = await presignRes.json();
+      const uploadRes = await fetch(presignData.uploadUrl, {
+        method: "PUT",
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed: ${await uploadRes.text()}`);
+      }
+      const completeRes = await fetch("/api/upload-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "complete",
+          kind: "resume",
+          key: presignData.key,
+        }),
+      });
+      if (!completeRes.ok) {
+        throw new Error(`Upload failed: ${await completeRes.text()}`);
+      }
       onClose();
       router.refresh();
     } catch (err: any) {
@@ -70,6 +106,7 @@ export default function ResumeUploader({
                 className="form-control"
                 onChange={onSelect}
               />
+              <div className="form-text">Max file size: 5 MB.</div>
             </div>
             {file && <p>Will upload: {file.name}</p>}
           </div>
