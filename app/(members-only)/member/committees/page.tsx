@@ -15,6 +15,7 @@ export default async function CommitteesPage() {
     (host ? `${forwardedProto ?? "https"}://${host}` : "");
 
   let committees = [];
+  let errorMessage: string | null = null;
   if (baseUrl) {
     try {
       const res = await fetch(`${baseUrl}/api/committees`, {
@@ -24,13 +25,17 @@ export default async function CommitteesPage() {
       if (res.ok) {
         committees = await res.json();
       } else {
-        console.error("Failed to load committees", res.status, await res.text());
+        const body = await res.text();
+        console.error("Failed to load committees", res.status, body);
+        errorMessage = "Unable to load committees right now.";
       }
     } catch (err) {
       console.error("Failed to load committees", err);
+      errorMessage = "Unable to load committees right now.";
     }
   } else {
     console.error("Failed to resolve base URL for committees fetch");
+    errorMessage = "Unable to load committees right now.";
   }
-  return <CommitteesClient committees={committees} />;
+  return <CommitteesClient committees={committees} error={errorMessage} />;
 }
