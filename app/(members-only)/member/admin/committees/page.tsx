@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faUsers,
+  faUserTie,
+  faSquarePlus,
+  faPenToSquare,
+  faTrash,
+  faCircleInfo,
+  faUserGroup,
+} from "@fortawesome/free-solid-svg-icons";
 
 type Member = {
   _id: string;
@@ -182,6 +192,7 @@ export default function CommitteesPage() {
         <div className="admin-members-header">
           <h2>Manage Committees</h2>
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            <FontAwesomeIcon icon={faSquarePlus} className="me-2" />
             Add Committee
           </button>
         </div>
@@ -216,12 +227,14 @@ export default function CommitteesPage() {
                         className="btn btn-sm btn-outline-primary me-2"
                         onClick={() => startEdit(c)}
                       >
+                        <FontAwesomeIcon icon={faPenToSquare} className="me-1" />
                         Edit
                       </button>
                       <button
                         className="btn btn-sm btn-outline-danger"
                         onClick={() => setDeleteId(c._id)}
                       >
+                        <FontAwesomeIcon icon={faTrash} className="me-1" />
                         Delete
                       </button>
                     </td>
@@ -279,10 +292,13 @@ export default function CommitteesPage() {
           className="modal fade show"
           style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
         >
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+          <div className="modal-dialog modal-lg modal-dialog-centered committee-modal">
             <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Create Committee</h5>
+              <div className="modal-header committee-modal__header">
+                <h5 className="modal-title d-flex align-items-center gap-2">
+                  <FontAwesomeIcon icon={faUsers} />
+                  Create Committee
+                </h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -292,7 +308,10 @@ export default function CommitteesPage() {
               <div className="modal-body">
                 <form onSubmit={saveCommittee} className="row g-3">
                   <div className="col-md-6">
-                    <label className="form-label">Committee Name</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faCircleInfo} />
+                      Committee Name
+                    </label>
                     <input
                       className="form-control"
                       value={form.name}
@@ -303,7 +322,10 @@ export default function CommitteesPage() {
                     />
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label">Committee Head</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faUserTie} />
+                      Committee Head
+                    </label>
                     <SingleMemberPicker
                       members={activeMembers}
                       value={form.committeeHeadId}
@@ -320,7 +342,10 @@ export default function CommitteesPage() {
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Description</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faCircleInfo} />
+                      Description
+                    </label>
                     <textarea
                       className="form-control"
                       rows={2}
@@ -331,7 +356,10 @@ export default function CommitteesPage() {
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Committee Members</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faUserGroup} />
+                      Committee Members
+                    </label>
                     <MemberPicker
                       members={activeMembers}
                       value={form.committeeMembers}
@@ -374,10 +402,13 @@ export default function CommitteesPage() {
           className="modal fade show"
           style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
         >
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+          <div className="modal-dialog modal-lg modal-dialog-centered committee-modal">
             <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Edit Committee</h5>
+              <div className="modal-header committee-modal__header">
+                <h5 className="modal-title d-flex align-items-center gap-2">
+                  <FontAwesomeIcon icon={faPenToSquare} />
+                  Edit Committee
+                </h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -396,7 +427,10 @@ export default function CommitteesPage() {
               <div className="modal-body">
                 <form onSubmit={saveEdit} className="row g-3">
                   <div className="col-md-6">
-                    <label className="form-label">Committee Name</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faCircleInfo} />
+                      Committee Name
+                    </label>
                     <input
                       className="form-control"
                       value={editForm.name}
@@ -407,7 +441,10 @@ export default function CommitteesPage() {
                     />
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label">Committee Head</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faUserTie} />
+                      Committee Head
+                    </label>
                     <SingleMemberPicker
                       members={activeMembers}
                       value={editForm.committeeHeadId}
@@ -424,7 +461,10 @@ export default function CommitteesPage() {
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Description</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faCircleInfo} />
+                      Description
+                    </label>
                     <textarea
                       className="form-control"
                       rows={2}
@@ -435,7 +475,10 @@ export default function CommitteesPage() {
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Committee Members</label>
+                    <label className="form-label d-flex align-items-center gap-2">
+                      <FontAwesomeIcon icon={faUserGroup} />
+                      Committee Members
+                    </label>
                     <MemberPicker
                       members={activeMembers}
                       value={editForm.committeeMembers}

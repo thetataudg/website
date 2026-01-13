@@ -7,10 +7,46 @@ const PendingMemberSchema = new Schema(
     fName: { type: String, required: true },
     lName: { type: String, required: true },
     majors: [{ type: String }],
+    minors: [{ type: String }],
     gradYear: { type: Number, required: true },
     bigs: [{ type: Schema.Types.ObjectId, ref: "Member" }],
     littles: [{ type: Schema.Types.ObjectId, ref: "Member" }],
     bio: { type: String },
+    headline: { type: String },
+    pronouns: { type: String },
+    skills: [{ type: String }],
+    funFacts: [{ type: String }],
+    projects: [
+      {
+        title: { type: String },
+        description: { type: String },
+        link: { type: String },
+      },
+    ],
+    work: [
+      {
+        title: { type: String },
+        organization: { type: String },
+        start: { type: String },
+        end: { type: String },
+        description: { type: String },
+        link: { type: String },
+      },
+    ],
+    awards: [
+      {
+        title: { type: String },
+        issuer: { type: String },
+        date: { type: String },
+        description: { type: String },
+      },
+    ],
+    customSections: [
+      {
+        title: { type: String },
+        body: { type: String },
+      },
+    ],
     committees: [{ type: String }],
     familyLine: { type: String },
     pledgeClass: { type: String },

@@ -25,6 +25,7 @@ type Member = {
   isCommitteeHead?: boolean;
   profilePicUrl?: string;
   socialLinks?: { github?: string; linkedin?: string };
+  isHidden?: boolean;
 };
 
 const fallbackGradients = [
@@ -53,6 +54,8 @@ export default function BrothersPage() {
   const [filter, setFilter] = useState<"Active" | "Alumni" | "Officers">(
     "Active"
   );
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -122,7 +125,10 @@ export default function BrothersPage() {
 
   const filteredMembers = useMemo(() => {
     const normalized = members.filter(
-      (m) => ["Active", "Alumni"].includes(m.status || "") && m.role !== "superadmin"
+      (m) =>
+        ["Active", "Alumni"].includes(m.status || "") &&
+        m.role !== "superadmin" &&
+        !m.isHidden
     );
     const filtered = normalized.filter((member) => {
       if (filter === "Officers") {
@@ -133,12 +139,18 @@ export default function BrothersPage() {
       }
       return member.status === filter;
     });
-    return filtered.sort((a, b) => {
+    const searched = query.trim()
+      ? filtered.filter((member) => {
+          const haystack = `${member.rollNo} ${member.fName} ${member.lName} ${member.majors?.join(" ") ?? ""}`.toLowerCase();
+          return haystack.includes(query.trim().toLowerCase());
+        })
+      : filtered;
+    return searched.sort((a, b) => {
       const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
       const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
       return aNum - bNum;
     });
-  }, [members, filter]);
+  }, [members, filter, query]);
 
   const officersEcouncil = useMemo(() => {
     if (filter !== "Officers") return [];
@@ -222,6 +234,23 @@ export default function BrothersPage() {
                   {option}
                 </button>
               ))}
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#120a0a]/15 bg-white px-4 py-2 text-xs uppercase tracking-[0.3em] text-[#120a0a]">
+              <button
+                type="button"
+                className="rounded-full border border-[#120a0a]/20 bg-transparent px-3 py-1 text-[0.62rem] uppercase tracking-[0.28em] text-[#120a0a] transition hover:border-[#120a0a]/40"
+                onClick={() => setShowSearch((v) => !v)}
+              >
+                Search Members
+              </button>
+              {showSearch && (
+                <input
+                  className="w-36 bg-transparent text-xs uppercase tracking-[0.28em] text-[#120a0a] outline-none sm:w-48"
+                  placeholder="Search names..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              )}
             </div>
             <div className="rounded-full bg-[#120a0a] px-6 py-3 text-sm uppercase tracking-[0.3em] text-[#f5d79a]">
               {loading ? "Loading..." : `${filteredMembers.length} brothers`}

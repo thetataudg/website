@@ -1,6 +1,6 @@
 // types/member.ts
 export interface MemberDoc {
-  clerkId: string;
+  clerkId?: string;
   rollNo: string;
   fName: string;
   lName: string;
@@ -49,4 +49,5 @@ export interface MemberDoc {
   role: string;
   profilePicUrl?: string;
   resumeUrl?: string;
+  isHidden?: boolean;
 }

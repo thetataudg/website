@@ -1,11 +1,11 @@
 // app/api/uploads/route.ts
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/clerk";
+import { requireAuth, requireRole } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import path from "path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const runtime = "nodejs";
@@ -94,15 +94,6 @@ export async function POST(req: Request) {
   logger.info({ clerkId }, "Upload request started");
   await connectDB();
 
-  const member = await Member.findOne({ clerkId })
-    .select("rollNo")
-    .lean<{ rollNo: string }>();
-  if (!member) {
-    logger.error({ clerkId }, "Upload failed: no member found");
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
-  const rollNo = member.rollNo;
-
   const clockOffsetMs = await resolveClockOffsetMs();
   const signingRegion =
     process.env.GARAGE_SIGNING_REGION ||
@@ -120,19 +111,76 @@ export async function POST(req: Request) {
     );
   }
 
-  const maxBytes = 5 * 1024 * 1024;
-  const out: Record<string, string> = {};
-  const update: Partial<{ profilePicUrl: string; resumeUrl: string }> = {};
-  const allowed = {
-    photo: [".jpg", ".jpeg", ".png"],
-    resume: [".pdf", ".doc", ".docx"],
-  };
+const maxBytes = 5 * 1024 * 1024;
+const out: Record<string, string> = {};
+const update: Partial<{ profilePicUrl: string; resumeUrl: string }> = {};
+const allowed = {
+  photo: [".jpg", ".jpeg", ".png"],
+  resume: [".pdf"],
+};
+
+const deleteOtherObjects = async (
+  client: S3Client,
+  bucket: string,
+  kind: keyof typeof allowed,
+  rollNo: string,
+  currentExt: string
+) => {
+  const candidates = allowed[kind].filter((ext) => ext !== currentExt);
+  for (const ext of candidates) {
+    const key = `members/${rollNo}/${kind}${ext}`;
+    try {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    } catch (err: any) {
+      logger.warn({ err, bucket, key }, "Failed to delete old upload");
+    }
+  }
+};
 
   const contentTypeHeader = req.headers.get("content-type") || "";
+  let body: any = null;
+  let rollNo: string | null = null;
+  let memberQuery: { clerkId?: string; rollNo?: string } = { clerkId };
+
   if (contentTypeHeader.includes("application/json")) {
-    const body = await req.json();
+    body = await req.json();
+    const targetRollNo = String(body?.targetRollNo || "").trim();
+    if (targetRollNo) {
+      try {
+        await requireRole(req as any, ["superadmin", "admin"]);
+      } catch (err: any) {
+        logger.warn({ err }, "Unauthorized admin upload attempt");
+        return NextResponse.json(
+          { error: err.message },
+          { status: err.statusCode }
+        );
+      }
+      const targetMember = await Member.findOne({ rollNo: targetRollNo })
+        .select("rollNo")
+        .lean<{ rollNo: string }>();
+      if (!targetMember) {
+        return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      }
+      rollNo = targetMember.rollNo;
+      memberQuery = { rollNo };
+    }
+  }
+
+  if (!rollNo) {
+    const member = await Member.findOne({ clerkId })
+      .select("rollNo")
+      .lean<{ rollNo: string }>();
+    if (!member) {
+      logger.error({ clerkId }, "Upload failed: no member found");
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+    rollNo = member.rollNo;
+    memberQuery = { clerkId };
+  }
+
+  if (contentTypeHeader.includes("application/json")) {
     const action = body?.action;
-    const kind = body?.kind;
+    const kind = body?.kind as keyof typeof allowed | undefined;
     if (action === "presign") {
       if (kind !== "photo" && kind !== "resume") {
         return NextResponse.json({ error: "Invalid upload kind" }, { status: 400 });
@@ -182,6 +230,10 @@ export async function POST(req: Request) {
       if (!key.startsWith(`members/${rollNo}/`)) {
         return NextResponse.json({ error: "Invalid upload key" }, { status: 400 });
       }
+      const ext = path.extname(key).toLowerCase();
+      if (!allowed[kind].includes(ext)) {
+        return NextResponse.json({ error: "Invalid upload key" }, { status: 400 });
+      }
       const bucket = kind === "photo" ? photoBucket : resumeBucket;
       const baseUrl = resolvedEndpoint?.replace(/\/$/, "") ?? "";
       const publicUrl = `${baseUrl}/${bucket}/${encodeURIComponent(key).replace(
@@ -193,7 +245,8 @@ export async function POST(req: Request) {
       } else {
         update.resumeUrl = publicUrl;
       }
-      await Member.findOneAndUpdate({ clerkId }, update);
+      await Member.findOneAndUpdate(memberQuery, update);
+      await deleteOtherObjects(s3, bucket, kind, rollNo, ext);
       return NextResponse.json({ [kind]: publicUrl }, { status: 200 });
     }
 
@@ -330,11 +383,12 @@ export async function POST(req: Request) {
     } else {
       update.resumeUrl = url;
     }
+    await deleteOtherObjects(s3, bucket, key, rollNo, ext);
   }
 
   // Apply updates to Member document
   if (Object.keys(update).length > 0) {
-    await Member.findOneAndUpdate({ clerkId }, update);
+    await Member.findOneAndUpdate(memberQuery, update);
     logger.info({ clerkId, update }, "Member document fields updated");
   }
 

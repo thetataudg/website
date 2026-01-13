@@ -38,10 +38,21 @@ export default function MemberNavbar() {
           isCommitteeHead: data.isCommitteeHead,
           memberId: data.memberId,
           isECouncil: data.isECouncil,
+          status: data.status,
+          needsProfileReview: data.needsProfileReview,
+          needsPermissionReview: data.needsPermissionReview,
+          pending: false,
         });
       } catch (error) {
         console.error("Navbar: Fetch error:", error);
-        setUserData({ rollNo: null, role: null, isCommitteeHead: false, memberId: null, isECouncil: false });
+        setUserData({
+          rollNo: null,
+          role: null,
+          isCommitteeHead: false,
+          memberId: null,
+          isECouncil: false,
+          pending: true,
+        });
       } finally {
         setLoading(false);
       }
@@ -99,6 +110,12 @@ export default function MemberNavbar() {
   };
 
   console.log("Navbar: Rendering - mounted:", mounted, "pathname:", pathname);
+
+  const isWaiting =
+    !userData ||
+    userData.pending ||
+    userData.needsPermissionReview ||
+    userData.needsProfileReview;
 
   const canSeeCommitteeEvents =
     userData &&
@@ -162,156 +179,188 @@ export default function MemberNavbar() {
 
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav mx-auto mb-2 mb-lg-0 members-navbar__menu">
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${isActive("/member") ? "active" : ""}`}
-                href="/member"
-              >
-                Home
-              </Link>
-            </li>
+            {isWaiting ? (
+              <>
+                <li className="nav-item">
+                  <Link
+                    className={`nav-link ${isActive("/member") ? "active" : ""}`}
+                    href="/member"
+                  >
+                    Home
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link
+                    className={`nav-link ${isActive("/member/brothers") ? "active" : ""}`}
+                    href="/member/brothers"
+                  >
+                    Brothers
+                  </Link>
+                </li>
+              </>
+            ) : (
+              <>
+                <li className="nav-item">
+                  <Link
+                    className={`nav-link ${isActive("/member") ? "active" : ""}`}
+                    href="/member"
+                  >
+                    Home
+                  </Link>
+                </li>
 
-            {userData && (
-              <li className="nav-item">
-                <Link
-                  className={`nav-link ${isActive("/member/profile") ? "active" : ""
-                    }`}
-                  href={userData.rollNo ? `/member/profile/${userData.rollNo}` : "/member/profile"}
-                >
-                  My Profile
-                </Link>
-              </li>
-            )}
-
-            {userData && (userData.role === "admin" || userData.role === "superadmin") && (
-              <li className="nav-item">
-                <Link
-                  className={`nav-link ${isActive("/member/admin") ? "active" : ""
-                    }`}
-                  href="/member/admin"
-                >
-                  Admin
-                </Link>
-              </li>
-            )}
-
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${isActive("/member/brothers") ? "active" : ""
-                  }`}
-                href="/member/brothers"
-              >
-                Brothers
-              </Link>
-            </li>
-
-            <li className="nav-item">
-              <Link
-                className={`nav-link ${isActive("/member/vote") ? "active" : ""
-                  }`}
-                href="/member/vote"
-              >
-                Vote
-              </Link>
-            </li>
-
-            {showEventsDropdown ? (
-              <li className="nav-item dropdown">
-                <a
-                  className={`nav-link dropdown-toggle ${isActive("/member/events") ? "active" : ""
-                    }`}
-                  href="#"
-                  id="eventsDropdown"
-                  role="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                >
-                  Events
-                </a>
-                <ul className="dropdown-menu" aria-labelledby="eventsDropdown">
-                  <li>
+                {userData && (
+                  <li className="nav-item">
                     <Link
-                      className={`dropdown-item ${isActive("/member/events") ? "active" : ""
+                      className={`nav-link ${isActive("/member/profile") ? "active" : ""
+                        }`}
+                      href={userData.rollNo ? `/member/profile/${userData.rollNo}` : "/member/profile"}
+                    >
+                      My Profile
+                    </Link>
+                  </li>
+                )}
+
+                {userData && (userData.role === "admin" || userData.role === "superadmin") && (
+                  <li className="nav-item">
+                    <Link
+                      className={`nav-link ${isActive("/member/admin") ? "active" : ""
+                        }`}
+                      href="/member/admin"
+                    >
+                      Admin
+                    </Link>
+                  </li>
+                )}
+
+                <li className="nav-item">
+                  <Link
+                    className={`nav-link ${isActive("/member/brothers") ? "active" : ""
+                      }`}
+                    href="/member/brothers"
+                  >
+                    Brothers
+                  </Link>
+                </li>
+
+                <li className="nav-item">
+                  <Link
+                    className={`nav-link ${isActive("/member/vote") ? "active" : ""
+                      }`}
+                    href="/member/vote"
+                  >
+                    Vote
+                  </Link>
+                </li>
+
+                {showEventsDropdown ? (
+                  <li className="nav-item dropdown">
+                    <a
+                      className={`nav-link dropdown-toggle ${isActive("/member/events") ? "active" : ""
+                        }`}
+                      href="#"
+                      id="eventsDropdown"
+                      role="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                    >
+                      Events
+                    </a>
+                    <ul className="dropdown-menu" aria-labelledby="eventsDropdown">
+                      <li>
+                        <Link
+                          className={`dropdown-item ${isActive("/member/events") ? "active" : ""
+                            }`}
+                          href="/member/events"
+                        >
+                          All Events
+                        </Link>
+                      </li>
+                      {canSeeManageEvents && (
+                        <li>
+                          <Link
+                            className={`dropdown-item ${isActive("/member/events/manage") ? "active" : ""
+                              }`}
+                            href="/member/events/manage"
+                          >
+                            Manage Events
+                          </Link>
+                        </li>
+                      )}
+                      {canSeeCommitteeEvents && (
+                        <li>
+                          <Link
+                            className={`dropdown-item ${isActive("/member/events/committee") ? "active" : ""
+                              }`}
+                            href="/member/events/committee"
+                          >
+                            Committee Events
+                          </Link>
+                        </li>
+                      )}
+                    </ul>
+                  </li>
+                ) : (
+                  <li className="nav-item">
+                    <Link
+                      className={`nav-link ${isActive("/member/events") ? "active" : ""
                         }`}
                       href="/member/events"
                     >
-                      All Events
+                      Events
                     </Link>
                   </li>
-                  {canSeeManageEvents && (
-                    <li>
-                      <Link
-                        className={`dropdown-item ${isActive("/member/events/manage") ? "active" : ""
-                          }`}
-                        href="/member/events/manage"
-                      >
-                        Manage Events
-                      </Link>
-                    </li>
-                  )}
-                  {canSeeCommitteeEvents && (
-                    <li>
-                      <Link
-                        className={`dropdown-item ${isActive("/member/events/committee") ? "active" : ""
-                          }`}
-                        href="/member/events/committee"
-                      >
-                        Committee Events
-                      </Link>
-                    </li>
-                  )}
-                </ul>
-              </li>
-            ) : (
-              <li className="nav-item">
-                <Link
-                  className={`nav-link ${isActive("/member/events") ? "active" : ""
-                    }`}
-                  href="/member/events"
-                >
-                  Events
-                </Link>
-              </li>
-            )}
+                )}
 
-            <li className="nav-item dropdown">
-              <a
-                className="nav-link dropdown-toggle"
-                href="#"
-                id="moreDropdown"
-                role="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                More
-              </a>
-              <ul
-                className="dropdown-menu"
-                aria-labelledby="moreDropdown"
-              >
-                <li>
+                <li className="nav-item">
                   <Link
-                    className={`dropdown-item ${isActive("/member/minutes") ? "active" : ""
-                      }`}
-                    href="/member/minutes"
+                    className={`nav-link ${isActive("/member/committees") ? "active" : ""}`}
+                    href="/member/committees"
                   >
-                    Minutes
+                    Committees
                   </Link>
                 </li>
-                <li>
-                  <hr className="dropdown-divider" />
-                </li>
-                <li>
-                  <Link
-                    className="dropdown-item"
-                    target="_blank"
-                    href="https://thetatau-dg.org/2dg4u"
+
+                <li className="nav-item dropdown">
+                  <a
+                    className="nav-link dropdown-toggle"
+                    href="#"
+                    id="moreDropdown"
+                    role="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
                   >
-                    Merchandise
-                  </Link>
+                    More
+                  </a>
+                  <ul
+                    className="dropdown-menu"
+                    aria-labelledby="moreDropdown"
+                  >
+                    <li>
+                      <Link
+                        className={`dropdown-item ${isActive("/member/minutes") ? "active" : ""
+                          }`}
+                        href="/member/minutes"
+                      >
+                        Minutes
+                      </Link>
+                    </li>
+                    <li>
+                      <hr className="dropdown-divider" />
+                    </li>
+                    <li>
+                      <Link
+                        className="dropdown-item"
+                        target="_blank"
+                        href="https://thetatau-dg.org/2dg4u"
+                      >
+                        Merchandise
+                      </Link>
+                    </li>
+                  </ul>
                 </li>
-              </ul>
-            </li>
+              </>
+            )}
           </ul>
 
           <ul className="navbar-nav ms-auto members-navbar__actions">

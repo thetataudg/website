@@ -12,6 +12,7 @@ interface PhotoUploaderProps {
   initialUrl?: string;
   onError: (msg: string) => void;
   onClose: () => void;
+  targetRollNo?: string;
 }
 
 export default function PhotoUploader({
@@ -19,6 +20,7 @@ export default function PhotoUploader({
   initialUrl,
   onError,
   onClose,
+  targetRollNo,
 }: PhotoUploaderProps) {
   const maxBytes = 5 * 1024 * 1024;
   const [file, setFile] = useState<File | null>(null);
@@ -54,6 +56,7 @@ export default function PhotoUploader({
           filename: file.name,
           contentType: file.type,
           size: file.size,
+          targetRollNo,
         }),
       });
       if (!presignRes.ok) {
@@ -74,6 +77,7 @@ export default function PhotoUploader({
           action: "complete",
           kind: "photo",
           key: presignData.key,
+          targetRollNo,
         }),
       });
       if (!completeRes.ok) {

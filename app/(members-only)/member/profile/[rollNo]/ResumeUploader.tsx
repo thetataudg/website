@@ -12,6 +12,7 @@ interface ResumeUploaderProps {
   initialUrl?: string;
   onError: (msg: string) => void;
   onClose: () => void;
+  targetRollNo?: string;
 }
 
 export default function ResumeUploader({
@@ -19,6 +20,7 @@ export default function ResumeUploader({
   initialUrl,
   onClose,
   onError,
+  targetRollNo,
 }: ResumeUploaderProps) {
   const maxBytes = 5 * 1024 * 1024;
   const [file, setFile] = useState<File | null>(null);
@@ -49,6 +51,7 @@ export default function ResumeUploader({
           filename: file.name,
           contentType: file.type,
           size: file.size,
+          targetRollNo,
         }),
       });
       if (!presignRes.ok) {
@@ -69,6 +72,7 @@ export default function ResumeUploader({
           action: "complete",
           kind: "resume",
           key: presignData.key,
+          targetRollNo,
         }),
       });
       if (!completeRes.ok) {
@@ -99,7 +103,7 @@ export default function ResumeUploader({
 
           <div className="modal-body">
             <div className="mb-3">
-              <label className="form-label">Select PDF or DOC/DOCX</label>
+              <label className="form-label">Select a PDF</label>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
