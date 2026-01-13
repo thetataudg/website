@@ -9,13 +9,6 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const runtime = "nodejs";
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "6mb",
-    },
-  },
-};
 
 const garageEndpointRaw = process.env.NEXT_PUBLIC_GARAGE_ENDPOINT;
 const garageRegion = process.env.NEXT_PUBLIC_GARAGE_REGION;
