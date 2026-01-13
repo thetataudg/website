@@ -332,7 +332,7 @@ export default function Rush() {
               What to Expect
             </h2>
             <div className="relative mt-10 w-full max-w-xl flex-1">
-              <div className="absolute bottom-0 left-[11px] top-0 w-0.5 bg-[#b3202a] opacity-90" />
+              <div className="absolute bottom-0 left-[11px] top-0 w-1 bg-[#b3202a] opacity-90" />
               <div
                 className="grid h-full grid-cols-[24px,1fr] items-center gap-x-6 py-2"
                 style={{
@@ -361,7 +361,7 @@ export default function Rush() {
           <div className="h-full rounded-[28px] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
             <Image
               alt="Rush flyer"
-              src="/rush/sp26rush.png"
+              src="/rush/Rush_Poster_SP26.png"
               width={520}
               height={650}
               className="h-full w-full rounded-[22px] object-cover"

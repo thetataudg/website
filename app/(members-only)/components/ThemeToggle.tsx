@@ -42,8 +42,11 @@ export default function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       aria-label="Toggle dark mode"
+      data-theme={theme}
     >
-      <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />
+      <span className="theme-toggle__icon" aria-hidden="true">
+        <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />
+      </span>
       <span className="theme-toggle__label">
         {theme === "dark" ? "Light" : "Dark"}
       </span>

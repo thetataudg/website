@@ -9,6 +9,7 @@ import LoadingState from "../../components/LoadingState";
 
 const TABS = [
   { href: "/member/admin/members", label: "Manage Members" },
+  { href: "/member/admin/profiles", label: "Create Blank Profiles" },
   { href: "/member/admin/committees", label: "Manage Committees" },
   { href: "/member/admin/invite", label: "Invite Member" },
   { href: "/member/admin/pending", label: "Pending Requests" },

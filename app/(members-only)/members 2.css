@@ -2450,44 +2450,32 @@
 }
 
 .committee-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 999px;
-  border: 1px solid var(--tt-line);
-  background: rgba(255, 255, 255, 0.95);
-  padding: 6px 8px 6px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.committee-search__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--tt-ink-soft);
 }
 
 .committee-search__input {
   min-width: 220px;
-  border: none;
-  padding: 6px 0;
-  background: transparent;
+  border-radius: 999px;
+  border: 1px solid var(--tt-line);
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.9);
   color: var(--tt-ink);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .committee-search__input:focus {
   outline: none;
-}
-
-.committee-search__button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: none;
-  background: #8b1b23;
-  color: #fff;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.committee-search__button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(139, 27, 35, 0.25);
+  border-color: rgba(139, 27, 35, 0.4);
+  box-shadow: 0 0 0 3px rgba(139, 27, 35, 0.15);
 }
 
 .committee-search-results {
@@ -2657,8 +2645,7 @@
 
 .committee-members__list {
   margin: 0;
-  padding-left: 22px;
-  list-style: disc;
+  padding-left: 20px;
 }
 
 .committee-members__list li {
@@ -2713,15 +2700,7 @@
   border-color: rgba(56, 80, 110, 0.4);
 }
 
-.members-shell[data-theme="dark"] .committee-search {
-  background: rgba(18, 26, 36, 0.9);
-  border-color: rgba(56, 80, 110, 0.4);
-}
-
-.members-shell[data-theme="dark"] .committee-search__button {
-  background: #b3202a;
-}
-
+.members-shell[data-theme="dark"] .committee-search__label,
 .members-shell[data-theme="dark"] .committee-search-results__committees,
 .members-shell[data-theme="dark"] .committee-card__desc,
 .members-shell[data-theme="dark"] .committee-members ul,

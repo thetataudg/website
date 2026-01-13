@@ -468,7 +468,7 @@ export default function Dashboard() {
                   className="qr-code"
                   src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
                     userData.memberId
-                  )}&size=220x220&color=${qrTheme === "dark" ? "ffffff" : "000000"}&bgcolor=${
+                  )}&size=480x480&color=${qrTheme === "dark" ? "ffffff" : "000000"}&bgcolor=${
                     qrTheme === "dark" ? "121a24" : "fffaf4"
                   }`}
                   onLoad={() => setQrLoading(false)}

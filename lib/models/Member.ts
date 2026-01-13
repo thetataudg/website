@@ -3,7 +3,7 @@ import mongoose, { Schema, model, models } from "mongoose";
 
 const MemberSchema = new Schema(
   {
-    clerkId: { type: String, required: true, unique: true },
+    clerkId: { type: String, required: false, unique: true, sparse: true },
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },
     lName: { type: String, required: true },
@@ -51,12 +51,13 @@ const MemberSchema = new Schema(
     committees: [{ type: String }],
     familyLine: { type: String },
     pledgeClass: { type: String },
-    isECouncil: { type: Boolean, required: true },
+    isECouncil: { type: Boolean, required: true, default: false },
     ecouncilPosition: { type: String },
     isCommitteeHead: { type: Boolean, required: true, default: false },
     hometown: { type: String },
     resumeUrl: { type: String },
     profilePicUrl: { type: String },
+    isHidden: { type: Boolean, default: false },
     socialLinks: { type: Map, of: String, default: {} },
     status: {
       type: String,
@@ -73,6 +74,10 @@ const MemberSchema = new Schema(
   },
   { timestamps: true }
 );
+
+if (process.env.NODE_ENV === "development" && models.Member) {
+  delete models.Member;
+}
 
 const Member = models.Member || model("Member", MemberSchema);
 export default Member;

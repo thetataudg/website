@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { clerkClient } from "@clerk/clerk-sdk-node";
+import { maybePresignUrl } from "@/lib/garage";
 
 export const runtime = "nodejs";
 
@@ -14,11 +15,18 @@ export async function GET(
   { params }: { params: { rollNo: string } }
 ) {
   await connectDB();
-  const member = await Member.findOne({ rollNo: params.rollNo }).lean<{ role?: string }>();
+  const member = await Member.findOne({ rollNo: params.rollNo })
+    .populate("bigs", "fName lName rollNo")
+    .populate("littles", "fName lName rollNo")
+    .lean<{ role?: string }>();
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
-  return NextResponse.json(member);
+  return NextResponse.json({
+    ...member,
+    profilePicUrl: await maybePresignUrl((member as any).profilePicUrl),
+    resumeUrl: await maybePresignUrl((member as any).resumeUrl),
+  });
 }
 
 export async function PATCH(
@@ -43,6 +51,12 @@ export async function PATCH(
   }
 
   const updates = await req.json();
+  if (typeof updates.rollNo === "string") {
+    updates.rollNo = updates.rollNo.trim();
+    if (!updates.rollNo) {
+      delete updates.rollNo;
+    }
+  }
   logger.info(
     { adminId, rollNo: params.rollNo, updates },
     "Admin profile update attempt"
@@ -57,6 +71,16 @@ export async function PATCH(
       "Admin PATCH failed: member not found"
     );
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  if (updates.rollNo && updates.rollNo !== params.rollNo) {
+    const existing = await Member.findOne({ rollNo: updates.rollNo }).lean();
+    if (existing) {
+      return NextResponse.json(
+        { error: "Roll number already in use" },
+        { status: 409 }
+      );
+    }
   }
 
   // Only superadmin can change role, and not for superadmin users
@@ -158,7 +182,7 @@ export async function DELETE(
 
   await connectDB();
   const member = await Member.findOne({ rollNo: params.rollNo }).lean<{
-    clerkId: string;
+    clerkId?: string;
   }>();
   if (!member) {
     logger.error(
@@ -174,14 +198,16 @@ export async function DELETE(
     "Deleted member from database"
   );
 
-  try {
-    await clerkClient.users.deleteUser(member.clerkId);
-    logger.info({ adminId, clerkId: member.clerkId }, "Deleted Clerk user");
-  } catch (err: any) {
-    logger.error(
-      { err, clerkId: member.clerkId },
-      "Failed to delete Clerk user"
-    );
+  if (member.clerkId) {
+    try {
+      await clerkClient.users.deleteUser(member.clerkId);
+      logger.info({ adminId, clerkId: member.clerkId }, "Deleted Clerk user");
+    } catch (err: any) {
+      logger.error(
+        { err, clerkId: member.clerkId },
+        "Failed to delete Clerk user"
+      );
+    }
   }
 
   return NextResponse.json({ status: "deleted" }, { status: 200 });

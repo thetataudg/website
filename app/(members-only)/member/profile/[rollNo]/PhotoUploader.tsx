@@ -12,6 +12,7 @@ interface PhotoUploaderProps {
   initialUrl?: string;
   onError: (msg: string) => void;
   onClose: () => void;
+  targetRollNo?: string;
 }
 
 export default function PhotoUploader({
@@ -19,7 +20,9 @@ export default function PhotoUploader({
   initialUrl,
   onError,
   onClose,
+  targetRollNo,
 }: PhotoUploaderProps) {
+  const maxBytes = 5 * 1024 * 1024;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState(initialUrl || "");
   const [uploading, setUploading] = useState(false);
@@ -28,6 +31,12 @@ export default function PhotoUploader({
   // When the user selects a file, generate a preview
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
+    if (f && f.size > maxBytes) {
+      setFile(null);
+      setPreview(initialUrl || "");
+      onError("File too large. Max size is 5 MB.");
+      return;
+    }
     setFile(f);
     if (f) setPreview(URL.createObjectURL(f));
   };
@@ -36,13 +45,44 @@ export default function PhotoUploader({
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    const fd = new FormData();
-    fd.append("photo", file);
 
     try {
-      const res = await fetch("/api/upload-file", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
-      await res.json();
+      const presignRes = await fetch("/api/upload-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "presign",
+          kind: "photo",
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+          targetRollNo,
+        }),
+      });
+      if (!presignRes.ok) {
+        throw new Error(`Upload failed: ${await presignRes.text()}`);
+      }
+      const presignData = await presignRes.json();
+      const uploadRes = await fetch(presignData.uploadUrl, {
+        method: "PUT",
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed: ${await uploadRes.text()}`);
+      }
+      const completeRes = await fetch("/api/upload-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "complete",
+          kind: "photo",
+          key: presignData.key,
+          targetRollNo,
+        }),
+      });
+      if (!completeRes.ok) {
+        throw new Error(`Upload failed: ${await completeRes.text()}`);
+      }
       onClose();
       router.refresh();
     } catch (err: any) {
@@ -84,6 +124,7 @@ export default function PhotoUploader({
               className="form-control"
               onChange={onSelect}
             />
+            <div className="form-text">Max file size: 5 MB.</div>
           </div>
           <div className="modal-footer">
             <button

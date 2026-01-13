@@ -1,71 +1,75 @@
-// app/(members-only)/member/admin/pending/PendingList.tsx
+// app/(members-only)/member/admin/profiles/CreateProfileModal.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import PhotoUploader from "../../profile/[rollNo]/PhotoUploader";
+import ResumeUploader from "../../profile/[rollNo]/ResumeUploader";
+import { LoadingSpinner } from "../../../components/LoadingState";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faImage,
+  faUpload,
+  faEye,
+  faEyeSlash,
+  faUserTag,
+} from "@fortawesome/free-solid-svg-icons";
+import type { MemberData } from "../members/MemberEditorModal";
 
-interface PendingRequest {
-  _id: string;
-  clerkId: string;
-  rollNo: string;
-  fName: string;
-  lName: string;
-  headline?: string;
-  pronouns?: string;
-  majors?: string[];
-  minors?: string[];
-  status: "pending" | "approved" | "rejected";
-  submittedAt: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  reviewComments?: string;
-  gradYear?: number;
-  bio?: string;
-  pledgeClass?: string;
-  hometown?: string;
-  skills?: string[];
-  funFacts?: string[];
-  projects?: Array<{ title?: string; description?: string; link?: string }>;
-  work?: Array<{
-    title?: string;
-    organization?: string;
-    start?: string;
-    end?: string;
-    description?: string;
-    link?: string;
-  }>;
-  awards?: Array<{
-    title?: string;
-    issuer?: string;
-    date?: string;
-    description?: string;
-  }>;
-  customSections?: Array<{ title?: string; body?: string }>;
-  socialLinks?: Record<string, string>;
-}
+const pledgeClassOptions = [
+  "Zeta Gamma",
+  "Eta Gamma",
+  "Theta Gamma",
+  "Iota Gamma",
+  "Kappa Gamma",
+  "Lambda Gamma",
+  "Mu Gamma",
+  "Nu Gamma",
+  "Xi Gamma",
+  "Omicron Gamma",
+  "Pi Gamma",
+  "Rho Gamma",
+  "Sigma Gamma",
+  "Tau Gamma",
+  "Upsilon Gamma",
+  "Phi Gamma",
+  "Chi Gamma",
+  "Psi Gamma",
+  "Omega Gamma",
+];
+
+const getMemberId = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value._id || "";
+};
 
 interface Props {
-  initialRequests: PendingRequest[];
+  show: boolean;
+  onClose: () => void;
+  onCreated: (member: MemberData) => void;
 }
 
-export default function PendingList({ initialRequests }: Props) {
-  const [requests, setRequests] = useState<PendingRequest[]>(initialRequests);
-  const [selected, setSelected] = useState<PendingRequest | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+export default function CreateProfileModal({ show, onClose, onCreated }: Props) {
   const [form, setForm] = useState({
     rollNo: "",
     fName: "",
     lName: "",
+    status: "Alumni",
+    isHidden: false,
+    isECouncil: false,
+    ecouncilPosition: "",
+    isCommitteeHead: false,
+    familyLine: "",
+    big: "",
+    little: "",
     headline: "",
     pronouns: "",
     majors: "",
     minors: "",
     gradYear: "",
-    pledgeClass: "",
-    hometown: "",
     bio: "",
+    hometown: "",
+    pledgeClass: "",
     skills: "",
     funFacts: "",
     github: "",
@@ -85,36 +89,60 @@ export default function PendingList({ initialRequests }: Props) {
     customSections: [] as Array<{ title: string; body: string }>,
   });
 
-  const pledgeClassOptions = [
-    "Zeta Gamma",
-    "Eta Gamma",
-    "Theta Gamma",
-    "Iota Gamma",
-    "Kappa Gamma",
-    "Lambda Gamma",
-    "Mu Gamma",
-    "Nu Gamma",
-    "Xi Gamma",
-    "Omicron Gamma",
-    "Pi Gamma",
-    "Rho Gamma",
-    "Sigma Gamma",
-    "Tau Gamma",
-    "Upsilon Gamma",
-    "Phi Gamma",
-    "Chi Gamma",
-    "Psi Gamma",
-    "Omega Gamma",
-  ];
+  const [allMembers, setAllMembers] = useState<MemberData[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<MemberData | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
 
-  const parseList = (text: string) =>
-    text
-      .split(/\n|,/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+  useEffect(() => {
+    if (!show) return;
+    setCreated(null);
+    setError(null);
+    setForm((f) => ({
+      ...f,
+      rollNo: "",
+      fName: "",
+      lName: "",
+      gradYear: "",
+      status: "Alumni",
+      isHidden: false,
+      isECouncil: false,
+      ecouncilPosition: "",
+      isCommitteeHead: false,
+      familyLine: "",
+      big: "",
+      little: "",
+      headline: "",
+      pronouns: "",
+      majors: "",
+      minors: "",
+      bio: "",
+      hometown: "",
+      pledgeClass: "",
+      skills: "",
+      funFacts: "",
+      github: "",
+      linkedin: "",
+      instagram: "",
+      website: "",
+      projects: [],
+      work: [],
+      awards: [],
+      customSections: [],
+    }));
 
-  const updateField = <K extends keyof typeof form>(key: K, value: string) =>
-    setForm((f) => ({ ...f, [key]: value }));
+    fetch("/api/members")
+      .then((r) => r.json())
+      .then((list: MemberData[]) => {
+        setAllMembers(list.filter((m) => m.role !== "superadmin"));
+      })
+      .catch(console.error);
+  }, [show]);
+
+  const update = <K extends keyof typeof form>(key: K, val: any) =>
+    setForm((f) => ({ ...f, [key]: val }));
 
   const updateArrayItem = <T, K extends keyof T>(
     key: "projects" | "work" | "awards" | "customSections",
@@ -160,81 +188,51 @@ export default function PendingList({ initialRequests }: Props) {
       return { ...f, [key]: copy };
     });
 
-  const openModal = (request: PendingRequest) => {
-    setSelected(request);
-    setError(null);
-    const socials = request.socialLinks || {};
-    setForm({
-      rollNo: request.rollNo || "",
-      fName: request.fName || "",
-      lName: request.lName || "",
-      headline: request.headline || "",
-      pronouns: request.pronouns || "",
-      majors: (request.majors || []).join(", "),
-      minors: (request.minors || []).join(", "),
-      gradYear: request.gradYear ? String(request.gradYear) : "",
-      pledgeClass: request.pledgeClass || "",
-      hometown: request.hometown || "",
-      bio: request.bio || "",
-      skills: (request.skills || []).join("\n"),
-      funFacts: (request.funFacts || []).join("\n"),
-      github: socials.github || "",
-      linkedin: socials.linkedin || "",
-      instagram: socials.instagram || "",
-      website: socials.website || "",
-      projects: (request.projects || []).map((p) => ({
-        title: p.title || "",
-        description: p.description || "",
-        link: p.link || "",
-      })),
-      work: (request.work || []).map((w) => ({
-        title: w.title || "",
-        organization: w.organization || "",
-        start: w.start || "",
-        end: w.end || "",
-        description: w.description || "",
-        link: w.link || "",
-      })),
-      awards: (request.awards || []).map((a) => ({
-        title: a.title || "",
-        issuer: a.issuer || "",
-        date: a.date || "",
-        description: a.description || "",
-      })),
-      customSections: (request.customSections || []).map((s) => ({
-        title: s.title || "",
-        body: s.body || "",
-      })),
-    });
-  };
+  const parseList = (text: string) =>
+    text
+      .split(/\n|,/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  async function review(id: string, action: "approve" | "reject") {
-    const res = await fetch(`/api/members/pending/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) {
-      console.error("Failed to review:", await res.text());
+  const photoLabel = useMemo(
+    () => (created?.profilePicUrl ? "Update Photo" : "Add Photo"),
+    [created?.profilePicUrl]
+  );
+  const resumeLabel = useMemo(
+    () => (created?.resumeUrl ? "Update Resume" : "Add Resume"),
+    [created?.resumeUrl]
+  );
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+
+    const gradYear = Number(form.gradYear);
+    if (!form.rollNo.trim() || !form.fName.trim() || !form.lName.trim() || !Number.isFinite(gradYear) || !gradYear) {
+      setError("Roll No, first name, last name, and graduation year are required.");
+      setSaving(false);
       return;
     }
-    setRequests((rs) => rs.filter((r) => r._id !== id));
-  }
-
-  const buildUpdates = () => {
-    const gradYear = Number(form.gradYear);
-    return {
+    const payload = {
       rollNo: form.rollNo.trim(),
       fName: form.fName.trim(),
       lName: form.lName.trim(),
+      status: form.status,
+      isHidden: form.isHidden,
+      isECouncil: form.isECouncil,
+      ecouncilPosition: form.isECouncil ? form.ecouncilPosition : "",
+      isCommitteeHead: form.isCommitteeHead,
+      familyLine: form.familyLine,
+      bigs: form.big ? [form.big] : [],
+      littles: form.little ? [form.little] : [],
       headline: form.headline.trim(),
       pronouns: form.pronouns.trim(),
       majors: parseList(form.majors),
       minors: parseList(form.minors),
-      gradYear: Number.isFinite(gradYear) && gradYear ? gradYear : undefined,
-      pledgeClass: form.pledgeClass.trim(),
-      hometown: form.hometown.trim(),
+      ...(Number.isFinite(gradYear) && gradYear ? { gradYear } : {}),
       bio: form.bio,
+      hometown: form.hometown,
+      pledgeClass: form.pledgeClass.trim(),
       skills: parseList(form.skills),
       funFacts: parseList(form.funFacts),
       projects: form.projects,
@@ -247,147 +245,246 @@ export default function PendingList({ initialRequests }: Props) {
         instagram: form.instagram.trim(),
         website: form.website.trim(),
       },
-    };
-  };
+    } as Partial<MemberData> & { rollNo: string; fName: string; lName: string };
 
-  const saveUpdates = async () => {
-    if (!selected) return;
-    setSaving(true);
-    setError(null);
-    const res = await fetch(`/api/members/pending/${selected._id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", updates: buildUpdates() }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data?.error || "Failed to save updates.");
+    try {
+      const endpoint = created
+        ? `/api/members/${created.rollNo}`
+        : "/api/members";
+      const method = created ? "PATCH" : "POST";
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        let message = text;
+        try {
+          const data = JSON.parse(text);
+          message = data?.error || message;
+        } catch {
+          // keep raw text
+        }
+        throw new Error(message || "Failed to save profile");
+      }
+
+      const saved = (await res.json()) as MemberData;
+      setCreated(saved);
+      setForm((f) => ({ ...f, rollNo: saved.rollNo }));
+      onCreated(saved);
+    } catch (err: any) {
+      setError(err?.message || "Failed to save profile");
+    } finally {
       setSaving(false);
-      return;
     }
-    const updated = (await res.json()) as PendingRequest;
-    setRequests((rs) =>
-      rs.map((r) => (r._id === selected._id ? { ...r, ...updated } : r))
-    );
-    setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
-    setSaving(false);
   };
 
-  const approveWithUpdates = async () => {
-    if (!selected) return;
-    setProcessing(true);
-    setError(null);
-    const updateRes = await fetch(`/api/members/pending/${selected._id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", updates: buildUpdates() }),
-    });
-    if (!updateRes.ok) {
-      const data = await updateRes.json().catch(() => ({}));
-      setError(data?.error || "Failed to update before approval.");
-      setProcessing(false);
-      return;
-    }
-    await review(selected._id, "approve");
-    setSelected(null);
-    setProcessing(false);
-  };
-
-  const rejectRequest = async () => {
-    if (!selected) return;
-    setProcessing(true);
-    setError(null);
-    await review(selected._id, "reject");
-    setSelected(null);
-    setProcessing(false);
-  };
+  if (!show) return null;
 
   return (
-    <div className="bento-card admin-table-card">
-      <div className="admin-members-header">
-        <h2>Pending Requests</h2>
-      </div>
-      <ul className="list-group admin-list">
-        {requests.map((r) => (
-          <li className="list-group-item" key={r._id}>
-            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <div>
-                <strong>#{r.rollNo}</strong> — {r.fName} {r.lName}
-              </div>
-              <div className="d-flex gap-2">
-                <button
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={() => openModal(r)}
-                >
-                  View
-                </button>
-              </div>
-            </div>
-          </li>
-        ))}
-        {requests.length === 0 && (
-          <li className="list-group-item text-center text-muted">
-            No pending requests.
-          </li>
-        )}
-      </ul>
+    <div
+      className="modal fade show"
+      style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+    >
+      <div className="modal-dialog modal-xl modal-dialog-scrollable admin-modal-wide">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">Create Member Profile</h5>
+            <button className="btn-close" onClick={onClose} />
+          </div>
 
-      {selected && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog modal-xl modal-dialog-scrollable admin-modal-wide">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  Review #{selected.rollNo} — {selected.fName} {selected.lName}
-                </h5>
-                <button className="btn-close" onClick={() => setSelected(null)} />
-              </div>
-              <div className="modal-body">
-                {error && <div className="alert alert-danger">{error}</div>}
+          {error && <div className="alert alert-danger m-3">{error}</div>}
 
-                <div className="profile-editor__section">
-                  <h4 className="mb-3">Basics</h4>
-                  <div className="row mb-3">
-                    <div className="col-md-4">
-                      <label className="form-label">Roll No</label>
-                      <input
-                        className="form-control"
-                        value={form.rollNo}
-                        onChange={(e) => updateField("rollNo", e.target.value)}
+          <div className="modal-body">
+            <div className="row g-4">
+              <div className="col-lg-4">
+                <div className="border rounded p-3">
+                  <h6 className="mb-3 d-flex align-items-center gap-2">
+                    <FontAwesomeIcon icon={faUserTag} />
+                    Profile Media
+                  </h6>
+                  <div className="text-center">
+                    {created?.profilePicUrl ? (
+                      <img
+                        src={created.profilePicUrl}
+                        alt="Profile"
+                        className="rounded-circle mb-3"
+                        style={{ width: 120, height: 120, objectFit: "cover" }}
                       />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">First Name</label>
-                      <input
-                        className="form-control"
-                        value={form.fName}
-                        onChange={(e) => updateField("fName", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Last Name</label>
-                      <input
-                        className="form-control"
-                        value={form.lName}
-                        onChange={(e) => updateField("lName", e.target.value)}
-                      />
-                    </div>
+                    ) : (
+                      <div
+                        className="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3"
+                        style={{ width: 120, height: 120 }}
+                      >
+                        <FontAwesomeIcon icon={faImage} className="text-muted" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm w-100"
+                      onClick={() => setShowPhotoModal(true)}
+                      disabled={!created}
+                    >
+                      <FontAwesomeIcon icon={faImage} className="me-2" />
+                      {photoLabel}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm w-100 mt-2"
+                      onClick={() => setShowResumeModal(true)}
+                      disabled={!created}
+                    >
+                      <FontAwesomeIcon icon={faUpload} className="me-2" />
+                      {resumeLabel}
+                    </button>
+                    {!created && (
+                      <p className="text-muted mt-2 mb-0" style={{ fontSize: 12 }}>
+                        Save the profile first to upload files.
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="profile-editor__section">
-                  <h4 className="mb-4">Profile Builder</h4>
+                <div className="border rounded p-3 mt-3">
+                  <h6 className="mb-3">Admin Controls</h6>
+                  <div className="mb-3">
+                    <label className="form-label">Roll No</label>
+                    <input
+                      className="form-control"
+                      value={form.rollNo}
+                      onChange={(e) => update("rollNo", e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">First Name</label>
+                    <input
+                      className="form-control"
+                      value={form.fName}
+                      onChange={(e) => update("fName", e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Last Name</label>
+                    <input
+                      className="form-control"
+                      value={form.lName}
+                      onChange={(e) => update("lName", e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${
+                        form.isHidden ? "btn-outline-secondary" : "btn-outline-success"
+                      }`}
+                      aria-pressed={!form.isHidden}
+                      onClick={() => update("isHidden", !form.isHidden)}
+                    >
+                      <FontAwesomeIcon
+                        icon={form.isHidden ? faEyeSlash : faEye}
+                        className="me-2"
+                      />
+                      {form.isHidden
+                        ? "Hidden from public site"
+                        : "Visible on public site"}
+                    </button>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Status</label>
+                    <select
+                      className="form-select"
+                      value={form.status}
+                      onChange={(e) => update("status", e.target.value)}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Alumni">Alumni</option>
+                      <option value="Removed">Removed</option>
+                      <option value="Deceased">Deceased</option>
+                    </select>
+                  </div>
+                  <div className="form-check mb-3">
+                    <input
+                      id="isECouncil"
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={form.isECouncil}
+                      onChange={(e) => update("isECouncil", e.target.checked)}
+                    />
+                    <label htmlFor="isECouncil" className="form-check-label">
+                      E-Council
+                    </label>
+                  </div>
+                  {form.isECouncil && (
+                    <div className="mb-3">
+                      <label className="form-label">E-Council Position</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.ecouncilPosition}
+                        onChange={(e) => update("ecouncilPosition", e.target.value)}
+                      />
+                    </div>
+                  )}
+                  <div className="mb-3">
+                    <label className="form-label">Family Line</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={form.familyLine}
+                      onChange={(e) => update("familyLine", e.target.value)}
+                    />
+                  </div>
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Big</label>
+                      <select
+                        className="form-select"
+                        value={form.big}
+                        onChange={(e) => update("big", e.target.value)}
+                      >
+                        <option value="">None</option>
+                        {allMembers
+                          .filter((m) => m.rollNo !== created?.rollNo)
+                          .map((m) => (
+                            <option key={m._id} value={getMemberId(m)}>
+                              {m.fName} {m.lName}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Little</label>
+                      <select
+                        className="form-select"
+                        value={form.little}
+                        onChange={(e) => update("little", e.target.value)}
+                      >
+                        <option value="">None</option>
+                        {allMembers
+                          .filter((m) => m.rollNo !== created?.rollNo)
+                          .map((m) => (
+                            <option key={m._id} value={getMemberId(m)}>
+                              {m.fName} {m.lName}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
+              <div className="col-lg-8">
+                <div className="mb-4">
+                  <h5 className="mb-3">Profile Builder</h5>
                   <div className="row mb-3">
                     <div className="col-md-8">
                       <label className="form-label">Headline / Tagline</label>
                       <input
                         className="form-control"
                         value={form.headline}
-                        onChange={(e) => updateField("headline", e.target.value)}
+                        onChange={(e) => update("headline", e.target.value)}
                         placeholder="Aspiring robotics engineer • Project lead"
                       />
                     </div>
@@ -396,7 +493,7 @@ export default function PendingList({ initialRequests }: Props) {
                       <input
                         className="form-control"
                         value={form.pronouns}
-                        onChange={(e) => updateField("pronouns", e.target.value)}
+                        onChange={(e) => update("pronouns", e.target.value)}
                         placeholder="he/him, she/her, they/them"
                       />
                     </div>
@@ -408,7 +505,7 @@ export default function PendingList({ initialRequests }: Props) {
                       <input
                         className="form-control"
                         value={form.majors}
-                        onChange={(e) => updateField("majors", e.target.value)}
+                        onChange={(e) => update("majors", e.target.value)}
                       />
                     </div>
                     <div className="col-sm-6">
@@ -416,7 +513,7 @@ export default function PendingList({ initialRequests }: Props) {
                       <input
                         className="form-control"
                         value={form.minors}
-                        onChange={(e) => updateField("minors", e.target.value)}
+                        onChange={(e) => update("minors", e.target.value)}
                       />
                     </div>
                   </div>
@@ -428,7 +525,7 @@ export default function PendingList({ initialRequests }: Props) {
                         type="number"
                         className="form-control"
                         value={form.gradYear}
-                        onChange={(e) => updateField("gradYear", e.target.value)}
+                        onChange={(e) => update("gradYear", e.target.value)}
                       />
                     </div>
                     <div className="col-sm-4">
@@ -436,7 +533,7 @@ export default function PendingList({ initialRequests }: Props) {
                       <select
                         className="form-select"
                         value={form.pledgeClass}
-                        onChange={(e) => updateField("pledgeClass", e.target.value)}
+                        onChange={(e) => update("pledgeClass", e.target.value)}
                       >
                         <option value="">Select pledge class</option>
                         {pledgeClassOptions.map((option) => (
@@ -451,33 +548,32 @@ export default function PendingList({ initialRequests }: Props) {
                       <input
                         className="form-control"
                         value={form.hometown}
-                        onChange={(e) => updateField("hometown", e.target.value)}
+                        onChange={(e) => update("hometown", e.target.value)}
                       />
                     </div>
                   </div>
 
-                  <div className="mb-0">
+                  <div className="mb-3">
                     <label className="form-label">Bio</label>
                     <textarea
                       className="form-control"
                       rows={4}
                       value={form.bio}
-                      onChange={(e) => updateField("bio", e.target.value)}
+                      onChange={(e) => update("bio", e.target.value)}
                       placeholder="Share your story, interests, or what you're working on."
                     />
                   </div>
                 </div>
 
-                <div className="profile-editor__section">
+                <div className="mb-4">
                   <h5 className="mb-3">Links & Highlights</h5>
-
                   <div className="row mb-3">
                     <div className="col-sm-6">
                       <label className="form-label">GitHub URL</label>
                       <input
                         className="form-control"
                         value={form.github}
-                        onChange={(e) => updateField("github", e.target.value)}
+                        onChange={(e) => update("github", e.target.value)}
                         placeholder="https://github.com/username"
                       />
                     </div>
@@ -486,19 +582,18 @@ export default function PendingList({ initialRequests }: Props) {
                       <input
                         className="form-control"
                         value={form.linkedin}
-                        onChange={(e) => updateField("linkedin", e.target.value)}
+                        onChange={(e) => update("linkedin", e.target.value)}
                         placeholder="https://linkedin.com/in/username"
                       />
                     </div>
                   </div>
-
                   <div className="row mb-3">
                     <div className="col-sm-6">
                       <label className="form-label">Instagram URL</label>
                       <input
                         className="form-control"
                         value={form.instagram}
-                        onChange={(e) => updateField("instagram", e.target.value)}
+                        onChange={(e) => update("instagram", e.target.value)}
                         placeholder="https://instagram.com/username"
                       />
                     </div>
@@ -507,12 +602,11 @@ export default function PendingList({ initialRequests }: Props) {
                       <input
                         className="form-control"
                         value={form.website}
-                        onChange={(e) => updateField("website", e.target.value)}
+                        onChange={(e) => update("website", e.target.value)}
                         placeholder="https://your-site.com"
                       />
                     </div>
                   </div>
-
                   <div className="row mb-0">
                     <div className="col-md-6">
                       <label className="form-label">Skills (one per line)</label>
@@ -520,7 +614,7 @@ export default function PendingList({ initialRequests }: Props) {
                         className="form-control"
                         rows={4}
                         value={form.skills}
-                        onChange={(e) => updateField("skills", e.target.value)}
+                        onChange={(e) => update("skills", e.target.value)}
                         placeholder="CAD\nPython\nProject Management"
                       />
                     </div>
@@ -530,14 +624,14 @@ export default function PendingList({ initialRequests }: Props) {
                         className="form-control"
                         rows={4}
                         value={form.funFacts}
-                        onChange={(e) => updateField("funFacts", e.target.value)}
+                        onChange={(e) => update("funFacts", e.target.value)}
                         placeholder="Loves sunrise hikes\nCollects vintage cameras"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="profile-editor__section">
+                <div className="mb-4">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h5 className="mb-0">Projects</h5>
                     <button
@@ -610,7 +704,7 @@ export default function PendingList({ initialRequests }: Props) {
                   ))}
                 </div>
 
-                <div className="profile-editor__section">
+                <div className="mb-4">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h5 className="mb-0">Work / Internships</h5>
                     <button
@@ -730,7 +824,7 @@ export default function PendingList({ initialRequests }: Props) {
                   ))}
                 </div>
 
-                <div className="profile-editor__section">
+                <div className="mb-4">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h5 className="mb-0">Awards / Certifications</h5>
                     <button
@@ -818,7 +912,7 @@ export default function PendingList({ initialRequests }: Props) {
                   ))}
                 </div>
 
-                <div className="profile-editor__section">
+                <div className="mb-4">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h5 className="mb-0">Custom Sections</h5>
                     <button
@@ -872,39 +966,46 @@ export default function PendingList({ initialRequests }: Props) {
                   ))}
                 </div>
               </div>
-              <div className="modal-footer">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setSelected(null)}
-                  disabled={processing}
-                >
-                  Close
-                </button>
-                <button
-                  className="btn btn-outline-primary"
-                  onClick={saveUpdates}
-                  disabled={saving || processing}
-                >
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
-                <button
-                  className="btn btn-outline-danger"
-                  onClick={rejectRequest}
-                  disabled={processing}
-                >
-                  Reject
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={approveWithUpdates}
-                  disabled={processing}
-                >
-                  {processing ? "Approving..." : "Approve"}
-                </button>
-              </div>
             </div>
           </div>
+
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={onClose} disabled={saving}>
+              Close
+            </button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <LoadingSpinner size="sm" className="me-2" />
+                  Saving...
+                </>
+              ) : created ? (
+                "Save Changes"
+              ) : (
+                "Create Profile"
+              )}
+            </button>
+          </div>
         </div>
+      </div>
+
+      {showPhotoModal && created && (
+        <PhotoUploader
+          show={showPhotoModal}
+          initialUrl={created.profilePicUrl}
+          onError={(msg) => setError(msg)}
+          onClose={() => setShowPhotoModal(false)}
+          targetRollNo={created.rollNo}
+        />
+      )}
+      {showResumeModal && created && (
+        <ResumeUploader
+          show={showResumeModal}
+          initialUrl={created.resumeUrl}
+          onError={(msg) => setError(msg)}
+          onClose={() => setShowResumeModal(false)}
+          targetRollNo={created.rollNo}
+        />
       )}
     </div>
   );
