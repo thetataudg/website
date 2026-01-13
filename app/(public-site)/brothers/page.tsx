@@ -64,6 +64,11 @@ export default function BrothersPage() {
     );
     if (!elements.length) return;
 
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      elements.forEach((el) => el.classList.add("reveal-in"));
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
