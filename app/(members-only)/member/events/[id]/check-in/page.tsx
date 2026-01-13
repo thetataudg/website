@@ -28,7 +28,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<any>(null);
   const zxingControlsRef = useRef<{ stop: () => void } | null>(null);
-  const zxingReaderRef = useRef<{ reset?: () => void } | null>(null);
+  const zxingReaderRef = useRef<any>(null);
   const scanningRef = useRef(false);
 
   async function refreshEvent() {
