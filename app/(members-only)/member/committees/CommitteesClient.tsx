@@ -29,8 +29,10 @@ interface Committee {
 
 export default function CommitteesClient({
   committees,
+  error,
 }: {
   committees: Committee[];
+  error?: string | null;
 }) {
   const [view, setView] = useState<"cards" | "list">("cards");
   const [selected, setSelected] = useState<Committee | null>(null);
@@ -156,6 +158,11 @@ export default function CommitteesClient({
 
   return (
     <div className="member-dashboard committees-page">
+      {error && (
+        <div className="alert alert-warning" role="alert">
+          {error}
+        </div>
+      )}
       <section className="bento-card committees-hero">
         <div>
           <h2 className="committees-title">Committees</h2>
