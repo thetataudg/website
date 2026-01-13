@@ -16,17 +16,22 @@ import {
   faUserTag,
 } from "@fortawesome/free-solid-svg-icons";
 
-type ProjectItem = { title: string; description: string; link: string };
+type ProjectItem = { title?: string; description?: string; link?: string };
 type WorkItem = {
-  title: string;
-  organization: string;
-  start: string;
-  end: string;
-  description: string;
-  link: string;
+  title?: string;
+  organization?: string;
+  start?: string;
+  end?: string;
+  description?: string;
+  link?: string;
 };
-type AwardItem = { title: string; issuer: string; date: string; description: string };
-type CustomSection = { title: string; body: string };
+type AwardItem = {
+  title?: string;
+  issuer?: string;
+  date?: string;
+  description?: string;
+};
+type CustomSection = { title?: string; body?: string };
 
 export interface MemberData {
   _id: string;
