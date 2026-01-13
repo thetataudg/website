@@ -27,6 +27,8 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<any>(null);
+  const zxingControlsRef = useRef<{ stop: () => void } | null>(null);
+  const zxingReaderRef = useRef<{ reset?: () => void } | null>(null);
   const scanningRef = useRef(false);
 
   async function refreshEvent() {
@@ -90,9 +92,34 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
 
   async function startScanner() {
     if (!videoRef.current) return;
+    setStatus("");
+    stopScanner();
     if (!("BarcodeDetector" in window)) {
-      setStatus("BarcodeDetector not supported. Use manual check-in.");
-      return;
+      try {
+        const { BrowserQRCodeReader } = await import("@zxing/browser");
+        const reader = new BrowserQRCodeReader();
+        zxingReaderRef.current = reader;
+        scanningRef.current = true;
+        zxingControlsRef.current = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          async (result) => {
+            if (!scanningRef.current || !result) return;
+            const text =
+              typeof result === "string" ? result : result.getText?.() || "";
+            if (text) {
+              scanningRef.current = false;
+              await checkIn(text);
+              stopScanner();
+            }
+          }
+        );
+        return;
+      } catch (err) {
+        setStatus("Unable to start scanner. Use manual check-in.");
+        scanningRef.current = false;
+        return;
+      }
     }
 
     streamRef.current = await navigator.mediaDevices.getUserMedia({
@@ -112,6 +139,13 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
 
   function stopScanner() {
     scanningRef.current = false;
+    if (zxingControlsRef.current) {
+      zxingControlsRef.current.stop();
+      zxingControlsRef.current = null;
+    }
+    if (zxingReaderRef.current?.reset) {
+      zxingReaderRef.current.reset();
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -208,7 +242,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
           <div className="checkin-card__header">
             <h4>Scan QR Code</h4>
           </div>
-          <video ref={videoRef} className="checkin-video" />
+          <video ref={videoRef} className="checkin-video" playsInline />
           <div className="checkin-actions">
             <button className="btn btn-primary" onClick={startScanner}>
               Start Scanner
