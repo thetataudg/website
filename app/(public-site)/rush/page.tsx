@@ -185,7 +185,7 @@ export default function Rush() {
             and show up to our rush events on campus.
           </p>
           <a
-            href="https://forms.gle/yNUJKf1JwkvvrbEJ6"
+            href="https://airtable.com/appQEL10mm4gp9XDx/pagGkFkzKTCxjJNU1/form"
             target="_blank"
             className="tt-button-primary mt-8"
           >
@@ -261,7 +261,7 @@ export default function Rush() {
                 chapter feel like home.
               </p>
               <a
-                href="https://forms.gle/yNUJKf1JwkvvrbEJ6"
+                href="https://airtable.com/appQEL10mm4gp9XDx/pagGkFkzKTCxjJNU1/form"
                 className="tt-button-primary mt-6 inline-flex"
               >
                 I'm Interested

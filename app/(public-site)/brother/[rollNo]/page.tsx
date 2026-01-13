@@ -136,6 +136,13 @@ export default function BrotherProfile({
     );
     if (!elements.length) return;
 
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (prefersReduced || isMobile) {
+      elements.forEach((el) => el.classList.add("reveal-in"));
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
