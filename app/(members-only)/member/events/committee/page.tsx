@@ -71,6 +71,22 @@ export default function CommitteeEventsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const mstDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const mstDateFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const formatMstDateTime = (value: string | Date) =>
+    mstDateTimeFormatter.format(new Date(value));
+  const formatMstDate = (value: string | Date) =>
+    mstDateFormatter.format(new Date(value));
+
   useEffect(() => {
     async function init() {
       const meRes = await fetch("/api/members/me");
@@ -178,13 +194,33 @@ export default function CommitteeEventsPage() {
       recurrenceCount: "1",
     });
 
-  function toInputValue(value: string | Date) {
+  const mstFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  function toMstInputValue(value: string | Date) {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-      d.getDate()
-    )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const parts = mstFormatter.formatToParts(d);
+    const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${lookup.year}-${lookup.month}-${lookup.day}T${lookup.hour}:${lookup.minute}`;
+  }
+
+  function toMstIso(value: string) {
+    if (!value) return value;
+    const [datePart, timePart] = value.split("T");
+    if (!datePart || !timePart) return value;
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hour, minute] = timePart.split(":").map(Number);
+    if ([year, month, day, hour, minute].some((v) => Number.isNaN(v))) return value;
+    const utcMs = Date.UTC(year, month - 1, day, hour + 7, minute);
+    return new Date(utcMs).toISOString();
   }
 
   function toDateInputValue(value: string | Date) {
@@ -206,8 +242,8 @@ export default function CommitteeEventsPage() {
       body: JSON.stringify({
         ...form,
         committeeId: selectedCommitteeId,
-        startTime: form.startTime,
-        endTime: form.endTime,
+        startTime: toMstIso(form.startTime),
+        endTime: toMstIso(form.endTime),
         recurrence: {
           enabled: form.recurrenceEnabled,
           frequency: form.recurrenceFrequency,
@@ -254,6 +290,8 @@ export default function CommitteeEventsPage() {
       me?.role === "admin" || me?.role === "superadmin" || me?.isECouncil;
     const payload: any = {
       ...form,
+      startTime: toMstIso(form.startTime),
+      endTime: toMstIso(form.endTime),
       recurrence: {
         enabled: form.recurrenceEnabled,
         frequency: form.recurrenceFrequency,
@@ -308,8 +346,8 @@ export default function CommitteeEventsPage() {
     setForm({
       name: event.name || "",
       description: event.description || "",
-      startTime: toInputValue(event.startTime),
-      endTime: toInputValue(event.endTime),
+      startTime: toMstInputValue(event.startTime),
+      endTime: toMstInputValue(event.endTime),
       location: event.location || "",
       eventType: event.eventType || "meeting",
       status: event.status || "scheduled",
@@ -465,7 +503,7 @@ export default function CommitteeEventsPage() {
                       </div>
                     </div>
                     <span className="event-pill event-pill--full">
-                      {new Date(evt.startTime).toLocaleDateString()}
+                      {formatMstDate(evt.startTime)}
                     </span>
                   </div>
                   <p className="event-card__description">
@@ -474,11 +512,11 @@ export default function CommitteeEventsPage() {
                   <div className="event-card__details">
                     <div>
                       <span className="event-detail-label">Start</span>
-                      <span>{new Date(evt.startTime).toLocaleString()}</span>
+                      <span>{formatMstDateTime(evt.startTime)}</span>
                     </div>
                     <div>
                       <span className="event-detail-label">End</span>
-                      <span>{new Date(evt.endTime).toLocaleString()}</span>
+                      <span>{formatMstDateTime(evt.endTime)}</span>
                     </div>
                   </div>
                 </button>
@@ -774,11 +812,11 @@ export default function CommitteeEventsPage() {
                   </div>
                   <div className="col-md-6">
                     <div className="event-detail-label">Start</div>
-                    <div>{new Date(selectedEvent.startTime).toLocaleString()}</div>
+                    <div>{formatMstDateTime(selectedEvent.startTime)}</div>
                   </div>
                   <div className="col-md-6">
                     <div className="event-detail-label">End</div>
-                    <div>{new Date(selectedEvent.endTime).toLocaleString()}</div>
+                    <div>{formatMstDateTime(selectedEvent.endTime)}</div>
                   </div>
                   <div className="col-12">
                     <div className="event-detail-label">Location</div>
@@ -829,7 +867,7 @@ export default function CommitteeEventsPage() {
                                 </td>
                                 <td className="text-end text-muted">
                                   {entry.checkedInAt
-                                    ? new Date(entry.checkedInAt).toLocaleString()
+                                    ? formatMstDateTime(entry.checkedInAt)
                                     : ""}
                                 </td>
                               </tr>

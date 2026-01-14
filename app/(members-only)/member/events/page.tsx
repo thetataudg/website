@@ -173,6 +173,35 @@ export default function EventsPage() {
     )}Z`;
   };
 
+  const mstDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const mstDateFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const mstMonthYearFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "long",
+  });
+  const mstTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const formatMstDateTime = (value: string | Date) =>
+    mstDateTimeFormatter.format(new Date(value));
+  const formatMstDate = (value: string | Date) =>
+    mstDateFormatter.format(new Date(value));
+  const formatMstTime = (value: string | Date) =>
+    mstTimeFormatter.format(new Date(value));
+
   const handleDownloadCalendar = () => {
     const lines = [
       "BEGIN:VCALENDAR",
@@ -501,11 +530,11 @@ export default function EventsPage() {
       <div className="event-card__details">
         <div>
           <span className="event-detail-label">Start</span>
-          <span>{new Date(evt.startTime).toLocaleString()}</span>
+          <span>{formatMstDateTime(evt.startTime)}</span>
         </div>
         <div>
           <span className="event-detail-label">End</span>
-          <span>{new Date(evt.endTime).toLocaleString()}</span>
+          <span>{formatMstDateTime(evt.endTime)}</span>
         </div>
         {evt.location && (
           <div>
@@ -758,11 +787,8 @@ export default function EventsPage() {
               <h2>Calendar</h2>
               <p className="text-muted">
                 {calendarView === "month"
-                  ? calendarDate.toLocaleString(undefined, {
-                      month: "long",
-                      year: "numeric",
-                    })
-                  : `Week of ${startOfWeek(calendarDate).toLocaleDateString()}`}
+                  ? mstMonthYearFormatter.format(calendarDate)
+                  : `Week of ${formatMstDate(startOfWeek(calendarDate))}`}
               </p>
             </div>
             <span className="events-count">{calendarEvents.length} events</span>
@@ -851,12 +877,7 @@ export default function EventsPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {selectedDate.toLocaleDateString(undefined, {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {formatMstDate(selectedDate)}
                 </h5>
                 <button
                   type="button"
@@ -875,15 +896,9 @@ export default function EventsPage() {
                         <div className="d-flex justify-content-between">
                           <strong>{evt.name}</strong>
                           <span className="text-muted">
-                            {new Date(evt.startTime).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}{" "}
+                            {formatMstTime(evt.startTime)}{" "}
                             -{" "}
-                            {new Date(evt.endTime).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {formatMstTime(evt.endTime)}
                           </span>
                         </div>
                         <div className="text-muted">
@@ -938,7 +953,7 @@ export default function EventsPage() {
                         </span>
                         <span className="text-muted">
                           {entry.checkedInAt
-                            ? new Date(entry.checkedInAt).toLocaleString()
+                          ? formatMstDateTime(entry.checkedInAt)
                             : ""}
                         </span>
                       </li>
