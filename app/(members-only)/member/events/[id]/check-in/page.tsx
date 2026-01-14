@@ -69,6 +69,14 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
     committee?.committeeHeadId?.toString?.() === me?.memberId ||
     committee?.committeeHeadId?._id === me?.memberId;
 
+  const mstDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const formatMstDateTime = (value: string | Date) =>
+    mstDateTimeFormatter.format(new Date(value));
+
   async function checkIn(memberId: string) {
     const res = await fetch(`/api/events/${params.id}/check-in`, {
       method: "POST",
@@ -198,7 +206,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
           <span>{event?.location || "TBD"}</span>
           <span className="checkin-meta__label">Start</span>
           <span>
-            {event?.startTime ? new Date(event.startTime).toLocaleString() : "TBD"}
+            {event?.startTime ? formatMstDateTime(event.startTime) : "TBD"}
           </span>
         </div>
       </section>
@@ -310,7 +318,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
                       </td>
                       <td className="text-end text-muted">
                         {entry?.checkedInAt
-                          ? new Date(entry.checkedInAt).toLocaleString()
+                          ? formatMstDateTime(entry.checkedInAt)
                           : ""}
                       </td>
                     </tr>

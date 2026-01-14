@@ -32,6 +32,14 @@ export default function EventCreatorPage() {
   const [showSeriesPrompt, setShowSeriesPrompt] = useState(false);
   const [summaryEvent, setSummaryEvent] = useState<any | null>(null);
 
+  const mstDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const formatMstDateTime = (value: string | Date) =>
+    mstDateTimeFormatter.format(new Date(value));
+
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -130,6 +138,8 @@ export default function EventCreatorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
+        startTime: toMstIso(form.startTime),
+        endTime: toMstIso(form.endTime),
         committeeId: form.chapterWide ? null : form.committeeId || null,
         recurrence: {
           enabled: form.recurrenceEnabled,
@@ -169,13 +179,33 @@ export default function EventCreatorPage() {
       ? events
       : events.filter((evt) => managedCommitteeIds.includes(evt.committeeId));
 
-  function toInputValue(value: string | Date) {
+  const mstFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  function toMstInputValue(value: string | Date) {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-      d.getDate()
-    )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const parts = mstFormatter.formatToParts(d);
+    const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${lookup.year}-${lookup.month}-${lookup.day}T${lookup.hour}:${lookup.minute}`;
+  }
+
+  function toMstIso(value: string) {
+    if (!value) return value;
+    const [datePart, timePart] = value.split("T");
+    if (!datePart || !timePart) return value;
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hour, minute] = timePart.split(":").map(Number);
+    if ([year, month, day, hour, minute].some((v) => Number.isNaN(v))) return value;
+    const utcMs = Date.UTC(year, month - 1, day, hour + 7, minute);
+    return new Date(utcMs).toISOString();
   }
 
   function toDateInputValue(value: string | Date) {
@@ -204,8 +234,8 @@ export default function EventCreatorPage() {
       name: event.name || "",
       description: event.description || "",
       committeeId: event.committeeId || "",
-      startTime: toInputValue(event.startTime),
-      endTime: toInputValue(event.endTime),
+      startTime: toMstInputValue(event.startTime),
+      endTime: toMstInputValue(event.endTime),
       location: event.location || "",
       eventType: event.eventType || "event",
       status: event.status || "scheduled",
@@ -247,6 +277,8 @@ export default function EventCreatorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
+        startTime: toMstIso(form.startTime),
+        endTime: toMstIso(form.endTime),
         committeeId: form.eventType === "chapter" ? null : form.committeeId || null,
         recurrence: {
           enabled: form.recurrenceEnabled,
@@ -384,7 +416,7 @@ export default function EventCreatorPage() {
                     <td>{evt.name}</td>
                     <td>{committee?.name || "Unknown"}</td>
                     <td>{eventTypeLabel}</td>
-                    <td>{new Date(evt.startTime).toLocaleString()}</td>
+                    <td>{formatMstDateTime(evt.startTime)}</td>
                     <td>{evt.status}</td>
                     <td className="text-end">
                     {evt.status === "completed" && (
@@ -831,7 +863,7 @@ export default function EventCreatorPage() {
                         </span>
                         <span className="text-muted">
                           {entry.checkedInAt
-                            ? new Date(entry.checkedInAt).toLocaleString()
+                            ? formatMstDateTime(entry.checkedInAt)
                             : ""}
                         </span>
                       </li>
