@@ -42,7 +42,7 @@ export async function PATCH(
   }
 
   const { action, reviewComments } = body;
-  if (!["approve", "reject"].includes(action)) {
+  if (!["approve", "reject", "update"].includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
@@ -52,18 +52,83 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  if (action === "update") {
+    const updates = body?.updates || {};
+    const sanitized: any = {};
+    const assignIf = (key: string, value: any) => {
+      if (value !== undefined) sanitized[key] = value;
+    };
+    const ensureArray = (value: any) => (Array.isArray(value) ? value : undefined);
+
+    assignIf("rollNo", updates.rollNo?.trim());
+    assignIf("fName", updates.fName);
+    assignIf("lName", updates.lName);
+    assignIf("headline", updates.headline);
+    assignIf("pronouns", updates.pronouns);
+    assignIf("majors", ensureArray(updates.majors));
+    assignIf("minors", ensureArray(updates.minors));
+    assignIf("gradYear", updates.gradYear);
+    assignIf("pledgeClass", updates.pledgeClass);
+    assignIf("bio", updates.bio);
+    assignIf("hometown", updates.hometown);
+    assignIf("skills", ensureArray(updates.skills));
+    assignIf("funFacts", ensureArray(updates.funFacts));
+    assignIf("projects", ensureArray(updates.projects));
+    assignIf("work", ensureArray(updates.work));
+    assignIf("awards", ensureArray(updates.awards));
+    assignIf("customSections", ensureArray(updates.customSections));
+    assignIf("socialLinks", updates.socialLinks);
+
+    if (sanitized.rollNo && sanitized.rollNo !== pending.rollNo) {
+      const existingMember = await Member.findOne({ rollNo: sanitized.rollNo }).lean();
+      if (existingMember) {
+        return NextResponse.json(
+          { error: "Roll number already in use" },
+          { status: 409 }
+        );
+      }
+      const existingPending = await PendingMember.findOne({
+        rollNo: sanitized.rollNo,
+        _id: { $ne: pending._id },
+      }).lean();
+      if (existingPending) {
+        return NextResponse.json(
+          { error: "Roll number already in use" },
+          { status: 409 }
+        );
+      }
+    }
+
+    const updatedPending = await PendingMember.findByIdAndUpdate(
+      params.id,
+      { $set: sanitized },
+      { new: true }
+    ).lean();
+
+    return NextResponse.json(updatedPending, { status: 200 });
+  }
+
   if (action === "approve") {
     await Member.create({
       clerkId: pending.clerkId,
       rollNo: pending.rollNo,
       fName: pending.fName,
       lName: pending.lName,
+      headline: pending.headline,
+      pronouns: pending.pronouns,
       majors: pending.majors,
+      minors: pending.minors,
       gradYear: pending.gradYear,
       bio: pending.bio,
+      pledgeClass: pending.pledgeClass,
+      skills: pending.skills,
+      funFacts: pending.funFacts,
+      projects: pending.projects,
+      work: pending.work,
+      awards: pending.awards,
+      customSections: pending.customSections,
       committees: pending.committees,
       familyLine: pending.familyLine,
-      pledgeClass: pending.pledgeClass,
       isECouncil: pending.isECouncil,
       ecouncilPosition: pending.ecouncilPosition,
       hometown: pending.hometown,

@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { maybePresignUrl } from "@/lib/garage";
 
 export const runtime = "nodejs";
 
@@ -50,8 +51,8 @@ export async function GET(req: Request) {
     {
       memberId: member._id?.toString(),
       rollNo: member.rollNo,
-      profilePicUrl: member.profilePicUrl,
-      resumeUrl: member.resumeUrl,
+      profilePicUrl: await maybePresignUrl(member.profilePicUrl),
+      resumeUrl: await maybePresignUrl(member.resumeUrl),
       role: member.role,
       status: member.status,
       isECouncil: member.isECouncil,

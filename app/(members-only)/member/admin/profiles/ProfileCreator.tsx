@@ -1,135 +1,60 @@
-// // app/(members-only)/member/admin/members/MembersList.tsx
-
+// app/(members-only)/member/admin/profiles/ProfileCreator.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
-import MemberEditorModal from "./MemberEditorModal";
-
-import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { useEffect, useMemo, useState } from "react";
+import MemberEditorModal, { MemberData } from "../members/MemberEditorModal";
+import CreateProfileModal from "./CreateProfileModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faKey,
-  faGavel,
-  faCheck,
-  faTimes,
-  faTriangleExclamation,
-  faMagnifyingGlass,
-} from "@fortawesome/free-solid-svg-icons";
-import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 
-export interface MemberData {
-  _id: string;
-  rollNo: string;
-  fName: string;
-  lName: string;
-  clerkId?: string;
-  role: "superadmin" | "admin" | "member";
-  status?: "Active" | "Alumni" | "Removed" | "Deceased";
-  isECouncil: boolean;
-  ecouncilPosition: string;
-  isCommitteeHead: boolean;
-  familyLine: string;
-  bigs: string[];
-  littles: string[];
-  majors: string[];
-  minors?: string[];
-  gradYear: number;
-  bio?: string;
-  headline?: string;
-  pronouns?: string;
-  skills?: string[];
-  funFacts?: string[];
-  projects?: Array<{ title?: string; description?: string; link?: string }>;
-  work?: Array<{
-    title?: string;
-    organization?: string;
-    start?: string;
-    end?: string;
-    description?: string;
-    link?: string;
-  }>;
-  awards?: Array<{
-    title?: string;
-    issuer?: string;
-    date?: string;
-    description?: string;
-  }>;
-  customSections?: Array<{ title?: string; body?: string }>;
-  hometown?: string;
-  pledgeClass?: string;
-  socialLinks?: Record<string, string>;
-  profilePicUrl?: string;
-  resumeUrl?: string;
-  isHidden?: boolean;
-}
-
-export default function MembersList({
+export default function ProfileCreator({
   initialMembers,
 }: {
   initialMembers: MemberData[];
 }) {
-  const [me, setMe] = useState<{ role: string; rollNo: string } | null>(null);
   const [members, setMembers] = useState<MemberData[]>(initialMembers);
   const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateWarning, setShowCreateWarning] = useState(false);
   const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [meRole, setMeRole] = useState<"superadmin" | "admin">("admin");
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "All" | "Active" | "Alumni" | "Removed" | "Deceased"
   >("All");
-  const [loadingMembers, setLoadingMembers] = useState(true);
 
   useEffect(() => {
     fetch("/api/members/me")
       .then((r) => r.json())
-      .then((d) => setMe({ role: d.role, rollNo: d.rollNo }))
-      .catch(() => setMe(null));
-    fetch("/api/members")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data: MemberData[]) => setMembers(data))
-      .catch(() => setMembers(initialMembers))
-      .finally(() => setLoadingMembers(false));
+      .then((d) => setMeRole(d.role === "superadmin" ? "superadmin" : "admin"))
+      .catch(() => setMeRole("admin"));
   }, []);
 
-  const { isLoaded, isSignedIn } = useAuth();
-
-  if (!isLoaded) {
-    return <LoadingState message="Loading members..." />;
-  }
-
-  if (!isSignedIn) {
-    return (
-      <div className="container">
-        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>You must be logged into use this function.</h3>
-          <RedirectToSignIn />
-        </div>
-      </div>
-    );
-  }
-
-  // filter out superadmins only
-  const visible = members.filter((m) => m.role !== "superadmin");
-  const filtered = visible
-    .filter((m) =>
-      statusFilter === "All" ? true : (m.status || "Unknown") === statusFilter
-    )
-    .filter((m) => {
-      if (!query.trim()) return true;
-      const haystack = `${m.rollNo} ${m.fName} ${m.lName} ${m.status ?? ""}`.toLowerCase();
-      return haystack.includes(query.trim().toLowerCase());
-    });
-  const sorted = [...filtered].sort((a, b) => {
-    const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
-    const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
-    return aNum - bNum;
-  });
+  const placeholderMembers = useMemo(() => {
+    const base = members.filter((m) => !m.clerkId);
+    return base
+      .filter((m) =>
+        statusFilter === "All" ? true : (m.status || "Unknown") === statusFilter
+      )
+      .filter((m) => {
+        if (!query.trim()) return true;
+        const haystack = `${m.rollNo} ${m.fName} ${m.lName} ${m.status ?? ""}`.toLowerCase();
+        return haystack.includes(query.trim().toLowerCase());
+      });
+  }, [members, statusFilter, query]);
 
   const editing = editingRollNo
     ? members.find((m) => m.rollNo === editingRollNo) || null
     : null;
+
+  const handleCreated = (member: MemberData) => {
+    setMembers((prev) => {
+      const exists = prev.some((m) => m.rollNo === member.rollNo);
+      return exists ? prev.map((m) => (m.rollNo === member.rollNo ? member : m)) : [...prev, member];
+    });
+  };
 
   async function handleSave(updates: Partial<MemberData>) {
     if (!editing) return;
@@ -138,11 +63,12 @@ export default function MembersList({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
+
     if (!res.ok) {
       const { error } = await res.json();
-      alert(`Failed to update member: ${error}`);
-      return;
+      throw new Error(error || "Failed to update member");
     }
+
     const updated = (await res.json()) as MemberData;
     setMembers((ms) =>
       ms.map((m) => (m.rollNo === editing.rollNo ? { ...m, ...updated } : m))
@@ -151,13 +77,10 @@ export default function MembersList({
 
   async function confirmDelete() {
     if (!deletingRollNo) return;
-
     setDeleteLoading(true);
-
     const res = await fetch(`/api/members/${deletingRollNo}`, {
       method: "DELETE",
     });
-
     if (res.ok) {
       setMembers((ms) => ms.filter((m) => m.rollNo !== deletingRollNo));
       setDeletingRollNo(null);
@@ -165,15 +88,31 @@ export default function MembersList({
       const { error } = await res.json();
       alert(`Failed to delete member: ${error}`);
     }
-
     setDeleteLoading(false);
   }
 
   return (
     <>
-      <div className="bento-card admin-table-card">
+      <section className="bento-card admin-table-card">
         <div className="admin-members-header">
-          <h2>Manage Members</h2>
+          <div>
+            <h2>Create Profiles</h2>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowCreateWarning(true)}
+          >
+            Create Profile
+          </button>
+        </div>
+      </section>
+
+      <section className="bento-card admin-table-card mt-4">
+        <div className="admin-members-header">
+          <div>
+            <h3>Profiles Without Accounts</h3>
+          </div>
           <div className="admin-search-controls">
             <select
               className="form-select admin-search__select"
@@ -229,74 +168,45 @@ export default function MembersList({
               </tr>
             </thead>
             <tbody>
-              {loadingMembers ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-5">
-                    <LoadingSpinner size="sm" className="me-2" />
-                    Loading members...
-                  </td>
-                </tr>
-              ) : (
-                sorted.map((m) => (
-                  <tr key={m._id}>
-                    <td>#{m.rollNo}</td>
-                    <td>
-                      {m.fName} {m.lName}{" "}
-                    {me && m.rollNo === me.rollNo && (
-                      <span className="badge bg-primary ms-1">You</span>
-                    )}
+              {placeholderMembers.map((m) => (
+                <tr key={m._id}>
+                  <td>#{m.rollNo}</td>
+                  <td>
+                    {m.fName} {m.lName}
                   </td>
                   <td>
                     {m.status || "Unknown"}
                     {m.isHidden && (
                       <span className="badge bg-secondary ms-2">Hidden</span>
                     )}
-                    {m.role === "admin" && (
-                      <FontAwesomeIcon
-                        icon={faKey}
-                        className="ms-2 text-warning"
-                        title="This user has admin privileges"
-                      />
-                    )}
-                    {m.isECouncil && (
-                      <FontAwesomeIcon
-                        icon={faGavel}
-                        className="ms-2 text-secondary"
-                        title="E-Council Member"
-                      />
-                    )}
                   </td>
                   <td className="text-end">
                     <button
-                      className="btn btn-sm btn-outline-primary me-2"
+                      className="btn btn-sm btn-outline-primary"
                       onClick={() => setEditingRollNo(m.rollNo)}
                     >
                       Edit
                     </button>
-
-                    {me?.role === "superadmin" && m.role !== "superadmin" && (
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => setDeletingRollNo(m.rollNo)}
-                      >
-                        Delete
-                      </button>
-                    )}
+                    <button
+                      className="btn btn-sm btn-outline-danger ms-2"
+                      onClick={() => setDeletingRollNo(m.rollNo)}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
-                ))
-              )}
-              {!loadingMembers && sorted.length === 0 && (
+              ))}
+              {placeholderMembers.length === 0 && (
                 <tr>
                   <td colSpan={4} className="text-center text-muted py-4">
-                    No members found.
+                    No placeholder profiles yet.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {editing && (
         <MemberEditorModal
@@ -304,11 +214,60 @@ export default function MembersList({
           show={true}
           onClose={() => setEditingRollNo(null)}
           onSave={handleSave}
-          editorRole={me?.role === "superadmin" ? "superadmin" : "admin"}
+          editorRole={meRole}
+        />
+      )}
+      {showCreateModal && (
+        <CreateProfileModal
+          show={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleCreated}
         />
       )}
 
-      {/* Simple confirmation modal */}
+      {showCreateWarning && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header warning-modal__header">
+                <h5 className="modal-title">Filler Profile Notice</h5>
+                <button
+                  className="btn-close"
+                  onClick={() => setShowCreateWarning(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <p className="mb-0">
+                  These are filler profiles only and cannot be accessed by the
+                  member. If you want them to log in, invite them from the Invite
+                  Member tab.
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowCreateWarning(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setShowCreateWarning(false);
+                    setShowCreateModal(true);
+                  }}
+                >
+                  I understand
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deletingRollNo && (
         <div
           className="modal show"
@@ -343,7 +302,6 @@ export default function MembersList({
                   onClick={confirmDelete}
                   disabled={deleteLoading}
                 >
-                  {deleteLoading && <LoadingSpinner size="sm" className="me-2" />}
                   {deleteLoading ? "Deleting..." : "Delete"}
                 </button>
               </div>

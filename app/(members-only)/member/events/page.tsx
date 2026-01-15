@@ -266,6 +266,13 @@ export default function EventsPage() {
     resolveEventType(event) === "chapter" ||
     (event.committeeId ? memberCommitteeIds.includes(event.committeeId) : false);
 
+  const isPastEvent = (evt: EventItem, now: Date) => {
+    const end = new Date(evt.endTime);
+    if (evt.status === "completed") return true;
+    if (evt.status === "scheduled" && end < now) return true;
+    return false;
+  };
+
   const collapseRecurring = (list: EventItem[]) => {
     const now = new Date();
     const seriesMap = new Map<
@@ -286,7 +293,7 @@ export default function EventsPage() {
       const end = new Date(evt.endTime);
       const entry = seriesMap.get(seriesKey) || {};
 
-      if (end >= now) {
+      if (!isPastEvent(evt, now)) {
         if (!entry.upcoming || start < new Date(entry.upcoming.startTime)) {
           entry.upcoming = evt;
         }
@@ -369,9 +376,8 @@ export default function EventsPage() {
       return start <= rangeEnd && end >= rangeStart;
     };
 
-    const actualEvents = events.filter(
-      (evt) => overlapsRange(evt) && (includePast || new Date(evt.endTime) >= now)
-    );
+    const shouldInclude = (evt: EventItem) => includePast || !isPastEvent(evt, now);
+    const actualEvents = events.filter((evt) => overlapsRange(evt) && shouldInclude(evt));
     const existingKeys = new Set<string>();
     actualEvents.forEach((evt) => {
       const seriesKey =
@@ -409,15 +415,15 @@ export default function EventsPage() {
 
       while (cursorStart <= rangeEnd) {
         const key = `${parent._id}:${cursorStart.toISOString()}`;
-        if (
-          !existingKeys.has(key) &&
-          (includePast || cursorEnd >= now)
-        ) {
+        const occurrence: EventItem = {
+          ...parent,
+          startTime: cursorStart.toISOString(),
+          endTime: cursorEnd.toISOString(),
+        };
+        if (!existingKeys.has(key) && (includePast || !isPastEvent(occurrence, now))) {
           generated.push({
-            ...parent,
+            ...occurrence,
             _id: `${parent._id}-${cursorStart.toISOString()}`,
-            startTime: cursorStart.toISOString(),
-            endTime: cursorEnd.toISOString(),
             recurrenceParentId: parent._id,
           });
         }
@@ -440,9 +446,7 @@ export default function EventsPage() {
   }, [calendarDate, calendarView, events, includePast]);
 
   const now = new Date();
-  const visibleEvents = includePast
-    ? events
-    : events.filter((evt) => new Date(evt.endTime) >= now);
+  const visibleEvents = includePast ? events : events.filter((evt) => !isPastEvent(evt, now));
 
   const myEvents = collapseRecurring(
     visibleEvents.filter(isMyEvent)

@@ -42,8 +42,8 @@ type Member = {
   customSections?: Array<{ title?: string; body?: string }>;
   committees?: string[];
   resumeUrl?: string;
-  bigs?: Array<string | { fName?: string; lName?: string }>;
-  littles?: Array<string | { fName?: string; lName?: string }>;
+  bigs?: Array<string | { fName?: string; lName?: string; rollNo?: string }>;
+  littles?: Array<string | { fName?: string; lName?: string; rollNo?: string }>;
   hometown?: string;
   familyLine?: string;
   pledgeClass?: string;
@@ -53,6 +53,7 @@ type Member = {
   ecouncilPosition?: string;
   profilePicUrl?: string;
   socialLinks?: Record<string, string>;
+  isHidden?: boolean;
 };
 
 const fallbackGradients = [
@@ -72,10 +73,14 @@ const getGradientClass = (rollNo: string) => {
 const getInitials = (first = "", last = "") =>
   `${first.trim().charAt(0)}${last.trim().charAt(0)}`.toUpperCase();
 
-const formatMemberName = (person: string | { fName?: string; lName?: string }) => {
-  if (typeof person === "string") return person;
+const resolveMemberDisplay = (
+  person: string | { fName?: string; lName?: string; rollNo?: string }
+) => {
+  if (typeof person === "string") {
+    return { label: "Unknown member", rollNo: null };
+  }
   const name = `${person.fName ?? ""} ${person.lName ?? ""}`.trim();
-  return name || "—";
+  return { label: name || "Unknown member", rollNo: person.rollNo ?? null };
 };
 
 const normalizeExternalUrl = (value?: string) => {
@@ -116,6 +121,13 @@ export default function BrotherProfile({
     );
     if (!elements.length) return;
 
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (prefersReduced || isMobile) {
+      elements.forEach((el) => el.classList.add("reveal-in"));
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -141,6 +153,9 @@ export default function BrotherProfile({
           throw new Error("Member not found");
         }
         const data = await res.json();
+        if (data?.isHidden) {
+          throw new Error("Profile unavailable");
+        }
         setMember(data);
       } catch (err: any) {
         setError(err.message || "Unable to load member");
@@ -259,7 +274,7 @@ export default function BrotherProfile({
         <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/60 to-[#120a0a]" />
         <div className="relative z-10 flex min-h-[50vh] flex-col items-start justify-end px-6 pb-12 sm:px-12">
           <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
-            Brother Profile
+            Theta Tau
           </p>
           <h1 className={`${bungee.className} mt-3 text-4xl text-[#b3202a] sm:text-6xl`}>
             {member.fName} {member.lName}
@@ -461,7 +476,7 @@ export default function BrotherProfile({
                   {bigs.length > 0 ? (
                     <p className="mt-3 text-sm text-white/75">
                       Big{bigs.length > 1 ? "s" : ""}:{" "}
-                      {bigs.map((b) => formatMemberName(b)).join(", ")}
+                      {renderMemberLinks(bigs)}
                     </p>
                   ) : (
                     <p className="mt-3 text-sm text-white/60">Bigs: —</p>
@@ -469,7 +484,7 @@ export default function BrotherProfile({
                   {littles.length > 0 ? (
                     <p className="mt-2 text-sm text-white/70">
                       Little{littles.length > 1 ? "s" : ""}:{" "}
-                      {littles.map((l) => formatMemberName(l)).join(", ")}
+                      {renderMemberLinks(littles)}
                     </p>
                   ) : (
                     <p className="mt-2 text-sm text-white/60">Littles: —</p>
