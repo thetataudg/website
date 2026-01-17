@@ -73,6 +73,7 @@ body {
   }
 }
 
+
 h1 {
   font-family: var(--font-inter);
   color: black;
@@ -212,44 +213,89 @@ p {
   border: 1px solid rgba(120, 30, 30, 0.12);
   padding: 18px 0;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+  display: grid;
+  gap: 18px;
 }
 
 .logo-marquee__track {
   display: flex;
   width: max-content;
   will-change: transform;
+  animation: logo-marquee-scroll 40s linear infinite;
+}
+
+.logo-marquee__track--reverse {
+  animation-direction: reverse;
 }
 
 .logo-marquee__row {
   display: flex;
   align-items: center;
-  gap: 36px;
+  gap: 28px;
   padding: 0 24px;
 }
 
-.logo-marquee__logo {
-  width: 140px;
-  height: 52px;
+.logo-marquee__tile {
+  width: 160px;
+  height: 72px;
   flex: 0 0 auto;
-  opacity: 0.85;
-  filter: grayscale(100%);
-  transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fffdf6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.logo-marquee__logo--wide {
-  width: 220px;
-  height: 64px;
-}
-
-.logo-marquee__logo:hover {
-  opacity: 1;
-  filter: grayscale(0%);
+.logo-marquee__tile:hover {
   transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.logo-marquee__mark {
+  width: 120px;
+  height: 40px;
+  opacity: 0.9;
+}
+
+.logo-marquee__icon {
+  width: 34px;
+  height: 34px;
+  opacity: 0.95;
+}
+
+@keyframes logo-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 @media (max-width: 768px) {
-  .logo-marquee__logo {
-    width: 110px;
-    height: 44px;
+  .logo-marquee {
+    gap: 12px;
+  }
+
+  .logo-marquee__track {
+    animation-duration: 55s;
+  }
+
+  .logo-marquee__tile {
+    width: 128px;
+    height: 58px;
+  }
+
+  .logo-marquee__mark {
+    width: 96px;
+    height: 32px;
+  }
+
+  .logo-marquee__icon {
+    width: 28px;
+    height: 28px;
   }
 }

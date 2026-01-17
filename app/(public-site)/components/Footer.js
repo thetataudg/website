@@ -104,7 +104,7 @@ const Footer = () => {
               <ul className="space-y-3 text-base text-[#1b0f0f]">
                 <li>
                   <Link
-                    href="/pillars#brotherhood"
+                    href="/about#brotherhood"
                     className="underline underline-offset-4"
                   >
                     Brotherhood
@@ -112,7 +112,7 @@ const Footer = () => {
                 </li>
                 <li>
                   <Link
-                    href="/pillars#professionalism"
+                    href="/about#professionalism"
                     className="underline underline-offset-4"
                   >
                     Professionalism
@@ -120,7 +120,7 @@ const Footer = () => {
                 </li>
                 <li>
                   <Link
-                    href="/pillars#service"
+                    href="/about#service"
                     className="underline underline-offset-4"
                   >
                     Service

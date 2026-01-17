@@ -21,6 +21,7 @@
     "axios": "^1.9.0",
     "bootstrap": "^5.3.5",
     "clerk": "^0.8.3",
+    "core-js": "^3.38.1",
     "dotenv": "^16.5.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",

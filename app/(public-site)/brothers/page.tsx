@@ -240,17 +240,17 @@ export default function BrothersPage() {
                 </button>
               ))}
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#120a0a]/15 bg-white px-4 py-2 text-xs uppercase tracking-[0.3em] text-[#120a0a]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#120a0a] bg-[#120a0a] px-4 py-2 text-xs uppercase tracking-[0.3em] text-[#f5d79a]">
               <button
                 type="button"
-                className="rounded-full border border-[#120a0a]/20 bg-transparent px-3 py-1 text-[0.62rem] uppercase tracking-[0.28em] text-[#120a0a] transition hover:border-[#120a0a]/40"
+                className="rounded-full border border-[#e2ab16] bg-transparent px-3 py-1 text-[0.62rem] uppercase tracking-[0.28em] text-[#f5d79a] transition hover:bg-[#e2ab16] hover:text-[#120a0a]"
                 onClick={() => setShowSearch((v) => !v)}
               >
                 Search Members
               </button>
               {showSearch && (
                 <input
-                  className="w-36 bg-transparent text-xs uppercase tracking-[0.28em] text-[#120a0a] outline-none sm:w-48"
+                  className="w-36 bg-transparent text-xs uppercase tracking-[0.28em] text-[#f5d79a] outline-none placeholder:text-[#f5d79a]/70 sm:w-48"
                   placeholder="Search names..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}

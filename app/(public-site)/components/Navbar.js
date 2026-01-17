@@ -31,11 +31,6 @@ const Navbar = () => {
       target: "/about",
     },
     {
-      id: 3,
-      linkname: "Pillars",
-      target: "/pillars",
-    },
-    {
       id: 4,
       linkname: "Rush",
       target: "/rush",

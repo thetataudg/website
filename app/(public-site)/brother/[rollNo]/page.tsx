@@ -91,7 +91,7 @@ const renderMemberLinks = (
     const content = rollNo ? (
       <Link
         href={`/brother/${rollNo}`}
-        className="underline decoration-white/40 underline-offset-4 transition hover:text-[#f5d79a]"
+        className="text-[#f5d79a] underline underline-offset-4"
       >
         {label}
       </Link>
@@ -105,6 +105,14 @@ const renderMemberLinks = (
       </span>
     );
   });
+
+const normalizeExternalUrl = (value?: string) => {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
 
 export default function BrotherProfile({
   params,
@@ -206,8 +214,58 @@ export default function BrotherProfile({
   if (loading) {
     return (
       <main className="bg-[#120a0a] pb-16 text-white">
-        <section className="mx-auto mt-20 w-full max-w-4xl rounded-[36px] bg-[#1b0f0f] px-8 py-12 text-center">
-          Loading profile...
+        <section className="relative mx-auto mt-10 w-full max-w-6xl overflow-hidden rounded-[36px] border border-white/10 bg-[#1b0f0f] px-8 py-12 text-center sm:mt-16">
+          <div className="pointer-events-none absolute inset-0 opacity-70">
+            <div className="absolute -left-32 top-0 h-64 w-64 rounded-full bg-[#7a0104]/35 blur-[120px]" />
+            <div className="absolute -right-20 bottom-0 h-64 w-64 rounded-full bg-[#f5d79a]/20 blur-[120px]" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-xs uppercase tracking-[0.5em] text-[#f5d79a]">
+              Loading profile
+            </p>
+            <h2 className={`${bungee.className} mt-4 text-3xl text-white sm:text-4xl`}>
+              Preparing a brother spotlight
+            </h2>
+            <p className="mt-4 text-base text-white/70">
+              Pulling highlights, committees, and links.
+            </p>
+          </div>
+        </section>
+
+        <section className="mx-auto mt-10 w-full max-w-6xl px-6 sm:px-10">
+          <div className="grid gap-8 lg:grid-cols-[0.9fr,1.1fr]">
+            <div className="rounded-[28px] bg-[#120a0a] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
+              <div className="h-[320px] w-full animate-pulse rounded-[22px] bg-white/10" />
+              <div className="mt-6 space-y-3">
+                <div className="h-4 w-40 animate-pulse rounded-full bg-white/10" />
+                <div className="h-6 w-56 animate-pulse rounded-full bg-white/10" />
+                <div className="h-4 w-28 animate-pulse rounded-full bg-white/10" />
+                <div className="mt-6 flex gap-3">
+                  {["A", "B", "C"].map((key) => (
+                    <div
+                      key={key}
+                      className="h-10 w-10 animate-pulse rounded-full bg-white/10"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-6">
+              {["bio", "grid", "skills"].map((key) => (
+                <div
+                  key={key}
+                  className="rounded-[24px] bg-white p-6 shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
+                >
+                  <div className="h-5 w-40 animate-pulse rounded-full bg-[#120a0a]/10" />
+                  <div className="mt-4 space-y-3">
+                    <div className="h-4 w-full animate-pulse rounded-full bg-[#120a0a]/10" />
+                    <div className="h-4 w-11/12 animate-pulse rounded-full bg-[#120a0a]/10" />
+                    <div className="h-4 w-9/12 animate-pulse rounded-full bg-[#120a0a]/10" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
       </main>
     );
@@ -335,7 +393,7 @@ export default function BrotherProfile({
             <div className="mt-8 flex items-center gap-6 text-2xl text-white/90">
               {member.socialLinks?.linkedin && (
                 <a
-                  href={member.socialLinks.linkedin}
+                  href={normalizeExternalUrl(member.socialLinks.linkedin)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="LinkedIn"
@@ -346,7 +404,7 @@ export default function BrotherProfile({
               )}
               {member.socialLinks?.github && (
                 <a
-                  href={member.socialLinks.github}
+                  href={normalizeExternalUrl(member.socialLinks.github)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="GitHub"
@@ -357,7 +415,7 @@ export default function BrotherProfile({
               )}
               {member.socialLinks?.instagram && (
                 <a
-                  href={member.socialLinks.instagram}
+                  href={normalizeExternalUrl(member.socialLinks.instagram)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Instagram"
@@ -368,7 +426,7 @@ export default function BrotherProfile({
               )}
               {member.socialLinks?.website && (
                 <a
-                  href={member.socialLinks.website}
+                  href={normalizeExternalUrl(member.socialLinks.website)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Website"
