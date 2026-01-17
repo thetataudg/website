@@ -154,130 +154,169 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Our Values Section */}
-      <section className="mx-4 rounded-[36px] bg-[#fdf7df] py-24 text-center lg:mx-10 reveal">
-        <h2 className={`${bungee.className} text-5xl text-[#b3202a]`}>
-          Our Values
-        </h2>
-
-        <div className="mx-auto mt-14 flex w-full max-w-7xl flex-col gap-12 px-6">
-          <div className="rounded-[32px] bg-[#120a0a] px-10 py-16 shadow-[0_12px_32px_rgba(0,0,0,0.35)] sm:px-14 reveal">
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="order-2 lg:order-1 lg:text-left">
-                <h3 className={`${bungee.className} text-4xl text-[#b3202a]`}>
-                  Brotherhood
-                </h3>
-                <p className="mt-5 text-xl text-white/85">
-                  Theta Tau fosters a strong sense of brotherhood by uniting members
-                  through shared values, collaborative efforts, and lifelong friendships.
-                </p>
-                <a
-                  href="/pillars#brotherhood"
-                  className="tt-button-secondary mt-10 inline-flex"
-                >
-                  Meet Our Brothers
-                </a>
-              </div>
-              <div className="order-1 flex justify-center lg:order-2">
+      <section className="mx-4 rounded-[36px] bg-[#fdf7df] py-24 lg:mx-10 reveal">
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 text-center">
+          <p className="text-xs uppercase tracking-[0.5em] text-[#7a0104]">
+            The Pillars
+          </p>
+          <h2 className={`${bungee.className} mt-4 text-5xl text-[#b3202a]`}>
+            What We Stand For
+          </h2>
+        </div>
+        <div className="mx-auto mt-12 grid w-full max-w-7xl gap-8 px-6 lg:grid-cols-3">
+          <div className="flex h-full min-h-[520px] flex-col rounded-[32px] bg-[#120a0a] p-10 text-white shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
+            <div className="flex flex-1 flex-col">
+              <div className="overflow-hidden bg-black/30 [border-radius:28%_72%_58%_42%/38%_48%_52%_62%]">
                 <Image
                   alt="Brotherhood"
-                  src="/Homepage-Brotherhood.png"
+                  src="/brothers_1.JPG"
                   width="449"
                   height="334"
-                  className="rounded-[44px] w-[95%] max-w-[620px]"
+                  className="h-[220px] w-full object-cover [border-radius:28%_72%_58%_42%/38%_48%_52%_62%]"
                 />
               </div>
+              <h3 className={`${bungee.className} mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
+                Brotherhood
+              </h3>
+              <p className="mt-4 text-base text-white/80">
+                A family of engineers who push each other to grow, lead, and show up.
+              </p>
             </div>
+            <a
+              href="/brothers"
+              className="tt-button-secondary mt-8 inline-flex w-full justify-center text-center"
+            >
+              Meet the brothers
+            </a>
           </div>
-
-          <div className="rounded-[32px] bg-[#120a0a] px-10 py-16 shadow-[0_12px_32px_rgba(0,0,0,0.35)] sm:px-14 reveal">
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="flex justify-center">
-                <Image
-                  alt="Service"
-                  src="/Homepage-Service.png"
-                  width="449"
-                  height="334"
-                  className="rounded-[44px] w-[95%] max-w-[620px]"
-                />
-              </div>
-              <div className="lg:text-right">
-                <h3 className={`${bungee.className} text-4xl text-[#b3202a]`}>
-                  Service
-                </h3>
-                <p className="mt-5 text-xl text-white/85">
-                  Members dedicate time and skills to community outreach and philanthropy,
-                  creating meaningful change around campus and beyond.
-                </p>
-                <a
-                  href="/pillars#service"
-                  className="tt-button-secondary mt-10 inline-flex"
-                >
-                  Learn More
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[32px] bg-[#120a0a] px-10 py-16 shadow-[0_12px_32px_rgba(0,0,0,0.35)] sm:px-14 reveal">
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="order-2 text-center lg:order-1 lg:text-left">
-                <h3 className={`${bungee.className} text-3xl sm:text-4xl text-[#b3202a] text-balance`}>
-                  Professionalism
-                </h3>
-                <p className="mt-5 text-xl text-white/85">
-                  We cultivate communication, problem-solving, and leadership skills so
-                  engineers thrive professionally and serve their communities.
-                </p>
-                <a
-                  href="/pillars#professionalism"
-                  className="tt-button-secondary mt-10 inline-flex"
-                >
-                  Learn More
-                </a>
-              </div>
-              <div className="order-1 flex justify-center lg:order-2">
+          <div className="flex h-full min-h-[520px] flex-col rounded-[32px] bg-[#120a0a] p-10 text-white shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
+            <div className="flex flex-1 flex-col">
+              <div className="overflow-hidden bg-black/30 [border-radius:62%_38%_36%_64%/48%_62%_38%_52%]">
                 <Image
                   alt="Professionalism"
-                  src="/Homepage-Professional.png"
+                  src="/delta-gamma-people-professional.jpg"
                   width="449"
                   height="334"
-                  className="rounded-[44px] w-[95%] max-w-[620px]"
+                  className="h-[220px] w-full object-cover object-top [border-radius:62%_38%_36%_64%/48%_62%_38%_52%]"
                 />
               </div>
+              <h3 className={`${bungee.className} mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
+                Professionalism
+              </h3>
+              <p className="mt-4 text-base text-white/80">
+                Mentorship, career prep, and leadership training for engineers who want more.
+              </p>
             </div>
+            <a
+              href="/about#professionalism"
+              className="tt-button-secondary mt-8 inline-flex w-full justify-center text-center"
+            >
+              Learn more
+            </a>
+          </div>
+          <div className="flex h-full min-h-[520px] flex-col rounded-[32px] bg-[#120a0a] p-10 text-white shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
+            <div className="flex flex-1 flex-col">
+              <div className="overflow-hidden bg-black/30 [border-radius:42%_58%_30%_70%/62%_40%_60%_38%]">
+                <Image
+                  alt="Service"
+                  src="/service_2.jpg"
+                  width="449"
+                  height="334"
+                  className="h-[220px] w-full object-cover [border-radius:42%_58%_30%_70%/62%_40%_60%_38%]"
+                />
+              </div>
+              <h3 className={`${bungee.className} mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
+                Service
+              </h3>
+              <p className="mt-4 text-base text-white/80">
+                We build with purpose through outreach, philanthropy, and impact.
+              </p>
+            </div>
+            <a
+              href="/about#service"
+              className="tt-button-secondary mt-8 inline-flex w-full justify-center text-center"
+            >
+              Get involved
+            </a>
           </div>
         </div>
+      </section>
 
-        <div className="mx-auto mt-14 w-full max-w-5xl rounded-[28px] bg-[#120a0a] px-8 py-12 reveal stats-counter">
-          <div className="grid grid-cols-1 gap-10 text-center sm:grid-cols-3">
-            <div>
-              <FaUsers className="mx-auto" color="#e2ab16" size={72} />
-              <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-                {stats.actives}+
-              </h3>
-              <p className="text-sm uppercase tracking-[0.25em] text-white/80">
-                Actives
-              </p>
-            </div>
-            <div>
-              <FaGraduationCap className="mx-auto" color="#e2ab16" size={72} />
-              <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-                {stats.alumni}+
-              </h3>
-              <p className="text-sm uppercase tracking-[0.25em] text-white/80">
-                Alumni
-              </p>
-            </div>
-            <div>
-              <FaBuilding className="mx-auto" color="#e2ab16" size={72} />
-              <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-                {stats.chapters}+
-              </h3>
-              <p className="text-sm uppercase tracking-[0.25em] text-white/80">
-                Chapters
-              </p>
-            </div>
+      <section className="mx-auto mt-16 w-full max-w-5xl rounded-[28px] bg-[#120a0a] px-8 py-12 reveal stats-counter">
+        <div className="grid grid-cols-1 gap-10 text-center sm:grid-cols-3">
+          <div>
+            <FaUsers className="mx-auto" color="#e2ab16" size={72} />
+            <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
+              {stats.actives}+
+            </h3>
+            <p className="text-sm uppercase tracking-[0.25em] text-white/80">
+              Actives
+            </p>
+          </div>
+          <div>
+            <FaGraduationCap className="mx-auto" color="#e2ab16" size={72} />
+            <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
+              {stats.alumni}+
+            </h3>
+            <p className="text-sm uppercase tracking-[0.25em] text-white/80">
+              Alumni
+            </p>
+          </div>
+          <div>
+            <FaBuilding className="mx-auto" color="#e2ab16" size={72} />
+            <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
+              {stats.chapters}+
+            </h3>
+            <p className="text-sm uppercase tracking-[0.25em] text-white/80">
+              Chapters
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto mt-16 w-full max-w-6xl px-6 reveal">
+        <div className="grid gap-8 lg:grid-cols-[0.6fr,1.4fr]">
+          <div className="rounded-[28px] bg-[#120a0a] p-8 text-white shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
+            <p className="text-xs uppercase tracking-[0.5em] text-[#f5d79a]">
+              The Experience
+            </p>
+            <h2 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
+              Your journey here
+            </h2>
+            <p className="mt-4 text-base text-white/75">
+              From your first rush event to graduation, Delta Gamma stays by your
+              side with opportunities to learn, lead, and build a network for life.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            {[
+              {
+                title: "Rush & Connect",
+                copy: "Meet the chapter through socials, info sessions, and service nights.",
+              },
+              {
+                title: "Build Skills",
+                copy: "Resume reviews, industry talks, and interview prep with alumni.",
+              },
+              {
+                title: "Lead Together",
+                copy: "Run committees, plan events, and guide the chapter forward.",
+              },
+              {
+                title: "Lifelong Network",
+                copy: "Stay connected to brothers across the country and industry.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-[24px] border border-white/10 bg-[#1b0f0f] px-6 py-8 text-white shadow-[0_12px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_30px_rgba(0,0,0,0.45)]"
+              >
+                <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm text-white/70">{item.copy}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

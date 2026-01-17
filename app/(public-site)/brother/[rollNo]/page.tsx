@@ -83,6 +83,29 @@ const resolveMemberDisplay = (
   return { label: name || "Unknown member", rollNo: person.rollNo ?? null };
 };
 
+const renderMemberLinks = (
+  people: Array<string | { fName?: string; lName?: string; rollNo?: string }>
+) =>
+  people.map((person, index) => {
+    const { label, rollNo } = resolveMemberDisplay(person);
+    const content = rollNo ? (
+      <Link
+        href={`/brother/${rollNo}`}
+        className="text-[#f5d79a] underline underline-offset-4"
+      >
+        {label}
+      </Link>
+    ) : (
+      <span>{label}</span>
+    );
+    return (
+      <span key={`${label}-${index}`}>
+        {content}
+        {index < people.length - 1 ? ", " : ""}
+      </span>
+    );
+  });
+
 const normalizeExternalUrl = (value?: string) => {
   if (!value) return "";
   const trimmed = value.trim();

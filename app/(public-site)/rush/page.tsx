@@ -272,6 +272,54 @@ export default function Rush() {
         </div>
       </section>
 
+      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.05fr,0.95fr]">
+          <div className="flex h-full flex-col items-center">
+            <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+              Rush Timeline
+            </p>
+            <h2 className={`${bungee.className} mt-3 text-4xl text-[#b3202a]`}>
+              What to Expect
+            </h2>
+            <div className="relative mt-10 w-full max-w-xl flex-1">
+              <div className="absolute bottom-0 left-[11px] top-0 w-1 bg-[#b3202a] opacity-90" />
+              <div
+                className="grid h-full grid-cols-[24px,1fr] items-center gap-x-6 py-2"
+                style={{
+                  gridTemplateRows: `repeat(${rushEvents.length}, minmax(0, 1fr))`,
+                }}
+              >
+                {rushEvents.map((event) => (
+                  <React.Fragment key={`${event.title}-timeline`}>
+                    <div className="flex items-center justify-center">
+                      <span className="relative z-10 h-4 w-4 rounded-full bg-[#e2ab16] shadow-[0_0_0_2px_rgba(0,0,0,0.2)]" />
+                    </div>
+                    <div className="flex flex-col justify-center">
+                      <p className="text-sm uppercase tracking-[0.25em] text-white/70">
+                        {event.date} · {event.time}
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-white">
+                        {event.title}
+                      </p>
+                      <p className="text-base text-white/70">{event.location}</p>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="h-full rounded-[28px] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <Image
+              alt="Rush flyer"
+              src="/rush/Rush_Poster_SP26.png"
+              width={520}
+              height={650}
+              className="h-full w-full rounded-[22px] object-cover"
+            />
+          </div>
+        </div>
+      </section>
+
       <section className="mx-4 mt-10 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
         <div className="flex flex-col gap-3">
           <p className="text-sm uppercase tracking-[0.35em] text-[#7a0104]">
@@ -319,54 +367,6 @@ export default function Rush() {
               );
             });
           })()}
-        </div>
-      </section>
-
-      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.05fr,0.95fr]">
-          <div className="flex h-full flex-col items-center">
-            <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
-              Rush Timeline
-            </p>
-            <h2 className={`${bungee.className} mt-3 text-4xl text-[#b3202a]`}>
-              What to Expect
-            </h2>
-            <div className="relative mt-10 w-full max-w-xl flex-1">
-              <div className="absolute bottom-0 left-[11px] top-0 w-1 bg-[#b3202a] opacity-90" />
-              <div
-                className="grid h-full grid-cols-[24px,1fr] items-center gap-x-6 py-2"
-                style={{
-                  gridTemplateRows: `repeat(${rushEvents.length}, minmax(0, 1fr))`,
-                }}
-              >
-                {rushEvents.map((event) => (
-                  <React.Fragment key={`${event.title}-timeline`}>
-                    <div className="flex items-center justify-center">
-                      <span className="relative z-10 h-4 w-4 rounded-full bg-[#e2ab16] shadow-[0_0_0_2px_rgba(0,0,0,0.2)]" />
-                    </div>
-                    <div className="flex flex-col justify-center">
-                      <p className="text-sm uppercase tracking-[0.25em] text-white/70">
-                        {event.date} · {event.time}
-                      </p>
-                      <p className="mt-2 text-2xl font-semibold text-white">
-                        {event.title}
-                      </p>
-                      <p className="text-base text-white/70">{event.location}</p>
-                    </div>
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="h-full rounded-[28px] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
-            <Image
-              alt="Rush flyer"
-              src="/rush/Rush_Poster_SP26.png"
-              width={520}
-              height={650}
-              className="h-full w-full rounded-[22px] object-cover"
-            />
-          </div>
         </div>
       </section>
 
