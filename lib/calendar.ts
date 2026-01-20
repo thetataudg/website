@@ -7,6 +7,12 @@ import logger from "@/lib/logger";
 const CALENDAR_SCOPE = ["https://www.googleapis.com/auth/calendar"];
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || "UTC";
+const GENERATED_SERVICE_ACCOUNT_PATH = path.join(
+  process.cwd(),
+  "netlify",
+  "generated",
+  "google-service-account.json"
+);
 
 type CalendarSyncResult = {
   eventId: string;
@@ -42,7 +48,8 @@ function loadServiceAccount() {
   if (inline) {
     return tryParseServiceAccount(inline);
   }
-  const relativePath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+  const relativePath =
+    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || GENERATED_SERVICE_ACCOUNT_PATH;
   if (relativePath) {
     try {
       const resolved = path.isAbsolute(relativePath)

@@ -16,6 +16,9 @@
 # production
 /build
 
+# generated artifacts
+netlify/generated/
+
 # misc
 .DS_Store
 *.pem

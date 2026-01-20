@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/generate-google-service-account.js && next dev",
+    "build": "node scripts/generate-google-service-account.js && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-google-service-account": "node scripts/generate-google-service-account.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
