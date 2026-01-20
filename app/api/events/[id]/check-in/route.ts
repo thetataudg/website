@@ -6,6 +6,7 @@ import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { verifyCheckInCode } from "@/lib/checkinCode";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -20,10 +21,13 @@ async function getMemberByClerk(req: Request) {
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const actor = await getMemberByClerk(req);
-    const { memberId } = await req.json();
+    const { code, source, scannerMemberId } = await req.json();
 
-    if (!memberId) {
-      return NextResponse.json({ error: "memberId is required" }, { status: 400 });
+    if (!code || typeof code !== "string") {
+      return NextResponse.json({ error: "code is required" }, { status: 400 });
+    }
+    if (!source || typeof source !== "string") {
+      return NextResponse.json({ error: "source is required" }, { status: 400 });
     }
 
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
@@ -51,7 +55,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
-    const targetMember = await Member.findById(memberId).lean();
+    const decoded = verifyCheckInCode(code);
+    if (!decoded) {
+      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
+    }
+    if (!mongoose.Types.ObjectId.isValid(decoded.memberId)) {
+      return NextResponse.json(
+        { error: "Member referenced in code is invalid" },
+        { status: 400 }
+      );
+    }
+
+    const targetMember = await Member.findById(decoded.memberId).lean();
     if (!targetMember) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
@@ -63,26 +78,49 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    const targetId = new mongoose.Types.ObjectId(memberId);
+    const targetId = new mongoose.Types.ObjectId(decoded.memberId);
+    let scannerObjectId = null;
+    if (scannerMemberId && mongoose.Types.ObjectId.isValid(scannerMemberId)) {
+      scannerObjectId = new mongoose.Types.ObjectId(scannerMemberId);
+    }
+
     const update = await Event.collection.updateOne(
       {
         _id: eventId,
         "attendees.memberId": { $ne: targetId },
       },
       {
-        $push: { attendees: { memberId: targetId, checkedInAt: new Date() } },
+        $push: {
+          attendees: {
+            memberId: targetId,
+            checkedInAt: new Date(),
+            source,
+            scannerMemberId: scannerObjectId,
+          },
+        },
       } as any
     );
 
     if (update.matchedCount === 0) {
       return NextResponse.json(
-        { status: "already-checked-in" },
+        { status: "already-checked-in", memberId: decoded.memberId },
         { status: 200 }
       );
     }
 
-    logger.info({ eventId, memberId }, "Checked in member");
-    return NextResponse.json({ status: "checked-in" }, { status: 200 });
+    logger.info(
+      { eventId, memberId: decoded.memberId, source, scannerMemberId },
+      "Checked in member via QR"
+    );
+    return NextResponse.json(
+      {
+        status: "checked-in",
+        memberId: decoded.memberId,
+        source,
+        scannerMemberId,
+      },
+      { status: 200 }
+    );
   } catch (err: any) {
     logger.error({ err }, "Failed to check in member");
     return NextResponse.json({ error: err.message }, { status: 403 });

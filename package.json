@@ -23,15 +23,19 @@
     "clerk": "^0.8.3",
     "core-js": "^3.38.1",
     "dotenv": "^16.5.0",
+    "googleapis": "^170.1.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
+    "luxon": "^3.7.2",
     "mongoose": "^8.13.2",
     "next": "^14.2.4",
     "pino": "^9.6.0",
     "react": "^18",
     "react-bootstrap": "^2.10.4",
+    "react-datepicker": "^9.1.0",
     "react-dom": "^18",
     "react-icons": "^5.0.1"
+    , "@netlify/functions": "^3.0.0"
   },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",

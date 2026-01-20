@@ -6,6 +6,7 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { addRecurrence } from "@/lib/recurrence";
+import { syncEventWithCalendar } from "@/lib/calendar";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -65,6 +66,7 @@ async function ensureFutureOccurrences(parentId: any) {
       attendees: [],
       recurrenceParentId: parentId,
     });
+    await syncEventWithCalendar(created);
     last = created.toObject();
     toCreate -= 1;
   }
@@ -224,6 +226,13 @@ export async function POST(req: Request) {
 
     if (normalizedRecurrence.enabled && event?._id) {
       await ensureFutureOccurrences(event._id);
+    }
+
+    if (event) {
+      const syncResult = await syncEventWithCalendar(event);
+      if (syncResult.calendarEventId) {
+        event.calendarEventId = syncResult.calendarEventId;
+      }
     }
 
     logger.info({ eventId: event._id }, "Event created");
