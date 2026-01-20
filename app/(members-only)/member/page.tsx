@@ -31,6 +31,10 @@ export default function Dashboard() {
   const [showQr, setShowQr] = useState(false);
   const [qrTheme, setQrTheme] = useState("light");
   const [qrLoading, setQrLoading] = useState(false);
+  const [checkInCode, setCheckInCode] = useState("");
+  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
+  const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(0);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [isCommitteeHead, setIsCommitteeHead] = useState(false);
 
   useEffect(() => {
@@ -103,6 +107,67 @@ export default function Dashboard() {
     });
     return () => observer.disconnect();
   }, [showQr]);
+
+  useEffect(() => {
+    if (!showQr || !userData?.memberId) {
+      setCheckInCode("");
+      setCodeExpiresAt(null);
+      setCodeError(null);
+      return;
+    }
+
+    let mounted = true;
+    let timer: NodeJS.Timeout;
+
+    const fetchCode = async () => {
+      setQrLoading(true);
+      try {
+        const res = await fetch("/api/checkin-code", { credentials: "include" });
+        if (!res.ok) {
+          throw new Error("Unable to generate code");
+        }
+        const payload = await res.json();
+        if (!mounted) return;
+        setCheckInCode(payload.code);
+        setCodeExpiresAt(payload.expiresAt);
+        setCodeError(null);
+      } catch (err: any) {
+        if (!mounted) return;
+        setCodeError(err?.message || "Failed to refresh check-in code");
+      } finally {
+        if (mounted) {
+          setQrLoading(false);
+        }
+      }
+    };
+
+    fetchCode();
+    timer = setInterval(fetchCode, 10000);
+
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+    }, [showQr, userData?.memberId]);
+
+  useEffect(() => {
+    if (!codeExpiresAt) {
+      setSecondsUntilRefresh(0);
+      return;
+    }
+    const update = () => {
+      setSecondsUntilRefresh((prev) => {
+        const seconds = Math.max(
+          0,
+          Math.ceil((codeExpiresAt - Date.now()) / 1000)
+        );
+        return seconds;
+      });
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [codeExpiresAt]);
 
   if (!isLoaded || loadingUserData) {
     return <LoadingState message="Loading dashboard..." />;
@@ -258,6 +323,13 @@ export default function Dashboard() {
       icon: faAddressCard,
       enabled: userHasProfile,
       variant: "success",
+    },
+    {
+      label: "Minutes",
+      href: "/member/minutes",
+      icon: faNoteSticky,
+      enabled: userHasProfile,
+      variant: "info",
     },
     // {
     //   label: "Minutes",
@@ -463,19 +535,34 @@ export default function Dashboard() {
                     <span className="text-muted">Loading QR code...</span>
                   </div>
                 )}
-                <img
-                  alt="Member QR Code"
-                  className="qr-code"
-                  src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-                    userData.memberId
-                  )}&size=480x480&color=${qrTheme === "dark" ? "ffffff" : "000000"}&bgcolor=${
-                    qrTheme === "dark" ? "121a24" : "fffaf4"
-                  }`}
-                  onLoad={() => setQrLoading(false)}
-                  onError={() => setQrLoading(false)}
-                  style={{ opacity: qrLoading ? 0 : 1 }}
-                />
-                <p className="text-muted mt-3">Show this at event check-in.</p>
+                {checkInCode ? (
+                  <img
+                    alt="Member QR Code"
+                    className="qr-code"
+                    src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+                      checkInCode
+                    )}&size=480x480&color=${
+                      qrTheme === "dark" ? "ffffff" : "000000"
+                    }&bgcolor=${qrTheme === "dark" ? "121a24" : "fffaf4"}`}
+                    onLoad={() => setQrLoading(false)}
+                    onError={() => setQrLoading(false)}
+                    style={{ opacity: qrLoading ? 0 : 1 }}
+                  />
+                ) : (
+                  <div className="qr-loading" style={{ marginTop: 24 }}>
+                    <span className="text-muted">
+                      {codeError || "Generating QR code..."}
+                    </span>
+                  </div>
+                )}
+                <p className="text-muted mt-3">
+                  Show this at event check-in.
+                  {secondsUntilRefresh > 0 ? (
+                    <> (refreshes in {secondsUntilRefresh}s)</>
+                  ) : (
+                    <> (refreshing...)</>
+                  )}
+                </p>
               </div>
             </div>
           </div>

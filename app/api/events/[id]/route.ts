@@ -7,6 +7,7 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { addRecurrence, applyTimeOfDay } from "@/lib/recurrence";
+import { syncEventWithCalendar, deleteCalendarEvent } from "@/lib/calendar";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -74,6 +75,7 @@ async function ensureFutureOccurrences(parentId: any) {
       attendees: [],
       recurrenceParentId: parentId,
     });
+    await syncEventWithCalendar(created);
     last = created.toObject();
     toCreate -= 1;
   }
@@ -349,6 +351,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         if (normalizedRecurrence.enabled) {
           await ensureFutureOccurrences(parentId);
         }
+
+        const refreshedInstances = await Event.find({
+          recurrenceParentId: parentId,
+          startTime: { $gte: new Date() },
+        });
+        for (const instance of refreshedInstances) {
+          await syncEventWithCalendar(instance);
+        }
+
+        const refreshedParent = await Event.findById(parentId);
+        if (refreshedParent) {
+          await syncEventWithCalendar(refreshedParent);
+        }
       }
     } else if (
       updatedEvent?.recurrence?.enabled &&
@@ -374,6 +389,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     if (updatedEvent && normalizedRecurrence) {
       (updatedEvent as any).recurrence = normalizedRecurrence;
+    }
+
+    if (updatedEvent) {
+      await syncEventWithCalendar(updatedEvent);
     }
 
     return NextResponse.json(updatedEvent, { status: 200 });
@@ -408,6 +427,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       );
     }
 
+    await deleteCalendarEvent(event);
     await Event.deleteOne({ _id: event._id });
     await Committee.findByIdAndUpdate(event.committeeId, {
       $pull: { events: event._id },

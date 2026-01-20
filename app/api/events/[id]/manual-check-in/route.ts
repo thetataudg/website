@@ -20,11 +20,13 @@ async function getMemberByClerk(req: Request) {
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const actor = await getMemberByClerk(req);
-    const { memberId } = await req.json();
+    const { memberId, source } = await req.json();
 
     if (!memberId || !mongoose.Types.ObjectId.isValid(memberId)) {
       return NextResponse.json({ error: "memberId is required" }, { status: 400 });
     }
+
+    const checkInSource = source && typeof source === "string" ? source : "Manual";
 
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -58,13 +60,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     const targetId = new mongoose.Types.ObjectId(memberId);
+    const scannerId =
+      typeof actor._id === "string" && mongoose.Types.ObjectId.isValid(actor._id)
+        ? new mongoose.Types.ObjectId(actor._id)
+        : null;
     const update = await Event.updateOne(
       {
         _id: eventId,
         "attendees.memberId": { $ne: targetId },
       },
       {
-        $push: { attendees: { memberId: targetId, checkedInAt: new Date() } },
+        $push: {
+          attendees: {
+            memberId: targetId,
+            checkedInAt: new Date(),
+            source: checkInSource,
+            scannerMemberId: scannerId,
+          },
+        },
       }
     );
 
@@ -75,7 +88,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    logger.info({ eventId, memberId }, "Manual check-in added");
+    logger.info({ eventId, memberId, source: checkInSource }, "Manual check-in added");
     return NextResponse.json({ status: "checked-in" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to add manual check-in");

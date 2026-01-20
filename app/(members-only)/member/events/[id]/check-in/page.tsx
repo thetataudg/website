@@ -30,6 +30,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const zxingControlsRef = useRef<{ stop: () => void } | null>(null);
   const zxingReaderRef = useRef<any>(null);
   const scanningRef = useRef(false);
+  const processingRef = useRef(false);
 
   async function refreshEvent() {
     const eventRes = await fetch(`/api/events/${params.id}`);
@@ -79,11 +80,46 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const formatMstDateTime = (value: string | Date) =>
     mstDateTimeFormatter.format(new Date(value));
 
-  async function checkIn(memberId: string) {
+  async function checkInCode(code: string) {
+    const payload: Record<string, any> = {
+      code,
+      source: "Phone",
+    };
+    if (me?.memberId) {
+      payload.scannerMemberId = me.memberId;
+    }
     const res = await fetch(`/api/events/${params.id}/check-in`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId }),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    const errorMessage =
+      data?.error === "Invalid code" ? "Invalid or expired code." : data?.error;
+    if (res.ok) {
+      setStatus(
+        data.status === "already-checked-in"
+          ? "Already checked in."
+          : "Checked in successfully."
+      );
+      await refreshEvent();
+    } else {
+      setStatus(errorMessage || "Check-in failed.");
+    }
+  }
+
+  async function manualCheckIn(memberId: string) {
+    const payload: Record<string, any> = {
+      memberId,
+      source: "Phone",
+    };
+    if (me?.memberId) {
+      payload.scannerMemberId = me.memberId;
+    }
+    const res = await fetch(`/api/events/${params.id}/manual-check-in`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -94,7 +130,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
       );
       await refreshEvent();
     } else {
-      setStatus(data.error || "Check-in failed.");
+      setStatus(data.error || "Manual check-in failed.");
     }
   }
 
@@ -113,13 +149,15 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
           videoRef.current,
           async (result) => {
             if (!scanningRef.current || !result) return;
-            const text =
-              typeof result === "string" ? result : result.getText?.() || "";
-            if (text) {
-              scanningRef.current = false;
-              await checkIn(text);
-              stopScanner();
-            }
+        const text =
+          typeof result === "string" ? result : result.getText?.() || "";
+        if (text && !processingRef.current) {
+          processingRef.current = true;
+          await checkInCode(text);
+          setTimeout(() => {
+            processingRef.current = false;
+          }, 1500);
+        }
           }
         );
         return;
@@ -166,10 +204,12 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
       const codes = await detectorRef.current.detect(videoRef.current);
       if (codes && codes.length > 0) {
         const code = codes[0].rawValue || "";
-        if (code) {
-          scanningRef.current = false;
-          await checkIn(code);
-          stopScanner();
+        if (code && !processingRef.current) {
+          processingRef.current = true;
+          await checkInCode(code);
+          setTimeout(() => {
+            processingRef.current = false;
+          }, 1500);
         }
       }
     } catch {
@@ -399,7 +439,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
                   type="button"
                   className="btn btn-outline-primary"
                   onClick={async () => {
-                    await checkIn(pendingCheckIn._id);
+                    await manualCheckIn(pendingCheckIn._id);
                     setPendingCheckIn(null);
                   }}
                 >

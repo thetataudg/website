@@ -63,6 +63,8 @@ export default function EventsPage() {
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     async function init() {
@@ -106,6 +108,36 @@ export default function EventsPage() {
     setEvents(data);
   }
 
+  const canForceSyncCalendar =
+    !!me &&
+    (me.role === "admin" ||
+      me.role === "superadmin" ||
+      me.isCommitteeHead);
+
+  async function handleForceSyncCalendar() {
+    if (!canForceSyncCalendar) return;
+    setIsSyncingCalendar(true);
+    setSyncFeedback(null);
+    try {
+      const res = await fetch("/api/calendar/force-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || "Calendar sync failed");
+      }
+      setSyncFeedback(
+        `Synced ${payload.synced ?? 0} of ${payload.total ?? 0} events`
+      );
+      await reloadEvents();
+    } catch (err: any) {
+      setSyncFeedback(err?.message || "Failed to sync calendar");
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  }
+
   async function fetchEventDetails(eventId: string) {
     const res = await fetch(`/api/events/${eventId}`);
     if (!res.ok) return null;
@@ -133,6 +165,8 @@ export default function EventsPage() {
     if (!res.ok) return;
     const updated = await res.json();
     if (applyToSeries === "series") {
+      await reloadEvents();
+    } else if (status === "completed" || status === "cancelled") {
       await reloadEvents();
     } else {
       setEvents((prev) =>
@@ -274,42 +308,7 @@ export default function EventsPage() {
   };
 
   const collapseRecurring = (list: EventItem[]) => {
-    const now = new Date();
-    const seriesMap = new Map<
-      string,
-      { upcoming?: EventItem; latestPast?: EventItem }
-    >();
-    const standalone: EventItem[] = [];
-
-    list.forEach((evt) => {
-      const seriesKey =
-        evt.recurrenceParentId ||
-        (evt.recurrence?.enabled || evt.recurrenceEnabled ? evt._id : null);
-      if (!seriesKey) {
-        standalone.push(evt);
-        return;
-      }
-      const start = new Date(evt.startTime);
-      const end = new Date(evt.endTime);
-      const entry = seriesMap.get(seriesKey) || {};
-
-      if (!isPastEvent(evt, now)) {
-        if (!entry.upcoming || start < new Date(entry.upcoming.startTime)) {
-          entry.upcoming = evt;
-        }
-      } else if (includePast) {
-        if (!entry.latestPast || end > new Date(entry.latestPast.endTime)) {
-          entry.latestPast = evt;
-        }
-      }
-      seriesMap.set(seriesKey, entry);
-    });
-
-    const collapsed = Array.from(seriesMap.values())
-      .map((entry) => entry.upcoming || entry.latestPast)
-      .filter(Boolean) as EventItem[];
-
-    return [...standalone, ...collapsed].sort(
+    return [...list].sort(
       (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
   };
@@ -636,7 +635,7 @@ export default function EventsPage() {
           <div className="btn-group" role="group" aria-label="View">
             <button
               type="button"
-              className={`btn btn-lg ${
+              className={`btn btn-sm ${
                 viewMode === "list" ? "btn-primary" : "btn-outline-secondary"
               }`}
               onClick={() => setViewMode("list")}
@@ -647,7 +646,7 @@ export default function EventsPage() {
             </button>
             <button
               type="button"
-              className={`btn btn-lg ${
+              className={`btn btn-sm ${
                 viewMode === "calendar" ? "btn-primary" : "btn-outline-secondary"
               }`}
               onClick={() => setViewMode("calendar")}
@@ -670,6 +669,21 @@ export default function EventsPage() {
             </span>
             <span className="events-toggle__label">Show past events</span>
           </label>
+          {canForceSyncCalendar && (
+            <div className="d-flex flex-column align-items-end gap-1">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                disabled={isSyncingCalendar}
+                onClick={handleForceSyncCalendar}
+              >
+                {isSyncingCalendar ? "Syncing calendar…" : "Force calendar sync"}
+              </button>
+              {syncFeedback && (
+                <small className="text-muted">{syncFeedback}</small>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -685,7 +699,7 @@ export default function EventsPage() {
             <div className="btn-group" role="group">
               <button
                 type="button"
-                className={`btn btn-lg ${
+                className={`btn btn-sm ${
                   calendarView === "month"
                     ? "btn-primary"
                     : "btn-outline-secondary"
@@ -696,7 +710,7 @@ export default function EventsPage() {
               </button>
               <button
                 type="button"
-                className={`btn btn-lg ${
+                className={`btn btn-sm ${
                   calendarView === "week"
                     ? "btn-primary"
                     : "btn-outline-secondary"
@@ -709,21 +723,21 @@ export default function EventsPage() {
             <div className="btn-group" role="group">
               <button
                 type="button"
-                className="btn btn-lg btn-outline-secondary"
+                className="btn btn-sm btn-outline-secondary"
                 onClick={() => shiftCalendar(-1)}
               >
                 Prev
               </button>
               <button
                 type="button"
-                className="btn btn-lg btn-outline-secondary"
+                className="btn btn-sm btn-outline-secondary"
                 onClick={() => setCalendarDate(new Date())}
               >
                 Today
               </button>
               <button
                 type="button"
-                className="btn btn-lg btn-outline-secondary"
+                className="btn btn-sm btn-outline-secondary"
                 onClick={() => shiftCalendar(1)}
               >
                 Next
@@ -731,7 +745,7 @@ export default function EventsPage() {
             </div>
             <button
               type="button"
-              className="btn btn-lg btn-outline-secondary"
+              className="btn btn-sm btn-outline-secondary"
               onClick={handleDownloadCalendar}
             >
               Download .ics

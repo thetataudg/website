@@ -15,6 +15,7 @@ const EventSchema = new Schema(
     startedAt: { type: Date },
     endedAt: { type: Date },
     location: { type: String, default: "" },
+    calendarEventId: { type: String, default: null },
     gemPointDurationMinutes: { type: Number, default: 0 },
     eventType: {
       type: String,
@@ -43,6 +44,12 @@ const EventSchema = new Schema(
       {
         memberId: { type: Schema.Types.ObjectId, ref: "Member", required: true },
         checkedInAt: { type: Date, required: true },
+        source: { type: String, default: null },
+        scannerMemberId: {
+          type: Schema.Types.ObjectId,
+          ref: "Member",
+          default: null,
+        },
       },
     ],
   },

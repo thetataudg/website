@@ -321,6 +321,16 @@ export default function MemberNavbar() {
                   </Link>
                 </li>
 
+                <li className="nav-item">
+                  <Link
+                    className={`nav-link ${isActive("/member/minutes") ? "active" : ""
+                      }`}
+                    href="/member/minutes"
+                  >
+                    Minutes
+                  </Link>
+                </li>
+
                 <li className="nav-item dropdown">
                   <a
                     className="nav-link dropdown-toggle"
@@ -338,11 +348,10 @@ export default function MemberNavbar() {
                   >
                     <li>
                       <Link
-                        className={`dropdown-item ${isActive("/member/minutes") ? "active" : ""
-                          }`}
-                        href="/member/minutes"
+                        className="dropdown-item"
+                        href="#"
                       >
-                        Minutes
+                        Coming Soon
                       </Link>
                     </li>
                     <li>
@@ -364,6 +373,11 @@ export default function MemberNavbar() {
           </ul>
 
           <ul className="navbar-nav ms-auto members-navbar__actions">
+            <li className="nav-item d-flex align-items-center me-2">
+              <Link className="btn btn-outline-light btn-sm main-site-link" href="/">
+                Main Site
+              </Link>
+            </li>
             <li className="nav-item">
               <ThemeToggle />
             </li>

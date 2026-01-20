@@ -36,6 +36,7 @@ yarn-error.log*
 next-env.d.ts
 
 .env
+calendar.json
 
 # clerk configuration (can include secrets)
 /.clerk/
