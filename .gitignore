@@ -16,6 +16,9 @@
 # production
 /build
 
+# generated artifacts
+netlify/generated/
+
 # misc
 .DS_Store
 *.pem
@@ -27,6 +30,9 @@ yarn-error.log*
 
 # local env files
 .env*.local
+
+# local secrets that should never be committed
+secrets/
 
 # vercel
 .vercel

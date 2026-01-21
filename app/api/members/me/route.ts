@@ -86,6 +86,22 @@ export async function PATCH(req: Request) {
   };
 
   const ensureArray = (value: any) => (Array.isArray(value) ? value : undefined);
+  const parseRollNos = (value: any) => {
+    if (value === undefined || value === null) return [];
+    const list = Array.isArray(value) ? value : [value];
+    return list
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  };
+  const resolveRollRefs = async (rollNos: string[], limit: number) => {
+    const normalized = rollNos.slice(0, limit);
+    if (!normalized.length) return [];
+    const docs = await Member.find({ rollNo: { $in: normalized } }, { rollNo: 1 }).lean();
+    const map = new Map(docs.map((doc: any) => [doc.rollNo, doc._id]));
+    return normalized
+      .map((roll) => map.get(roll))
+      .filter(Boolean);
+  };
 
   assignIf("headline", updates.headline);
   assignIf("pronouns", updates.pronouns);
@@ -104,6 +120,12 @@ export async function PATCH(req: Request) {
   assignIf("socialLinks", updates.socialLinks);
 
   await connectDB();
+  if ("bigs" in updates) {
+    sanitized.bigs = await resolveRollRefs(parseRollNos(updates.bigs), 1);
+  }
+  if ("littles" in updates) {
+    sanitized.littles = await resolveRollRefs(parseRollNos(updates.littles), 5);
+  }
   const member = await Member.findOneAndUpdate(
     { clerkId },
     { $set: sanitized },
