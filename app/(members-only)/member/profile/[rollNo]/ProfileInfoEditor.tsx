@@ -5,6 +5,22 @@ import { useState } from "react";
 import type { MemberDoc } from "@/types/member";
 import { LoadingSpinner } from "../../../components/LoadingState";
 
+const resolveRollNo = (entry: any) => {
+  if (!entry) return "";
+  if (typeof entry === "string") return entry;
+  if (typeof entry.rollNo === "string") return entry.rollNo;
+  if (entry.memberId) {
+    if (typeof entry.memberId === "string") return entry.memberId;
+    if (Array.isArray(entry.memberId) && entry.memberId.length) {
+      return typeof entry.memberId[0] === "string"
+        ? entry.memberId[0]
+        : entry.memberId[0]?.rollNo || "";
+    }
+    if (typeof entry.memberId.rollNo === "string") return entry.memberId.rollNo;
+  }
+  return "";
+};
+
 type ProjectItem = { title: string; description: string; link: string };
 type WorkItem = {
   title: string;
@@ -56,6 +72,11 @@ export default function ProfileInfoEditor({
     bio: member.bio || "",
     hometown: member.hometown,
     pledgeClass: member.pledgeClass || "",
+    big: resolveRollNo(member.bigs?.[0]),
+    littles: (member.littles || [])
+      .map((entry) => resolveRollNo(entry))
+      .filter(Boolean)
+      .join(", "),
     skills: (member.skills || []).join("\n"),
     funFacts: (member.funFacts || []).join("\n"),
     github: socials.github || "",
@@ -152,6 +173,8 @@ export default function ProfileInfoEditor({
       bio: form.bio,
       hometown: form.hometown,
       pledgeClass: form.pledgeClass.trim(),
+      bigs: form.big ? [form.big.trim()] : [],
+      littles: parseList(form.littles).slice(0, 5),
       skills: parseList(form.skills),
       funFacts: parseList(form.funFacts),
       projects: form.projects,
@@ -257,6 +280,27 @@ export default function ProfileInfoEditor({
               className="form-control"
               value={form.hometown}
               onChange={(e) => updateField("hometown", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="row mb-3">
+          <div className="col-sm-6">
+            <label className="form-label">Big (roll number)</label>
+            <input
+              className="form-control"
+              value={form.big}
+              onChange={(e) => updateField("big", e.target.value)}
+              placeholder="e.g. 12345"
+            />
+          </div>
+          <div className="col-sm-6">
+            <label className="form-label">Littles (comma-separated, up to 5)</label>
+            <input
+              className="form-control"
+              value={form.littles}
+              onChange={(e) => updateField("littles", e.target.value)}
+              placeholder="e.g. 54321, 67890"
             />
           </div>
         </div>

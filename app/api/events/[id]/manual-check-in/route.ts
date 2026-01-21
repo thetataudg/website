@@ -38,7 +38,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     const isAdmin = actor.role === "admin" || actor.role === "superadmin";
-    if (!isAdmin) {
+    const isPrivileged = isAdmin || actor.isECouncil;
+    if (!isPrivileged) {
       const committee = await Committee.findById(event.committeeId);
       const isHead =
         committee?.committeeHeadId?.toString() === actor._id?.toString();
