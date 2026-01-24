@@ -1,10 +1,36 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import { GEM_CATEGORIES, GEM_CATEGORY_LABELS, GemCategory } from "@/lib/gem";
+import { toArizonaInputValue, toArizonaIso } from "@/lib/recurrence";
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active (scheduled / ongoing)" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "ongoing", label: "Ongoing" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const TYPE_OPTIONS = [
+  { value: "all", label: "All types" },
+  { value: "meeting", label: "Meeting" },
+  { value: "event", label: "Event" },
+  { value: "chapter", label: "Chapter" },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: "all", label: "All GEM categories" },
+  ...GEM_CATEGORIES.map((value) => ({
+    value,
+    label: GEM_CATEGORY_LABELS[value],
+  })),
+  { value: "uncategorized", label: "Uncategorized" },
+];
 
 type Committee = {
   _id: string;
@@ -31,6 +57,13 @@ export default function EventCreatorPage() {
   const [showModal, setShowModal] = useState(false);
   const [showSeriesPrompt, setShowSeriesPrompt] = useState(false);
   const [summaryEvent, setSummaryEvent] = useState<any | null>(null);
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [committeeFilter, setCommitteeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [nameFilter, setNameFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const EVENTS_PER_PAGE = 15;
 
   const mstDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Phoenix",
@@ -47,6 +80,7 @@ export default function EventCreatorPage() {
     startTime: "",
     endTime: "",
     location: "",
+    gemCategory: "",
     eventType: "event",
     status: "scheduled",
     visibleToAlumni: true,
@@ -111,6 +145,7 @@ export default function EventCreatorPage() {
       startTime: "",
       endTime: "",
       location: "",
+      gemCategory: "",
       eventType: "event",
       status: "scheduled",
       visibleToAlumni: true,
@@ -128,6 +163,9 @@ export default function EventCreatorPage() {
     return event?.committeeId ? "event" : "chapter";
   };
 
+  const capitalizeLabel = (value: string) =>
+    value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
+
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -138,9 +176,10 @@ export default function EventCreatorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        startTime: toMstIso(form.startTime),
-        endTime: toMstIso(form.endTime),
+        startTime: toArizonaIso(form.startTime),
+        endTime: toArizonaIso(form.endTime),
         committeeId: form.chapterWide ? null : form.committeeId || null,
+        gemCategory: form.gemCategory || null,
         recurrence: {
           enabled: form.recurrenceEnabled,
           frequency: form.recurrenceFrequency,
@@ -179,34 +218,72 @@ export default function EventCreatorPage() {
       ? events
       : events.filter((evt) => managedCommitteeIds.includes(evt.committeeId));
 
-  const mstFormatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Phoenix",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const resolvedStatusList = (filter: string) =>
+    filter === "active" ? ["scheduled", "ongoing"] : [filter];
 
-  function toMstInputValue(value: string | Date) {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "";
-    const parts = mstFormatter.formatToParts(d);
-    const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-    return `${lookup.year}-${lookup.month}-${lookup.day}T${lookup.hour}:${lookup.minute}`;
-  }
+  const filteredEvents = useMemo(() => {
+    if (!managedEvents.length) return [];
+    return managedEvents.filter((evt) => {
+      const statuses = resolvedStatusList(statusFilter);
+      if (!statuses.includes(evt.status)) {
+        return false;
+      }
+      const normalizedType = normalizeEventType(evt);
+      if (typeFilter !== "all" && normalizedType !== typeFilter) {
+        return false;
+      }
+      if (committeeFilter !== "all") {
+        if (committeeFilter === "chapter") {
+          if (normalizedType !== "chapter") return false;
+        } else if (evt.committeeId !== committeeFilter) {
+          return false;
+        }
+      }
+      const eventCategory = evt.gemCategory || "uncategorized";
+      if (categoryFilter !== "all" && eventCategory !== categoryFilter) {
+        return false;
+      }
+      if (nameFilter.trim()) {
+        if (!evt.name?.toLowerCase().includes(nameFilter.trim().toLowerCase())) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [
+    managedEvents,
+    statusFilter,
+    typeFilter,
+    committeeFilter,
+    categoryFilter,
+    nameFilter,
+  ]);
 
-  function toMstIso(value: string) {
-    if (!value) return value;
-    const [datePart, timePart] = value.split("T");
-    if (!datePart || !timePart) return value;
-    const [year, month, day] = datePart.split("-").map(Number);
-    const [hour, minute] = timePart.split(":").map(Number);
-    if ([year, month, day, hour, minute].some((v) => Number.isNaN(v))) return value;
-    const utcMs = Date.UTC(year, month - 1, day, hour + 7, minute);
-    return new Date(utcMs).toISOString();
-  }
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    statusFilter,
+    typeFilter,
+    committeeFilter,
+    categoryFilter,
+    nameFilter,
+    managedEvents.length,
+  ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredEvents.length / EVENTS_PER_PAGE)
+  );
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedEvents = filteredEvents.slice(
+    (currentPage - 1) * EVENTS_PER_PAGE,
+    currentPage * EVENTS_PER_PAGE
+  );
 
   function toDateInputValue(value: string | Date) {
     const d = new Date(value);
@@ -234,9 +311,10 @@ export default function EventCreatorPage() {
       name: event.name || "",
       description: event.description || "",
       committeeId: event.committeeId || "",
-      startTime: toMstInputValue(event.startTime),
-      endTime: toMstInputValue(event.endTime),
+      startTime: toArizonaInputValue(event.startTime),
+      endTime: toArizonaInputValue(event.endTime),
       location: event.location || "",
+      gemCategory: event.gemCategory || "",
       eventType: event.eventType || "event",
       status: event.status || "scheduled",
       visibleToAlumni: !!event.visibleToAlumni,
@@ -277,9 +355,10 @@ export default function EventCreatorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        startTime: toMstIso(form.startTime),
-        endTime: toMstIso(form.endTime),
+        startTime: toArizonaIso(form.startTime),
+        endTime: toArizonaIso(form.endTime),
         committeeId: form.eventType === "chapter" ? null : form.committeeId || null,
+        gemCategory: form.gemCategory || null,
         recurrence: {
           enabled: form.recurrenceEnabled,
           frequency: form.recurrenceFrequency,
@@ -395,6 +474,90 @@ export default function EventCreatorPage() {
             Create Event
           </button>
         </div>
+        <hr className="my-4" />
+        <div className="event-filter-row row g-3 align-items-end">
+          <div className="col-md-3 col-sm-6">
+            <label className="form-label small text-muted">Status</label>
+            <select
+              className="form-select form-select-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-3 col-sm-6">
+            <label className="form-label small text-muted">Type</label>
+            <select
+              className="form-select form-select-sm"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              {TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-4 col-sm-6">
+            <label className="form-label small text-muted">Committee</label>
+            <select
+              className="form-select form-select-sm"
+              value={committeeFilter}
+              onChange={(e) => setCommitteeFilter(e.target.value)}
+            >
+              <option value="all">All committees</option>
+              <option value="chapter">Chapter-wide</option>
+              {committees.map((committee) => (
+                <option key={committee._id} value={committee._id}>
+                  {committee.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-3 col-sm-6">
+            <label className="form-label small text-muted">GEM category</label>
+            <select
+              className="form-select form-select-sm"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-2 col-sm-6">
+            <label className="form-label small text-muted">Event name</label>
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Search"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="bento-card admin-table-card mt-3">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <p className="text-muted small mb-0">
+              Showing {filteredEvents.length} events matching filters
+            </p>
+          </div>
+          <div className="text-muted small">
+            Page {currentPage} of {totalPages}
+          </div>
+        </div>
         <div className="table-responsive">
           <table className="table admin-table">
             <thead>
@@ -402,37 +565,47 @@ export default function EventCreatorPage() {
                 <th>Name</th>
                 <th>Committee</th>
                 <th>Type</th>
+                <th>Category</th>
                 <th>Start</th>
                 <th>Status</th>
                 <th className="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {managedEvents.map((evt) => {
+              {paginatedEvents.map((evt) => {
                 const committee = committees.find((c) => c._id === evt.committeeId);
                 const eventTypeLabel = normalizeEventType(evt);
+                const displayEventType = capitalizeLabel(eventTypeLabel);
+                const categoryLabel =
+                  evt.gemCategory && GEM_CATEGORY_LABELS[evt.gemCategory as GemCategory]
+                    ? GEM_CATEGORY_LABELS[evt.gemCategory as GemCategory]
+                    : "Uncategorized";
+                const committeeDisplay =
+                  committee?.name ||
+                  (eventTypeLabel === "chapter" ? "Chapter" : "Unknown");
                 return (
                   <tr key={evt._id}>
                     <td>{evt.name}</td>
-                    <td>{committee?.name || "Unknown"}</td>
-                    <td>{eventTypeLabel}</td>
+                    <td>{committeeDisplay}</td>
+                    <td>{displayEventType}</td>
+                    <td>{categoryLabel}</td>
                     <td>{formatMstDateTime(evt.startTime)}</td>
                     <td>{evt.status}</td>
                     <td className="text-end">
-                    {evt.status === "completed" && (
+                      {evt.status === "completed" && (
+                        <button
+                          className="btn btn-sm btn-outline-secondary me-2"
+                          onClick={() => viewAttendance(evt._id)}
+                        >
+                          View
+                        </button>
+                      )}
                       <button
-                        className="btn btn-sm btn-outline-secondary me-2"
-                        onClick={() => viewAttendance(evt._id)}
+                        className="btn btn-sm btn-outline-primary me-2"
+                        onClick={() => startEdit(evt._id)}
                       >
-                        View
+                        Edit
                       </button>
-                    )}
-                    <button
-                      className="btn btn-sm btn-outline-primary me-2"
-                      onClick={() => startEdit(evt._id)}
-                    >
-                      Edit
-                    </button>
                       <button
                         className="btn btn-sm btn-outline-danger"
                         onClick={() => {
@@ -446,15 +619,47 @@ export default function EventCreatorPage() {
                   </tr>
                 );
               })}
-              {managedEvents.length === 0 && (
+              {filteredEvents.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-muted">
+                  <td colSpan={7} className="text-center text-muted">
                     No events found.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+        <div className="d-flex justify-content-between align-items-center mt-3">
+          <span className="text-muted small">
+            Showing{" "}
+            {filteredEvents.length
+              ? `${(currentPage - 1) * EVENTS_PER_PAGE + 1} - ${Math.min(
+                  filteredEvents.length,
+                  currentPage * EVENTS_PER_PAGE
+                )}`
+              : "0"}{" "}
+            of {filteredEvents.length} events
+          </span>
+          <div className="btn-group btn-group-sm">
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+              }
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </section>
 
@@ -539,6 +744,21 @@ export default function EventCreatorPage() {
                 <option value="meeting">Meeting</option>
                 <option value="event">Event</option>
                 <option value="chapter">Chapter</option>
+              </select>
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">GEM Category</label>
+              <select
+                className="form-select"
+                value={form.gemCategory}
+                onChange={(e) => updateForm("gemCategory", e.target.value)}
+              >
+                <option value="">Uncategorized</option>
+                {GEM_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {GEM_CATEGORY_LABELS[category]}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="col-12">

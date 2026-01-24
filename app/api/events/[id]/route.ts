@@ -6,8 +6,9 @@ import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
-import { addRecurrence, applyTimeOfDay } from "@/lib/recurrence";
+import { addRecurrence, applyTimeOfDay, getArizonaNow, toArizonaDateTime } from "@/lib/recurrence";
 import { syncEventWithCalendar, deleteCalendarEvent } from "@/lib/calendar";
+import { normalizeGemCategory } from "@/lib/gem";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -32,7 +33,7 @@ async function ensureFutureOccurrences(parentId: any) {
   if (!parent || !parent.recurrence?.enabled) return;
 
   const count = Math.max(Number(parent.recurrence?.count) || 1, 1);
-  const now = new Date();
+  const now = getArizonaNow();
 
   const existing = await Event.find({
     $or: [{ _id: parentId }, { recurrenceParentId: parentId }],
@@ -40,7 +41,10 @@ async function ensureFutureOccurrences(parentId: any) {
     .sort({ startTime: 1 })
     .lean();
 
-  const future = existing.filter((evt: any) => evt.startTime >= now);
+  const future = existing.filter((evt: any) => {
+    const eventStart = toArizonaDateTime(evt.startTime);
+    return eventStart ? eventStart >= now : false;
+  });
   if (future.length >= count) return;
 
   let last = existing[existing.length - 1] || parent;
@@ -67,8 +71,8 @@ async function ensureFutureOccurrences(parentId: any) {
       startedAt: null,
       endedAt: null,
       location: parent.location,
-      gemPointDurationMinutes: parent.gemPointDurationMinutes,
       eventType: parent.eventType,
+      gemCategory: parent.gemCategory || null,
       recurrence: { enabled: false },
       status: "scheduled",
       visibleToAlumni: parent.visibleToAlumni,
@@ -230,14 +234,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const isRecurringInstance = !!event.recurrenceParentId;
     const seriesParentId = isRecurringInstance ? event.recurrenceParentId : null;
 
+    const requestedGemCategory =
+      updates.gemCategory === undefined ? event.gemCategory : updates.gemCategory;
+    const normalizedGemCategory = normalizeGemCategory(requestedGemCategory);
+
     const updatesToApply: any = {
       name: updates.name ?? event.name,
       description: updates.description ?? event.description,
       startTime: updates.startTime ? new Date(updates.startTime) : event.startTime,
       endTime: updates.endTime ? new Date(updates.endTime) : event.endTime,
       location: updates.location ?? event.location,
-      gemPointDurationMinutes:
-        updates.gemPointDurationMinutes ?? event.gemPointDurationMinutes,
+      gemCategory: normalizedGemCategory,
       eventType: normalizedEventType,
       recurrence:
         applyToSeries === "series" || !event.recurrenceParentId
@@ -277,6 +284,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
               applyToSeries === "series" || !event.recurrenceParentId
                 ? normalizedRecurrence
                 : event.recurrence,
+            gemCategory: normalizedGemCategory,
           },
         }
       );
@@ -317,6 +325,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 description: updates.description ?? parent.description,
                 location: updates.location ?? parent.location,
                 eventType: normalizedEventType,
+                gemCategory: normalizedGemCategory,
                 status: nextStatus,
                 visibleToAlumni:
                   typeof updates.visibleToAlumni === "boolean"
@@ -338,6 +347,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 description: updates.description ?? parent.description,
                 location: updates.location ?? parent.location,
                 eventType: normalizedEventType,
+                gemCategory: normalizedGemCategory,
                 recurrence: normalizedRecurrence,
                 visibleToAlumni:
                   typeof updates.visibleToAlumni === "boolean"

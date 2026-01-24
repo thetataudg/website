@@ -23,6 +23,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string>("");
   const [pendingCheckIn, setPendingCheckIn] = useState<Member | null>(null);
+  const [endingEvent, setEndingEvent] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -131,6 +132,29 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
       await refreshEvent();
     } else {
       setStatus(data.error || "Manual check-in failed.");
+    }
+  }
+
+  async function endEvent() {
+    if (!event) return;
+    setEndingEvent(true);
+    try {
+      const res = await fetch(`/api/events/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (res.ok) {
+        await refreshEvent();
+        setStatus("Event ended.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setStatus(data?.error || "Unable to end event.");
+      }
+    } catch {
+      setStatus("Unable to end event.");
+    } finally {
+      setEndingEvent(false);
     }
   }
 
@@ -282,6 +306,15 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
           <span>
             {event?.startTime ? formatMstDateTime(event.startTime) : "TBD"}
           </span>
+          {event?.status === "ongoing" && (isAdmin || isHead) && (
+            <button
+              className="btn btn-outline-danger btn-sm"
+              onClick={endEvent}
+              disabled={endingEvent}
+            >
+              {endingEvent ? "Ending..." : "End event"}
+            </button>
+          )}
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
@@ -117,6 +117,22 @@ export default function MemberNavbar() {
     userData.needsPermissionReview ||
     userData.needsProfileReview;
 
+  const handleMainSiteClick = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const url = "/";
+    const newTab = window.open(url, "_blank");
+    if (newTab) {
+      newTab.focus();
+      setTimeout(() => {
+        try {
+          newTab.location.reload();
+        } catch (err) {
+          console.error("Navbar: Unable to reload main site tab", err);
+        }
+      }, 600);
+    }
+  }, []);
+
   const canSeeCommitteeEvents =
     userData &&
     (userData.role === "admin" ||
@@ -129,6 +145,7 @@ export default function MemberNavbar() {
     (userData.role === "admin" ||
       userData.role === "superadmin" ||
       userData.isECouncil);
+  const canSeeGem = Boolean(userData?.memberId);
   const showEventsDropdown = canSeeCommitteeEvents || canSeeManageEvents;
 
   // Don't render nav items until mounted (prevents hydration mismatch)
@@ -312,6 +329,17 @@ export default function MemberNavbar() {
                   </li>
                 )}
 
+                {canSeeGem && (
+                  <li className="nav-item">
+                    <Link
+                      className={`nav-link ${isActive("/member/gem") ? "active" : ""}`}
+                      href="/member/gem"
+                    >
+                      GEM
+                    </Link>
+                  </li>
+                )}
+
                 <li className="nav-item">
                   <Link
                     className={`nav-link ${isActive("/member/committees") ? "active" : ""}`}
@@ -374,9 +402,13 @@ export default function MemberNavbar() {
 
           <ul className="navbar-nav ms-auto members-navbar__actions">
             <li className="nav-item d-flex align-items-center me-2">
-              <Link className="btn btn-outline-light btn-sm main-site-link" href="/">
+              <button
+                type="button"
+                className="btn btn-outline-light btn-sm main-site-link"
+                onClick={handleMainSiteClick}
+              >
                 Main Site
-              </Link>
+              </button>
             </li>
             <li className="nav-item">
               <ThemeToggle />

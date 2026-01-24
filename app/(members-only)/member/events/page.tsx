@@ -10,6 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { addRecurrence } from "@/lib/recurrence";
 import LoadingState from "../../components/LoadingState";
+import { GEM_CATEGORY_LABELS, GemCategory } from "@/lib/gem";
 
 type EventItem = {
   _id: string;
@@ -29,7 +30,7 @@ type EventItem = {
   startTime: string;
   endTime: string;
   location?: string;
-  gemPointDurationMinutes?: number;
+  gemCategory?: string | null;
   status: string;
   visibleToAlumni: boolean;
 };
@@ -375,8 +376,7 @@ export default function EventsPage() {
       return start <= rangeEnd && end >= rangeStart;
     };
 
-    const shouldInclude = (evt: EventItem) => includePast || !isPastEvent(evt, now);
-    const actualEvents = events.filter((evt) => overlapsRange(evt) && shouldInclude(evt));
+    const actualEvents = events.filter((evt) => overlapsRange(evt));
     const existingKeys = new Set<string>();
     actualEvents.forEach((evt) => {
       const seriesKey =
@@ -419,7 +419,7 @@ export default function EventsPage() {
           startTime: cursorStart.toISOString(),
           endTime: cursorEnd.toISOString(),
         };
-        if (!existingKeys.has(key) && (includePast || !isPastEvent(occurrence, now))) {
+        if (!existingKeys.has(key)) {
           generated.push({
             ...occurrence,
             _id: `${parent._id}-${cursorStart.toISOString()}`,
@@ -442,7 +442,7 @@ export default function EventsPage() {
     );
 
     return { rangeStart, rangeEnd, events: fullList };
-  }, [calendarDate, calendarView, events, includePast]);
+  }, [calendarDate, calendarView, events]);
 
   const now = new Date();
   const visibleEvents = includePast ? events : events.filter((evt) => !isPastEvent(evt, now));
@@ -504,7 +504,12 @@ export default function EventsPage() {
     return "Event";
   };
 
-  const renderEventCard = (evt: EventItem) => (
+  const renderEventCard = (evt: EventItem) => {
+    const categoryLabel =
+      evt.gemCategory && GEM_CATEGORY_LABELS[evt.gemCategory as GemCategory]
+        ? GEM_CATEGORY_LABELS[evt.gemCategory as GemCategory]
+        : "Uncategorized";
+    return (
     <div className="event-card" key={evt._id}>
       <div className="event-card__header">
         <h3 className="event-card__title">{evt.name}</h3>
@@ -522,6 +527,7 @@ export default function EventsPage() {
           <span className="event-pill event-pill--recurring">Recurring</span>
         ) : null}
         <span className="event-meta">Committee: {getCommitteeLabel(evt)}</span>
+        <span className="event-meta">GEM: {categoryLabel}</span>
       </div>
       <p className="event-card__description">
         {evt.description || "No description"}
@@ -597,7 +603,8 @@ export default function EventsPage() {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   if (!isLoaded || loading) {
     return <LoadingState message="Loading events..." />;

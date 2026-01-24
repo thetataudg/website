@@ -1,4 +1,5 @@
 import mongoose, { Schema, model, models } from "mongoose";
+import { GEM_CATEGORIES } from "@/lib/gem";
 
 const EventSchema = new Schema(
   {
@@ -16,11 +17,15 @@ const EventSchema = new Schema(
     endedAt: { type: Date },
     location: { type: String, default: "" },
     calendarEventId: { type: String, default: null },
-    gemPointDurationMinutes: { type: Number, default: 0 },
     eventType: {
       type: String,
       enum: ["meeting", "event", "chapter"],
       default: "event",
+    },
+    gemCategory: {
+      type: String,
+      enum: GEM_CATEGORIES,
+      default: null,
     },
     recurrence: {
       enabled: { type: Boolean, default: false },

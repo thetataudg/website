@@ -17,6 +17,7 @@
     "@fortawesome/free-brands-svg-icons": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
+    "@netlify/functions": "^3.0.0",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.9.0",
     "bootstrap": "^5.3.5",
@@ -35,11 +36,11 @@
     "react-datepicker": "^9.1.0",
     "react-dom": "^18",
     "react-icons": "^5.0.1"
-    , "@netlify/functions": "^3.0.0"
   },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
     "@types/bootstrap": "^5.2.10",
+    "@types/luxon": "^3.7.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
