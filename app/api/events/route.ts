@@ -5,8 +5,9 @@ import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
-import { addRecurrence } from "@/lib/recurrence";
+import { addRecurrence, getArizonaNow, toArizonaDateTime } from "@/lib/recurrence";
 import { syncEventWithCalendar } from "@/lib/calendar";
+import { normalizeGemCategory } from "@/lib/gem";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -23,7 +24,7 @@ async function ensureFutureOccurrences(parentId: any) {
   if (!parent || !parent.recurrence?.enabled) return;
 
   const count = Math.max(Number(parent.recurrence?.count) || 1, 1);
-  const now = new Date();
+  const now = getArizonaNow();
 
   const existing = await Event.find({
     $or: [{ _id: parentId }, { recurrenceParentId: parentId }],
@@ -31,7 +32,10 @@ async function ensureFutureOccurrences(parentId: any) {
     .sort({ startTime: 1 })
     .lean();
 
-  const future = existing.filter((evt: any) => evt.startTime >= now);
+  const future = existing.filter((evt: any) => {
+    const eventStart = toArizonaDateTime(evt.startTime);
+    return eventStart ? eventStart >= now : false;
+  });
   if (future.length >= count) return;
 
   let last = existing[existing.length - 1] || parent;
@@ -58,8 +62,8 @@ async function ensureFutureOccurrences(parentId: any) {
       startedAt: null,
       endedAt: null,
       location: parent.location,
-      gemPointDurationMinutes: parent.gemPointDurationMinutes,
       eventType: parent.eventType,
+      gemCategory: parent.gemCategory || null,
       recurrence: { enabled: false },
       status: "scheduled",
       visibleToAlumni: parent.visibleToAlumni,
@@ -121,7 +125,7 @@ export async function POST(req: Request) {
       startTime,
       endTime,
       location = "",
-      gemPointDurationMinutes = 0,
+      gemCategory,
       eventType = "event",
       status = "scheduled",
       visibleToAlumni = true,
@@ -171,6 +175,8 @@ export async function POST(req: Request) {
         ? eventType
         : "event";
 
+    const normalizedGemCategory = normalizeGemCategory(gemCategory);
+
     const normalizedRecurrence = {
       enabled: !!recurrence?.enabled,
       frequency:
@@ -193,8 +199,8 @@ export async function POST(req: Request) {
       startedAt: null,
       endedAt: null,
       location,
-      gemPointDurationMinutes,
       eventType: normalizedEventType,
+      gemCategory: normalizedGemCategory,
       recurrence: normalizedRecurrence,
       status,
       visibleToAlumni,
@@ -212,9 +218,15 @@ export async function POST(req: Request) {
 
     if (event?._id) {
       await Event.collection.updateOne(
-        { _id: event._id },
-        { $set: { eventType: normalizedEventType, recurrence: normalizedRecurrence } }
-      );
+      { _id: event._id },
+      {
+        $set: {
+          eventType: normalizedEventType,
+          recurrence: normalizedRecurrence,
+          gemCategory: normalizedGemCategory,
+        },
+      }
+    );
       event.recurrence = normalizedRecurrence;
     }
 

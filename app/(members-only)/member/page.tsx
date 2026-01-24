@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { RedirectToSignIn } from "@clerk/nextjs";
 import axios from "axios";
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(0);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isCommitteeHead, setIsCommitteeHead] = useState(false);
 
   useEffect(() => {
@@ -117,10 +118,10 @@ export default function Dashboard() {
     }
 
     let mounted = true;
-    let timer: NodeJS.Timeout;
-
     const fetchCode = async () => {
       setQrLoading(true);
+      setCheckInCode("");
+      setCodeError(null);
       try {
         const res = await fetch("/api/checkin-code", { credentials: "include" });
         if (!res.ok) {
@@ -131,6 +132,9 @@ export default function Dashboard() {
         setCheckInCode(payload.code);
         setCodeExpiresAt(payload.expiresAt);
         setCodeError(null);
+        const delay = Math.max(payload.expiresAt - Date.now() - 500, 0);
+        refreshTimeoutRef.current && clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = setTimeout(fetchCode, delay);
       } catch (err: any) {
         if (!mounted) return;
         setCodeError(err?.message || "Failed to refresh check-in code");
@@ -142,13 +146,12 @@ export default function Dashboard() {
     };
 
     fetchCode();
-    timer = setInterval(fetchCode, 10000);
 
     return () => {
       mounted = false;
-      clearInterval(timer);
+      refreshTimeoutRef.current && clearTimeout(refreshTimeoutRef.current);
     };
-    }, [showQr, userData?.memberId]);
+  }, [showQr, userData?.memberId]);
 
   useEffect(() => {
     if (!codeExpiresAt) {
@@ -529,13 +532,12 @@ export default function Dashboard() {
                 />
               </div>
               <div className="modal-body text-center">
-                {qrLoading && (
+                {qrLoading ? (
                   <div className="qr-loading">
                     <LoadingSpinner size="2x" />
                     <span className="text-muted">Loading QR code...</span>
                   </div>
-                )}
-                {checkInCode ? (
+                ) : checkInCode ? (
                   <img
                     alt="Member QR Code"
                     className="qr-code"

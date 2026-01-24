@@ -5,6 +5,8 @@ import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import { GEM_CATEGORIES, GEM_CATEGORY_LABELS, GemCategory } from "@/lib/gem";
+import { toArizonaInputValue, toArizonaIso } from "@/lib/recurrence";
 
 type Committee = {
   _id: string;
@@ -22,6 +24,7 @@ type EventItem = {
   description?: string;
   location?: string;
   eventType?: string;
+  gemCategory?: string | null;
 };
 
 type Member = {
@@ -31,6 +34,20 @@ type Member = {
   rollNo: string;
   status?: string;
 };
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Scheduled & ongoing" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "ongoing", label: "Ongoing" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const TYPE_OPTIONS = [
+  { value: "all", label: "All types" },
+  { value: "meeting", label: "Meeting" },
+  { value: "event", label: "Event" },
+];
 
 export default function CommitteeEventsPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -44,6 +61,9 @@ export default function CommitteeEventsPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [selectedCommitteeId, setSelectedCommitteeId] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [nameFilter, setNameFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [pendingCheckIn, setPendingCheckIn] = useState<Member | null>(null);
@@ -59,6 +79,7 @@ export default function CommitteeEventsPage() {
     startTime: "",
     endTime: "",
     location: "",
+    gemCategory: "",
     eventType: "meeting",
     status: "scheduled",
     visibleToAlumni: true,
@@ -141,9 +162,31 @@ export default function CommitteeEventsPage() {
     managedCommitteeIds.includes(e.committeeId)
   );
 
-  const selectedCommitteeEvents = selectedCommitteeId
-    ? managedEvents.filter((e) => e.committeeId === selectedCommitteeId)
-    : [];
+  const selectedCommitteeEvents = useMemo(() => {
+    if (!selectedCommitteeId) return [];
+    return managedEvents.filter((e) => e.committeeId === selectedCommitteeId);
+  }, [managedEvents, selectedCommitteeId]);
+
+  const resolvedStatusList = (filter: string) =>
+    filter === "active" ? ["scheduled", "ongoing"] : [filter];
+
+  const filteredEvents = useMemo(() => {
+    if (!selectedCommitteeId) return [];
+    return selectedCommitteeEvents.filter((evt) => {
+      const statuses = resolvedStatusList(statusFilter);
+      if (!statuses.includes(evt.status)) return false;
+      if (typeFilter !== "all" && (evt.eventType || "event") !== typeFilter) {
+        return false;
+      }
+      if (
+        nameFilter.trim() &&
+        !evt.name?.toLowerCase().includes(nameFilter.trim().toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [selectedCommitteeEvents, selectedCommitteeId, statusFilter, typeFilter, nameFilter]);
 
   const selectedCommittee = committees.find((c) => c._id === selectedCommitteeId);
 
@@ -184,6 +227,7 @@ export default function CommitteeEventsPage() {
       startTime: "",
       endTime: "",
       location: "",
+      gemCategory: "",
       eventType: "meeting",
       status: "scheduled",
       visibleToAlumni: true,
@@ -193,35 +237,6 @@ export default function CommitteeEventsPage() {
       recurrenceEndDate: "",
       recurrenceCount: "1",
     });
-
-  const mstFormatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Phoenix",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
-  function toMstInputValue(value: string | Date) {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "";
-    const parts = mstFormatter.formatToParts(d);
-    const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-    return `${lookup.year}-${lookup.month}-${lookup.day}T${lookup.hour}:${lookup.minute}`;
-  }
-
-  function toMstIso(value: string) {
-    if (!value) return value;
-    const [datePart, timePart] = value.split("T");
-    if (!datePart || !timePart) return value;
-    const [year, month, day] = datePart.split("-").map(Number);
-    const [hour, minute] = timePart.split(":").map(Number);
-    if ([year, month, day, hour, minute].some((v) => Number.isNaN(v))) return value;
-    const utcMs = Date.UTC(year, month - 1, day, hour + 7, minute);
-    return new Date(utcMs).toISOString();
-  }
 
   function toDateInputValue(value: string | Date) {
     const d = new Date(value);
@@ -242,8 +257,9 @@ export default function CommitteeEventsPage() {
       body: JSON.stringify({
         ...form,
         committeeId: selectedCommitteeId,
-        startTime: toMstIso(form.startTime),
-        endTime: toMstIso(form.endTime),
+        gemCategory: form.gemCategory || null,
+        startTime: toArizonaIso(form.startTime),
+        endTime: toArizonaIso(form.endTime),
         recurrence: {
           enabled: form.recurrenceEnabled,
           frequency: form.recurrenceFrequency,
@@ -290,8 +306,8 @@ export default function CommitteeEventsPage() {
       me?.role === "admin" || me?.role === "superadmin" || me?.isECouncil;
     const payload: any = {
       ...form,
-      startTime: toMstIso(form.startTime),
-      endTime: toMstIso(form.endTime),
+      startTime: toArizonaIso(form.startTime),
+      endTime: toArizonaIso(form.endTime),
       recurrence: {
         enabled: form.recurrenceEnabled,
         frequency: form.recurrenceFrequency,
@@ -299,6 +315,7 @@ export default function CommitteeEventsPage() {
         endDate: form.recurrenceEndDate || null,
       },
     };
+    payload.gemCategory = form.gemCategory || null;
     if (isAdmin) {
       payload.committeeId = selectedCommitteeId || null;
     }
@@ -346,13 +363,14 @@ export default function CommitteeEventsPage() {
     setForm({
       name: event.name || "",
       description: event.description || "",
-      startTime: toMstInputValue(event.startTime),
-      endTime: toMstInputValue(event.endTime),
+      startTime: toArizonaInputValue(event.startTime),
+      endTime: toArizonaInputValue(event.endTime),
       location: event.location || "",
       eventType: event.eventType || "meeting",
       status: event.status || "scheduled",
       visibleToAlumni: !!event.visibleToAlumni,
       recurrenceEnabled: !!(event.recurrence?.enabled || event.recurrenceEnabled),
+      gemCategory: event.gemCategory || "",
       recurrenceFrequency:
         event.recurrence?.frequency || event.recurrenceFrequency || "weekly",
       recurrenceInterval: String(
@@ -412,25 +430,21 @@ export default function CommitteeEventsPage() {
         </div>
       </section>
 
-      <section className="bento-card">
-        <div className="events-section__header">
+      <section className="bento-card admin-table-card">
+        <div className="event-creator__header">
           <div>
             <h2>Select a Committee</h2>
             <p className="text-muted">
               Choose a committee to view and manage its events.
             </p>
           </div>
-        </div>
-        <div className="row g-3 align-items-end">
-          <div className="col-lg-6">
-            <label className="form-label">Committee</label>
+          <div className="event-creator__controls">
             <select
-              className="form-select"
+              className="form-select form-select-sm committee-select"
               value={selectedCommitteeId}
               onChange={(e) => {
                 setSelectedCommitteeId(e.target.value);
                 setSelectedEvent(null);
-                setQuery("");
               }}
             >
               <option value="">Choose a committee</option>
@@ -443,8 +457,6 @@ export default function CommitteeEventsPage() {
                 );
               })}
             </select>
-          </div>
-          <div className="col-lg-6 text-lg-end">
             <button
               className="btn btn-primary"
               disabled={!selectedCommitteeId}
@@ -455,79 +467,127 @@ export default function CommitteeEventsPage() {
                 setShowCreateModal(true);
               }}
             >
-              Create New Event
+              Create Committee Event
             </button>
+          </div>
+        </div>
+        <hr className="my-3" />
+        <div className="row g-3 event-filter-row">
+          <div className="col-md-3">
+            <label className="form-label small text-muted">Status</label>
+            <select
+              className="form-select form-select-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-3">
+            <label className="form-label small text-muted">Type</label>
+            <select
+              className="form-select form-select-sm"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              {TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-4">
+            <label className="form-label small text-muted">Search name</label>
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Search events"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
           </div>
         </div>
       </section>
 
-      <section className="events-section bento-card">
-        <div className="events-section__header">
+      <section className="bento-card admin-table-card mt-3">
+        <div className="d-flex justify-content-between align-items-center mb-3">
           <div>
-            <h2>{selectedCommittee?.name || "Committee"} Events</h2>
-            <p className="text-muted">
-              {selectedCommitteeId
-                ? "Click an event to review details or add attendees."
-                : "Select a committee to see its events."}
+            <p className="text-muted small mb-0">
+              {selectedCommittee?.name || "Committee"} events
             </p>
           </div>
-          <span className="events-count">
+          <span className="text-muted small">
             {selectedCommitteeEvents.length} events
           </span>
         </div>
-
-        {selectedCommitteeId ? (
-          selectedCommitteeEvents.length ? (
-            <div className="events-grid">
-              {selectedCommitteeEvents.map((evt) => (
-                <button
-                  type="button"
-                  key={evt._id}
-                  className="event-card text-start"
-                  onClick={() => loadEventDetails(evt._id)}
-                >
-                  <div className="event-card__header">
-                    <div className="event-card__title-block">
-                      <h3 className="event-card__title">{evt.name}</h3>
-                      <div className="event-card__meta event-card__meta--split">
-                        <span className="event-pill event-pill--type">
-                          {(evt.eventType || "event").toUpperCase()}
-                        </span>
-                        <span
-                          className={`event-pill event-pill--status status-${
-                            evt.status || "scheduled"
-                          }`}
+        <div className="table-responsive">
+          <table className="table admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Start</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>GEM Category</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEvents.length ? (
+                filteredEvents.map((evt) => {
+                  const categoryLabel =
+                    evt.gemCategory && GEM_CATEGORY_LABELS[evt.gemCategory as GemCategory]
+                      ? GEM_CATEGORY_LABELS[evt.gemCategory as GemCategory]
+                      : "Uncategorized";
+                  return (
+                    <tr key={evt._id}>
+                      <td>
+                        <button
+                          className="btn btn-link p-0"
+                          type="button"
+                          onClick={() => loadEventDetails(evt._id)}
                         >
-                          {(evt.status || "scheduled").toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="event-pill event-pill--full">
-                      {formatMstDate(evt.startTime)}
-                    </span>
-                  </div>
-                  <p className="event-card__description">
-                    {evt.description || "No description added yet."}
-                  </p>
-                  <div className="event-card__details">
-                    <div>
-                      <span className="event-detail-label">Start</span>
-                      <span>{formatMstDateTime(evt.startTime)}</span>
-                    </div>
-                    <div>
-                      <span className="event-detail-label">End</span>
-                      <span>{formatMstDateTime(evt.endTime)}</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted">No events for this committee yet.</p>
-          )
-        ) : (
-          <p className="text-muted">Pick a committee to get started.</p>
-        )}
+                          {evt.name}
+                        </button>
+                      </td>
+                      <td>{formatMstDateTime(evt.startTime)}</td>
+                      <td>{evt.status}</td>
+                      <td>{(evt.eventType || "event").toUpperCase()}</td>
+                      <td>{categoryLabel}</td>
+                      <td className="text-end">
+                        <button
+                          className="btn btn-sm btn-outline-primary me-2"
+                          onClick={() => startEdit(evt._id)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => loadEventDetails(evt._id)}
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="text-center text-muted">
+                    {selectedCommitteeId
+                      ? "No events match the current filters."
+                      : "Select a committee to view events."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {showCreateModal && (
@@ -584,6 +644,21 @@ export default function CommitteeEventsPage() {
                       >
                         <option value="meeting">Meeting</option>
                         <option value="event">Event</option>
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label">GEM Category</label>
+                      <select
+                        className="form-select"
+                        value={form.gemCategory}
+                        onChange={(e) => updateForm("gemCategory", e.target.value)}
+                      >
+                        <option value="">Uncategorized</option>
+                        {GEM_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>
+                            {GEM_CATEGORY_LABELS[category]}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-md-6">
@@ -821,6 +896,14 @@ export default function CommitteeEventsPage() {
                   <div className="col-12">
                     <div className="event-detail-label">Location</div>
                     <div>{selectedEvent.location || "TBD"}</div>
+                  </div>
+                  <div className="col-12">
+                    <div className="event-detail-label">GEM Category</div>
+                    <div>
+                      {selectedEvent.gemCategory && GEM_CATEGORY_LABELS[selectedEvent.gemCategory as GemCategory]
+                        ? GEM_CATEGORY_LABELS[selectedEvent.gemCategory as GemCategory]
+                        : "Uncategorized"}
+                    </div>
                   </div>
                   <div className="col-12">
                     <div className="event-detail-label">Add attendee</div>

@@ -1,6 +1,6 @@
 import { createHmac } from "crypto";
 
-const WINDOW_SECONDS = 10;
+const WINDOW_SECONDS = 60;
 const DEFAULT_SECRET = "default-checkin-secret";
 
 function getSecret() {
