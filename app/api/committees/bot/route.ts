@@ -9,8 +9,16 @@ const HEADER_NAME = (process.env.COMMITTEES_BOT_SECRET_HEADER || "x-api-secret")
 export async function GET(req: Request) {
   const provided = req.headers.get(HEADER_NAME);
   if (!provided || provided !== SECRET) {
-    logger.warn({ provided }, "Unauthorized committee bot request");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logger.warn({ provided, header: HEADER_NAME }, "Unauthorized committee bot request");
+    return NextResponse.json(
+      {
+        error: "Unauthorized",
+        header: HEADER_NAME,
+        provided,
+        expected: SECRET,
+      },
+      { status: 401 }
+    );
   }
 
   try {
