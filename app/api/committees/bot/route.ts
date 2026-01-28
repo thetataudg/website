@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db";
 import Committee from "@/lib/models/Committee";
 import logger from "@/lib/logger";
 
-const SECRET = process.env.COMMITTEES_BOT_SECRET || "ttdgbot1904";
+const SECRET = process.env.COMMITTEES_BOT_SECRET;
 const HEADER_NAME = (process.env.COMMITTEES_BOT_SECRET_HEADER || "x-api-secret").toLowerCase();
 
 export async function GET(req: Request) {
