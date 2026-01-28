@@ -54,7 +54,10 @@ export async function GET(req: Request) {
       }
     }
 
-    logger.info("Fetched filtered pending invitations", { count: filteredInvitations.length });
+    logger.info({
+      event: "Fetched filtered pending invitations",
+      count: filteredInvitations.length,
+    });
     return NextResponse.json(filteredInvitations, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to fetch invitations");
@@ -115,7 +118,8 @@ export async function POST(req: NextRequest) {
       notify: true,
     });
 
-    logger.info("Invitation sent", {
+    logger.info({
+      event: "Invitation sent",
       invitationId: invitation.id,
       by: admin.clerkId,
     });

@@ -21,6 +21,17 @@ interface MemberUpdateResult {
   resumeUrl?: string;
 }
 
+type PendingMemberDoc = {
+  _id?: { toString: () => string };
+  rollNo?: string;
+  isECouncil?: boolean;
+  ecouncilPosition?: string;
+  status?: string;
+  submittedAt?: Date;
+  reviewedAt?: Date;
+  reviewComments?: string;
+};
+
 export async function GET(req: Request) {
   let clerkId: string;
   try {
@@ -62,7 +73,9 @@ export async function GET(req: Request) {
     );
   }
 
-  const pending = await PendingMember.findOne({ clerkId }).lean();
+  const pending = (await PendingMember.findOne({ clerkId }).lean()) as
+    | PendingMemberDoc
+    | null;
   if (pending) {
     logger.info(
       { clerkId, rollNo: pending.rollNo },

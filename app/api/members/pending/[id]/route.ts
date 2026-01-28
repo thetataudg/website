@@ -151,7 +151,8 @@ export async function PATCH(
     });
 
     await PendingMember.findByIdAndDelete(params.id);
-    logger.info("Pending request approved and deleted", {
+    logger.info({
+      event: "Pending request approved and deleted",
       pendingId: params.id,
       approvedBy: admin.clerkId,
     });
@@ -160,13 +161,17 @@ export async function PATCH(
   } else {
     try {
       await clerkClient.users.deleteUser(pending.clerkId);
-      logger.info("Clerk user deleted", { clerkId: pending.clerkId });
+      logger.info({
+        event: "Clerk user deleted",
+        clerkId: pending.clerkId,
+      });
     } catch (err: any) {
       logger.error({ err }, "Failed to delete Clerk user");
     }
 
     await PendingMember.findByIdAndDelete(params.id);
-    logger.info("Pending request rejected and deleted", {
+    logger.info({
+      event: "Pending request rejected and deleted",
       pendingId: params.id,
       rejectedBy: admin.clerkId,
       comments: reviewComments,
