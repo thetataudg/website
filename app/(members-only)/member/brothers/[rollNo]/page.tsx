@@ -11,11 +11,24 @@ interface Params {
 }
 
 export default async function BrotherDetailPage({ params }: Params) {
-  // build absolute URL for SSR fetch
-  const host = headers().get("host")!;
+  const headerList = headers();
+  const host = headerList.get("host")!;
   const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
   const base = `${proto}://${host}`;
-  const cookie = headers().get("cookie") ?? "";
+  const cookie = headerList.get("cookie");
+
+  const authRes = await fetch(`${base}/api/members/me`, {
+    headers: cookie ? { cookie } : undefined,
+    cache: "no-store",
+  });
+  if (!authRes.ok) {
+    return <Unauthorized />;
+  }
+  const me = await authRes.json();
+  const restricted = !me.memberId || Boolean(me.pending);
+  if (restricted) {
+    return <Unauthorized />;
+  }
 
   const res = await fetch(
     `${base}/api/members/${encodeURIComponent(params.rollNo)}`,
@@ -32,10 +45,22 @@ export default async function BrotherDetailPage({ params }: Params) {
     )}`,
     {
       cache: "no-store",
-      headers: { cookie },
     }
   );
   const committees = committeesRes.ok ? await committeesRes.json() : [];
 
   return <BrotherDetailClient member={member} committees={committees} />;
+}
+
+function Unauthorized() {
+  return (
+    <div className="member-dashboard">
+      <div className="bento-card text-center">
+        <h2>Unauthorized</h2>
+        <p className="text-muted">
+          You do not have permission to view this brother profile.
+        </p>
+      </div>
+    </div>
+  );
 }

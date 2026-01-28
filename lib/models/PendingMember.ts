@@ -57,6 +57,17 @@ const PendingMemberSchema = new Schema(
     profilePicUrl: { type: String },
     socialLinks: { type: Map, of: String, default: {} },
 
+    preferredStatus: {
+      type: String,
+      enum: ["Active", "Alumni", "Removed", "Deceased"],
+      default: "Active",
+    },
+    preferredRole: {
+      type: String,
+      enum: ["superadmin", "admin", "member"],
+      default: "member",
+    },
+
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

@@ -17,6 +17,8 @@ const garageSecretKey = process.env.GARAGE_SECRET_KEY;
 const garageUseSSL = process.env.GARAGE_USE_SSL;
 const photoBucket = process.env.S3_PHOTO_BUCKET;
 const resumeBucket = process.env.S3_RESUME_BUCKET;
+const garageClockSyncEnabled =
+  (process.env.GARAGE_ENABLE_CLOCK_SYNC || "").toLowerCase() === "true";
 
 const isAwsEndpoint = (endpoint?: string) =>
   !!endpoint && endpoint.includes("amazonaws.com");
@@ -32,7 +34,7 @@ const resolveClockOffsetMs = async () => {
     const parsed = Number(override);
     if (!Number.isNaN(parsed)) return parsed;
   }
-  if (!resolvedEndpoint) {
+  if (!resolvedEndpoint || !garageClockSyncEnabled) {
     return 0;
   }
   try {

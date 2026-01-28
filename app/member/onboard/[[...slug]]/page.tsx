@@ -1,7 +1,6 @@
 /* app/member/onboard/[[...slug]]/page.tsx */
 import { SignUp } from "@clerk/nextjs";
 import { clerkClient as getClerk, auth } from "@clerk/nextjs/server";
-import { notFound } from "next/navigation";
 import OnboardForm from "./OnboardForm";
 import { emailToSlug } from "@/utils/email-to-slug";
 
@@ -10,7 +9,7 @@ interface Params {
 }
 
 export default async function OnboardPage({ params }: { params: Params }) {
-  const slug = params.slug?.[0] ?? "";
+  const slug = params.slug?.[0];
   const { userId } = await auth();
 
   if (!userId) {
@@ -23,32 +22,38 @@ export default async function OnboardPage({ params }: { params: Params }) {
 
   const clerk = await getClerk();
   const user = await clerk.users.getUser(userId);
+  const primaryEmail =
+    user.primaryEmailAddress?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
 
-  // do any of the user’s e-mails match the slug?
-  const invitedEmail = user.emailAddresses.find(
-    (e) => emailToSlug(e.emailAddress) === slug
-  )?.emailAddress;
+  const emailBySlug = slug
+    ? user.emailAddresses.find(
+        (e) => emailToSlug(e.emailAddress) === slug
+      )?.emailAddress
+    : null;
 
-  if (!invitedEmail) return (
-    <div className="member-dashboard">
-      <div className="bento-card">
-        <h1>401 Unauthorized</h1>
-        <p>You are not invited to use this application.</p>
+  if (slug && !emailBySlug) {
+    return (
+      <div className="member-dashboard">
+        <div className="bento-card">
+          <h1>401 Unauthorized</h1>
+          <p>This invitation does not match the logged-in email.</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
-  const pending = (await clerk.invitations.getInvitationList()).data.find(
-    (i) =>
-      i.emailAddress.toLowerCase() === invitedEmail.toLowerCase() &&
-      i.status === "pending"
-  );
-  // if (!pending) return (
-  //   <div className="d-flex justify-content-center mt-5">
-  //       <h1>401 Unauthorized</h1>
-  //       <p>Invitation is not found or already used.</p>
-  //   </div>
-  // )
+  const invitedEmail = emailBySlug ?? primaryEmail;
+
+  if (!invitedEmail) {
+    return (
+      <div className="member-dashboard">
+        <div className="bento-card">
+          <h1>Missing email</h1>
+          <p>We could not determine an email address for this account.</p>
+        </div>
+      </div>
+    );
+  }
 
   return <OnboardForm invitedEmail={invitedEmail} />;
 }

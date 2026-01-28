@@ -5,13 +5,30 @@ import { headers } from "next/headers";
 import MembersList, { MemberData } from "./MembersList";
 
 export default async function BrothersPage() {
-  // build absolute URL for SSR
-  const host = headers().get("host")!;
+  const headerList = headers();
+  const host = headerList.get("host")!;
   const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
   const base = `${proto}://${host}`;
+  const cookie = headerList.get("cookie");
 
-  // fetch the entire list of members
-  const res = await fetch(`${base}/api/members`, { cache: "no-store" });
+  const meRes = await fetch(`${base}/api/members/me`, {
+    headers: cookie ? { cookie } : undefined,
+    cache: "no-store",
+  });
+  if (!meRes.ok) {
+    return <Unauthorized />;
+  }
+  const me = await meRes.json();
+  const isRestricted = !me.memberId || Boolean(me.pending);
+  if (isRestricted) {
+    return <Unauthorized />;
+  }
+
+  const res = await fetch(`${base}/api/members`, {
+    cache: "no-store",
+    headers: cookie ? { cookie } : undefined,
+  });
+
   if (!res.ok) {
     throw new Error("Failed to fetch members");
   }
@@ -31,4 +48,17 @@ export default async function BrothersPage() {
     }));
 
   return <MembersList initialMembers={members} />;
+}
+
+function Unauthorized() {
+  return (
+    <div className="member-dashboard">
+      <div className="bento-card text-center">
+        <h2>Unauthorized</h2>
+        <p className="text-muted">
+          You do not have permission to view the brothers directory.
+        </p>
+      </div>
+    </div>
+  );
 }

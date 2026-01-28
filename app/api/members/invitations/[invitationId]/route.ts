@@ -37,7 +37,8 @@ export async function DELETE(
     }
 
     await clerkClient.invitations.revokeInvitation(params.invitationId);
-    logger.info("Invitation revoked", {
+    logger.info({
+      event: "Invitation revoked",
       invitationId: params.invitationId,
       revokedBy: admin.clerkId,
     });

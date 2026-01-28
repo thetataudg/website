@@ -6,6 +6,9 @@ import Member from "@/lib/models/Member";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import logger from "@/lib/logger";
 
+const memberStatusOptions = ["Active", "Alumni", "Removed", "Deceased"];
+const memberRoleOptions = ["superadmin", "admin", "member"];
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -78,6 +81,12 @@ export async function PATCH(
     assignIf("awards", ensureArray(updates.awards));
     assignIf("customSections", ensureArray(updates.customSections));
     assignIf("socialLinks", updates.socialLinks);
+    if (updates.preferredStatus && memberStatusOptions.includes(updates.preferredStatus)) {
+      sanitized.preferredStatus = updates.preferredStatus;
+    }
+    if (updates.preferredRole && memberRoleOptions.includes(updates.preferredRole)) {
+      sanitized.preferredRole = updates.preferredRole;
+    }
 
     if (sanitized.rollNo && sanitized.rollNo !== pending.rollNo) {
       const existingMember = await Member.findOne({ rollNo: sanitized.rollNo }).lean();
@@ -135,14 +144,15 @@ export async function PATCH(
       resumeUrl: pending.resumeUrl,
       profilePicUrl: pending.profilePicUrl,
       socialLinks: pending.socialLinks,
-      status: "Active",
-      role: "member",
+      status: pending.preferredStatus || "Active",
+      role: pending.preferredRole || "member",
       needsProfileReview: false,
       needsPermissionReview: false,
     });
 
     await PendingMember.findByIdAndDelete(params.id);
-    logger.info("Pending request approved and deleted", {
+    logger.info({
+      event: "Pending request approved and deleted",
       pendingId: params.id,
       approvedBy: admin.clerkId,
     });
@@ -151,17 +161,23 @@ export async function PATCH(
   } else {
     try {
       await clerkClient.users.deleteUser(pending.clerkId);
-      logger.info("Clerk user deleted", { clerkId: pending.clerkId });
+      logger.info({
+        event: "Clerk user deleted",
+        clerkId: pending.clerkId,
+      });
     } catch (err: any) {
       logger.error({ err }, "Failed to delete Clerk user");
     }
 
     await PendingMember.findByIdAndDelete(params.id);
-    logger.info("Pending request rejected and deleted", {
+    logger.info({
+      event: "Pending request rejected and deleted",
       pendingId: params.id,
       rejectedBy: admin.clerkId,
       comments: reviewComments,
     });
+
+    await Member.deleteOne({ clerkId: pending.clerkId });
 
     return NextResponse.json({ status: "rejected" }, { status: 200 });
   }
