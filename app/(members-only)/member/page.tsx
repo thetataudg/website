@@ -20,23 +20,36 @@ import {
   faUsersCog,
 } from "@fortawesome/free-solid-svg-icons";
 import LoadingState, { LoadingSpinner } from "../components/LoadingState";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
+  const router = useRouter();
   const [userData, setUserData] = useState<any>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [showQr, setShowQr] = useState(false);
-  const [qrTheme, setQrTheme] = useState("light");
   const [qrLoading, setQrLoading] = useState(false);
+  const qrForegroundColor = "000000";
+  const qrBackgroundColor = "fffaf4";
   const [checkInCode, setCheckInCode] = useState("");
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(0);
   const [codeError, setCodeError] = useState<string | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isCommitteeHead, setIsCommitteeHead] = useState(false);
+  const walletUrls = {
+    google: "#",
+    apple: "#",
+  };
+
+  const handleAddToWallet =
+    (provider: keyof typeof walletUrls) => () => {
+      window.open(walletUrls[provider], "_blank", "noopener");
+    };
 
   useEffect(() => {
     async function fetchUserData() {
@@ -46,19 +59,38 @@ export default function Dashboard() {
 
         console.log("API /api/members/me response:", data);
 
+        const isPending = Boolean(data.pending);
+        const hasProfile = Boolean(data.memberId);
+        const needsProfileReview = data.needsProfileReview ?? false;
+        const needsPermissionReview = data.needsPermissionReview ?? false;
         setUserData({
-          userHasProfile: true,
-          needsProfileReview: data.needsProfileReview,
-          needsPermissionReview: data.needsPermissionReview,
-          type: data.status, // Use the real status from API
-          isECouncil: data.isECouncil,
+          userHasProfile: hasProfile,
+          pending: isPending,
+          pendingStatus: data.pendingStatus,
+          pendingDetails: isPending
+            ? {
+                pendingId: data.pendingId,
+                submittedAt: data.pendingSubmittedAt,
+                reviewedAt: data.pendingReviewedAt,
+                reviewComments: data.pendingReviewComments,
+              }
+            : undefined,
+          needsProfileReview,
+          needsPermissionReview,
+          type: isPending ? "Pending" : data.status, // Use the real status from API
+          isECouncil: Boolean(data.isECouncil),
           isAdmin: data.role === "admin" || data.role === "superadmin",
           rollNo: data.rollNo,
           memberId: data.memberId,
         });
 
       } catch (error) {
-        console.error("Error fetching user data:", error);
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          setNeedsOnboarding(true);
+          router.replace("/member/onboard");
+        } else {
+          console.error("Error fetching user data:", error);
+        }
         setUserData(null);
       } finally {
         setLoadingUserData(false);
@@ -67,6 +99,12 @@ export default function Dashboard() {
 
     if (isSignedIn) fetchUserData();
   }, [isSignedIn]);
+
+  useEffect(() => {
+    if (needsOnboarding) {
+      router.replace("/member/onboard");
+    }
+  }, [needsOnboarding, router]);
 
   useEffect(() => {
     if (!userData?.memberId) return;
@@ -93,21 +131,6 @@ export default function Dashboard() {
     };
     loadCommitteeHead();
   }, [userData?.memberId]);
-
-  useEffect(() => {
-    if (!showQr) return;
-    const getTheme = () => document?.body?.dataset?.theme || "light";
-    setQrTheme(getTheme());
-    setQrLoading(true);
-    const observer = new MutationObserver(() => {
-      setQrTheme(getTheme());
-    });
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, [showQr]);
 
   useEffect(() => {
     if (!showQr || !userData?.memberId) {
@@ -176,6 +199,12 @@ export default function Dashboard() {
     return <LoadingState message="Loading dashboard..." />;
   }
 
+  if (needsOnboarding) {
+    return (
+      <LoadingState message="Redirecting to the onboarding form..." />
+    );
+  }
+
   if (!isSignedIn) {
     return (
       <div className="container">
@@ -196,7 +225,7 @@ export default function Dashboard() {
     // All accesses are false for unapproved users
     const privileges = [
       { label: "Edit Profile", access: false },
-      { label: "Directory", access: true },
+      { label: "Directory", access: false },
       { label: "Minutes", access: false },
       { label: "Vote", access: false },
       { label: "Admin Voting", access: false },
@@ -303,7 +332,7 @@ export default function Dashboard() {
 
   const privileges = [
     { label: "Edit Profile", access: userHasProfile },
-    { label: "Directory", access: true },
+    { label: "Directory", access: userHasProfile },
     { label: "Minutes", access: userHasProfile },
     { label: "Vote", access: userHasProfile && type === "Active" },
     { label: "Admin Voting", access: isECouncil },
@@ -538,18 +567,18 @@ export default function Dashboard() {
                     <span className="text-muted">Loading QR code...</span>
                   </div>
                 ) : checkInCode ? (
-                  <img
-                    alt="Member QR Code"
-                    className="qr-code"
-                    src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-                      checkInCode
-                    )}&size=480x480&color=${
-                      qrTheme === "dark" ? "ffffff" : "000000"
-                    }&bgcolor=${qrTheme === "dark" ? "121a24" : "fffaf4"}`}
-                    onLoad={() => setQrLoading(false)}
-                    onError={() => setQrLoading(false)}
-                    style={{ opacity: qrLoading ? 0 : 1 }}
-                  />
+                  <div className="qr-code-wrapper">
+                    <img
+                      alt="Member QR Code"
+                      className="qr-code"
+                      src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+                        checkInCode
+                      )}&size=480x480&color=${qrForegroundColor}&bgcolor=${qrBackgroundColor}`}
+                      onLoad={() => setQrLoading(false)}
+                      onError={() => setQrLoading(false)}
+                      style={{ opacity: qrLoading ? 0 : 1 }}
+                    />
+                  </div>
                 ) : (
                   <div className="qr-loading" style={{ marginTop: 24 }}>
                     <span className="text-muted">
@@ -565,6 +594,29 @@ export default function Dashboard() {
                     <> (refreshing...)</>
                   )}
                 </p>
+                
+                {/*
+                <button
+                  type="button"
+                  className="wallet-btn wallet-btn--google"
+                  onClick={handleAddToWallet("google")}
+                >
+                  <span className="wallet-icon" aria-hidden="true">
+                    <img src="/google_wallet.svg" alt="" />
+                  </span>
+                  Add to Google Wallet
+                </button>
+                <button
+                  type="button"
+                  className="wallet-btn wallet-btn--apple"
+                  onClick={handleAddToWallet("apple")}
+                >
+                  <span className="wallet-icon" aria-hidden="true">
+                    <img src="/apple_wallet.svg" alt="" />
+                  </span>
+                  Add to Apple Wallet
+                </button>
+                */}
               </div>
             </div>
           </div>

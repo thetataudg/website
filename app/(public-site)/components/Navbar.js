@@ -102,9 +102,12 @@ const Navbar = () => {
           <li
             className="rounded-full border border-[#e2ab16] px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#e2ab16] transition duration-150 hover:bg-[#e2ab16] hover:text-black"
           >
-            <SignInButton>
-              Sign In
-            </SignInButton>
+              <SignInButton
+                signUpForceRedirectUrl="/member/onboard"
+                signUpFallbackRedirectUrl="/member/onboard"
+              >
+                Sign In
+              </SignInButton>
           </li>
         </SignedOut>
         </ul>
@@ -140,7 +143,10 @@ const Navbar = () => {
             </SignedIn>
             <SignedOut>
               <li className="rounded-full border border-[#e2ab16] px-6 py-2 text-sm font-bold uppercase tracking-[0.2em] text-[#e2ab16]">
-                <SignInButton />
+              <SignInButton
+                signUpForceRedirectUrl="/member/onboard"
+                signUpFallbackRedirectUrl="/member/onboard"
+              />
               </li>
             </SignedOut>
           </ul>

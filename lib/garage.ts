@@ -14,6 +14,9 @@ const garageSigningRegion =
   process.env.GARAGE_SIGNING_REGION ||
   (isAwsEndpoint(garageEndpointRaw) ? garageRegion : "garage");
 
+const garageClockSyncEnabled =
+  (process.env.GARAGE_ENABLE_CLOCK_SYNC || "").toLowerCase() === "true";
+
 const resolvedEndpoint =
   garageEndpointRaw && !garageEndpointRaw.startsWith("http")
     ? `${garageUseSSL === "false" ? "http" : "https"}://${garageEndpointRaw}`
@@ -25,7 +28,7 @@ const resolveClockOffsetMs = async () => {
     const parsed = Number(override);
     if (!Number.isNaN(parsed)) return parsed;
   }
-  if (!resolvedEndpoint) return 0;
+  if (!resolvedEndpoint || !garageClockSyncEnabled) return 0;
   try {
     const res = await fetch(resolvedEndpoint, { method: "HEAD" });
     const serverDate = res.headers.get("date");

@@ -24,13 +24,16 @@ export const getMinutesSigningRegion = () =>
   (isAwsEndpoint(garageEndpointRaw) ? garageRegion : "garage") ||
   "";
 
+const garageClockSyncEnabled =
+  (process.env.GARAGE_ENABLE_CLOCK_SYNC || "").toLowerCase() === "true";
+
 export const resolveMinutesClockOffset = async () => {
   const override = process.env.GARAGE_CLOCK_SKEW_MS;
   if (override) {
     const parsed = Number(override);
     if (!Number.isNaN(parsed)) return parsed;
   }
-  if (!resolvedEndpoint) {
+  if (!resolvedEndpoint || !garageClockSyncEnabled) {
     return 0;
   }
   try {

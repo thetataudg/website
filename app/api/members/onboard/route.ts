@@ -87,10 +87,12 @@ export async function POST(req: NextRequest) {
       ecouncilPosition,
       hometown,
       resumeUrl,
-      profilePicUrl,
-      socialLinks,
-      status: "pending",
-    });
+    profilePicUrl,
+    socialLinks,
+    status: "pending",
+    preferredStatus: "Active",
+    preferredRole: "member",
+  });
 
     logger.info("New onboarding submitted", { clerkId, rollNo });
     return NextResponse.json({ id: pending._id }, { status: 201 });

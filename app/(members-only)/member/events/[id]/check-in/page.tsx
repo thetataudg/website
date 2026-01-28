@@ -30,6 +30,7 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const detectorRef = useRef<any>(null);
   const zxingControlsRef = useRef<{ stop: () => void } | null>(null);
   const zxingReaderRef = useRef<any>(null);
+  const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scanningRef = useRef(false);
   const processingRef = useRef(false);
 
@@ -168,13 +169,13 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
         const reader = new BrowserQRCodeReader();
         zxingReaderRef.current = reader;
         scanningRef.current = true;
-        zxingControlsRef.current = await reader.decodeFromVideoDevice(
-          undefined,
-          videoRef.current,
-          async (result) => {
-            if (!scanningRef.current || !result) return;
-        const text =
-          typeof result === "string" ? result : result.getText?.() || "";
+    zxingControlsRef.current = await reader.decodeFromVideoDevice(
+      undefined,
+      videoRef.current,
+      async (result) => {
+        if (!scanningRef.current || !result) return;
+    const text =
+      typeof result === "string" ? result : result.getText?.() || "";
         if (text && !processingRef.current) {
           processingRef.current = true;
           await checkInCode(text);
@@ -183,53 +184,91 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
           }, 1500);
         }
           }
-        );
-        return;
-      } catch (err) {
-        setStatus("Unable to start scanner. Use manual check-in.");
-        scanningRef.current = false;
-        return;
-      }
-    }
+    );
+    return;
+  } catch (err) {
+    setStatus("Unable to start scanner. Use manual check-in.");
+    scanningRef.current = false;
+    return;
+  }
+}
 
-    streamRef.current = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" },
-      audio: false,
-    });
+streamRef.current = await navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "environment" },
+  audio: false,
+});
     videoRef.current.srcObject = streamRef.current;
     await videoRef.current.play();
 
-    detectorRef.current = new (window as any).BarcodeDetector({
-      formats: ["qr_code"],
-    });
+  detectorRef.current = new (window as any).BarcodeDetector({
+    formats: ["qr_code"],
+  });
 
-    scanningRef.current = true;
-    scanLoop();
-  }
+  const canvas = document.createElement("canvas");
+  scanCanvasRef.current = canvas;
 
-  function stopScanner() {
-    scanningRef.current = false;
-    if (zxingControlsRef.current) {
-      zxingControlsRef.current.stop();
-      zxingControlsRef.current = null;
-    }
-    if (zxingReaderRef.current?.reset) {
-      zxingReaderRef.current.reset();
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
+  scanningRef.current = true;
+  scanLoop();
+}
+
+function stopScanner() {
+  scanningRef.current = false;
+  if (zxingControlsRef.current) {
+    zxingControlsRef.current.stop();
+    zxingControlsRef.current = null;
   }
+  if (zxingReaderRef.current?.reset) {
+    zxingReaderRef.current.reset();
+  }
+  if (streamRef.current) {
+    streamRef.current.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }
+  scanCanvasRef.current = null;
+}
 
   async function scanLoop() {
     if (!scanningRef.current || !videoRef.current || !detectorRef.current) return;
-    try {
-      const codes = await detectorRef.current.detect(videoRef.current);
-      if (codes && codes.length > 0) {
-        const code = codes[0].rawValue || "";
-        if (code && !processingRef.current) {
-          processingRef.current = true;
+  try {
+    const canvas = scanCanvasRef.current;
+    let detectionTarget: CanvasImageSource | undefined = videoRef.current;
+    if (canvas && videoRef.current) {
+      const width =
+        videoRef.current.videoWidth || videoRef.current.clientWidth || 0;
+      const height =
+        videoRef.current.videoHeight || videoRef.current.clientHeight || 0;
+
+      if (width && height) {
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.filter = "contrast(180%) brightness(130%)";
+          ctx.drawImage(videoRef.current, 0, 0, width, height);
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const data = imageData.data;
+          // Boost contrast further by thresholding to binary colors.
+          for (let i = 0; i < data.length; i += 4) {
+            const gray =
+              data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+            const value = gray > 160 ? 255 : 0;
+            data[i] = data[i + 1] = data[i + 2] = value;
+          }
+          ctx.putImageData(imageData, 0, 0);
+          detectionTarget = canvas;
+        }
+      } else {
+        detectionTarget = videoRef.current;
+      }
+    }
+
+    const codes = await detectorRef.current.detect(
+      detectionTarget as CanvasImageSource
+    );
+    if (codes && codes.length > 0) {
+      const code = codes[0].rawValue || "";
+      if (code && !processingRef.current) {
+        processingRef.current = true;
           await checkInCode(code);
           setTimeout(() => {
             processingRef.current = false;

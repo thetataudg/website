@@ -31,6 +31,7 @@ export default function MemberNavbar() {
 
         const data = await res.json();
         console.log("Navbar: Fetch success:", data);
+        const isPending = Boolean(data.pending);
 
         setUserData({
           rollNo: data.rollNo,
@@ -38,10 +39,11 @@ export default function MemberNavbar() {
           isCommitteeHead: data.isCommitteeHead,
           memberId: data.memberId,
           isECouncil: data.isECouncil,
-          status: data.status,
-          needsProfileReview: data.needsProfileReview,
-          needsPermissionReview: data.needsPermissionReview,
-          pending: false,
+          status: data.status || (isPending ? "Pending" : undefined),
+          needsProfileReview: data.needsProfileReview ?? false,
+          needsPermissionReview: data.needsPermissionReview ?? false,
+          pending: isPending,
+          pendingStatus: data.pendingStatus,
         });
       } catch (error) {
         console.error("Navbar: Fetch error:", error);
@@ -196,36 +198,17 @@ export default function MemberNavbar() {
 
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav mx-auto mb-2 mb-lg-0 members-navbar__menu">
-            {isWaiting ? (
-              <>
-                <li className="nav-item">
-                  <Link
-                    className={`nav-link ${isActive("/member") ? "active" : ""}`}
-                    href="/member"
-                  >
-                    Home
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link
-                    className={`nav-link ${isActive("/member/brothers") ? "active" : ""}`}
-                    href="/member/brothers"
-                  >
-                    Brothers
-                  </Link>
-                </li>
-              </>
-            ) : (
-              <>
-                <li className="nav-item">
-                  <Link
-                    className={`nav-link ${isActive("/member") ? "active" : ""}`}
-                    href="/member"
-                  >
-                    Home
-                  </Link>
-                </li>
+            <li className="nav-item">
+              <Link
+                className={`nav-link ${isActive("/member") ? "active" : ""}`}
+                href="/member"
+              >
+                Home
+              </Link>
+            </li>
 
+            {!isWaiting && (
+              <>
                 {userData && (
                   <li className="nav-item">
                     <Link

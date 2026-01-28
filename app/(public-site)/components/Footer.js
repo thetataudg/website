@@ -89,7 +89,10 @@ const Footer = () => {
               </h2>
               <div className="text-base text-[#1b0f0f]">
                 <SignedOut>
-                  <SignInButton />
+                  <SignInButton
+                    signUpForceRedirectUrl="/member/onboard"
+                    signUpFallbackRedirectUrl="/member/onboard"
+                  />
                 </SignedOut>
                 <SignedIn>
                   <UserButton />

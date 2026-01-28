@@ -1,7 +1,7 @@
 // app/(members-only)/member/admin/pending/PendingList.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+ import { useState } from "react";
 
 interface PendingRequest {
   _id: string;
@@ -41,6 +41,8 @@ interface PendingRequest {
   }>;
   customSections?: Array<{ title?: string; body?: string }>;
   socialLinks?: Record<string, string>;
+  preferredStatus?: "Active" | "Alumni" | "Removed" | "Deceased";
+  preferredRole?: "superadmin" | "admin" | "member";
 }
 
 interface Props {
@@ -83,6 +85,8 @@ export default function PendingList({ initialRequests }: Props) {
     }>,
     awards: [] as Array<{ title: string; issuer: string; date: string; description: string }>,
     customSections: [] as Array<{ title: string; body: string }>,
+    preferredStatus: "Active",
+    preferredRole: "member",
   });
 
   const pledgeClassOptions = [
@@ -106,6 +110,15 @@ export default function PendingList({ initialRequests }: Props) {
     "Psi Gamma",
     "Omega Gamma",
   ];
+
+  const preferredStatusOptions = [
+    "Active",
+    "Alumni",
+    "Removed",
+    "Deceased",
+  ];
+
+  const preferredRoleOptions = ["member", "admin", "superadmin"];
 
   const parseList = (text: string) =>
     text
@@ -205,6 +218,8 @@ export default function PendingList({ initialRequests }: Props) {
         title: s.title || "",
         body: s.body || "",
       })),
+      preferredStatus: request.preferredStatus || "Active",
+      preferredRole: request.preferredRole || "member",
     });
   };
 
@@ -247,6 +262,8 @@ export default function PendingList({ initialRequests }: Props) {
         instagram: form.instagram.trim(),
         website: form.website.trim(),
       },
+      preferredStatus: form.preferredStatus,
+      preferredRole: form.preferredRole,
     };
   };
 
@@ -374,6 +391,43 @@ export default function PendingList({ initialRequests }: Props) {
                         value={form.lName}
                         onChange={(e) => updateField("lName", e.target.value)}
                       />
+                    </div>
+                  </div>
+                </div>
+                <div className="profile-editor__section">
+                  <h4 className="mb-3">Membership</h4>
+                  <div className="row mb-3">
+                    <div className="col-sm-6">
+                      <label className="form-label">Status</label>
+                      <select
+                        className="form-select"
+                        value={form.preferredStatus}
+                        onChange={(e) =>
+                          updateField("preferredStatus", e.target.value)
+                        }
+                      >
+                        {preferredStatusOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-sm-6">
+                      <label className="form-label">Role</label>
+                      <select
+                        className="form-select"
+                        value={form.preferredRole}
+                        onChange={(e) =>
+                          updateField("preferredRole", e.target.value)
+                        }
+                      >
+                        {preferredRoleOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option.charAt(0).toUpperCase() + option.slice(1)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

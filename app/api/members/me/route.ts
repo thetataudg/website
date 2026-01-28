@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
+import PendingMember from "@/lib/models/PendingMember";
 import logger from "@/lib/logger";
 import { maybePresignUrl } from "@/lib/garage";
 
@@ -41,28 +42,56 @@ export async function GET(req: Request) {
     )
     .lean() as any;
 
-  if (!member || Array.isArray(member)) {
-    logger.error({ clerkId }, "Member not found for /api/members/me GET");
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+  if (member && !Array.isArray(member)) {
+    logger.info({ clerkId, rollNo: member.rollNo }, "Member/me GET successful");
+    return NextResponse.json(
+      {
+        memberId: member._id?.toString(),
+        rollNo: member.rollNo,
+        profilePicUrl: await maybePresignUrl(member.profilePicUrl),
+        resumeUrl: await maybePresignUrl(member.resumeUrl),
+        role: member.role,
+        status: member.status,
+        isECouncil: member.isECouncil,
+        ecouncilPosition: member.ecouncilPosition,
+        isCommitteeHead: member.isCommitteeHead,
+        needsProfileReview: member.needsProfileReview,
+        needsPermissionReview: member.needsPermissionReview,
+      },
+      { status: 200 }
+    );
   }
 
-  logger.info({ clerkId, rollNo: member.rollNo }, "Member/me GET successful");
-  return NextResponse.json(
-    {
-      memberId: member._id?.toString(),
-      rollNo: member.rollNo,
-      profilePicUrl: await maybePresignUrl(member.profilePicUrl),
-      resumeUrl: await maybePresignUrl(member.resumeUrl),
-      role: member.role,
-      status: member.status,
-      isECouncil: member.isECouncil,
-      ecouncilPosition: member.ecouncilPosition,
-      isCommitteeHead: member.isCommitteeHead,
-      needsProfileReview: member.needsProfileReview,
-      needsPermissionReview: member.needsPermissionReview,
-    },
-    { status: 200 }
-  );
+  const pending = await PendingMember.findOne({ clerkId }).lean();
+  if (pending) {
+    logger.info(
+      { clerkId, rollNo: pending.rollNo },
+      "Member/me GET served pending profile"
+    );
+    return NextResponse.json(
+      {
+        memberId: null,
+        pending: true,
+        pendingId: pending._id?.toString(),
+        rollNo: pending.rollNo,
+        role: "member",
+        status: "Pending",
+        isECouncil: pending.isECouncil,
+        ecouncilPosition: pending.ecouncilPosition,
+        isCommitteeHead: false,
+        needsProfileReview: pending.status === "pending",
+        needsPermissionReview: pending.isECouncil,
+        pendingStatus: pending.status,
+        pendingSubmittedAt: pending.submittedAt?.toISOString(),
+        pendingReviewComments: pending.reviewComments,
+        pendingReviewedAt: pending.reviewedAt?.toISOString(),
+      },
+      { status: 200 }
+    );
+  }
+
+  logger.error({ clerkId }, "Member not found for /api/members/me GET");
+  return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 }
 
 export async function PATCH(req: Request) {
