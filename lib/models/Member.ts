@@ -3,6 +3,7 @@ import mongoose, { Schema, model, models } from "mongoose";
 
 const MemberSchema = new Schema(
   {
+    discordId: { type: String, unique: true, sparse: true },
     clerkId: { type: String, required: false, unique: true, sparse: true },
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },

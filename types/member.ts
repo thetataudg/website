@@ -1,6 +1,7 @@
 // types/member.ts
 export interface MemberDoc {
   clerkId?: string;
+  discordId?: string;
   rollNo: string;
   fName: string;
   lName: string;

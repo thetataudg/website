@@ -8,6 +8,34 @@ import logger from "@/lib/logger";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { maybePresignUrl } from "@/lib/garage";
 
+const MEMBER_SECRET_HEADER = process.env.MEMBER_API_SECRET_HEADER || "x-api-secret";
+const MEMBER_SECRET_QUERY_PARAM = process.env.MEMBER_API_SECRET_QUERY_PARAM || "secret";
+const DEFAULT_DISCORD_BOT_SECRET = process.env.DISCORD_BOT_SECRET || "discord-bot-secret";
+const MEMBER_UPDATE_SECRET =
+  process.env.MEMBER_UPDATE_API_SECRET ||
+  process.env.MEMBER_UPDATE_SECRET ||
+  process.env.MEMBER_SECRET ||
+  process.env.MEMBERS_API_SECRET ||
+  process.env.APPROVAL_API_SECRET ||
+  DEFAULT_DISCORD_BOT_SECRET;
+
+function getProvidedSecret(req: Request) {
+  try {
+    const headerValue = req.headers.get(MEMBER_SECRET_HEADER);
+    if (headerValue) {
+      return headerValue;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const url = new URL(req.url);
+    return url.searchParams.get(MEMBER_SECRET_QUERY_PARAM) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const runtime = "nodejs";
 
 export async function GET(
@@ -33,24 +61,42 @@ export async function PATCH(
   req: Request,
   { params }: { params: { rollNo: string } }
 ) {
+  const providedSecret = getProvidedSecret(req);
+  const secretAuthorized =
+    MEMBER_UPDATE_SECRET && providedSecret && providedSecret === MEMBER_UPDATE_SECRET;
+
   let adminId: string;
   let adminRole: string | null = null;
-  try {
-    const adminObj = await requireRole(req as any, ["superadmin", "admin"]);
-    adminId = typeof adminObj === "string" ? adminObj : adminObj.clerkId;
-    await connectDB();
-    const admin = await Member.findOne({ clerkId: adminId }).lean<{ role?: string }>();
-    adminRole = admin?.role || null;
-    logger.info({ admin, adminId, adminRole }, "Fetched admin for PATCH");
-  } catch (err: any) {
-    logger.warn({ err }, "Unauthorized admin PATCH attempt");
-    return NextResponse.json(
-      { error: err.message },
-      { status: err.statusCode }
-    );
+  if (!secretAuthorized) {
+    try {
+      const adminObj = await requireRole(req as any, ["superadmin", "admin"]);
+      adminId = typeof adminObj === "string" ? adminObj : adminObj.clerkId;
+      await connectDB();
+      const admin = await Member.findOne({ clerkId: adminId }).lean<{ role?: string }>();
+      adminRole = admin?.role || null;
+      logger.info({ admin, adminId, adminRole }, "Fetched admin for PATCH");
+    } catch (err: any) {
+      logger.warn({ err }, "Unauthorized admin PATCH attempt");
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.statusCode || 401 }
+      );
+    }
+  } else {
+    adminId = "discord-bot";
+    adminRole = "admin";
   }
 
   const updates = await req.json();
+  if (secretAuthorized) {
+    const invalidKeys = Object.keys(updates || {}).filter((key) => key !== "discordId");
+    if (invalidKeys.length) {
+      return NextResponse.json(
+        { error: "Secret-based updates may only modify discordId" },
+        { status: 400 }
+      );
+    }
+  }
   if (typeof updates.rollNo === "string") {
     updates.rollNo = updates.rollNo.trim();
     if (!updates.rollNo) {
