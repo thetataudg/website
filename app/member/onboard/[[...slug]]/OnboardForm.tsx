@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import ConnectWithDiscordButton from "@/components/ConnectWithDiscordButton";
 
 type Alert = { type: "success" | "danger"; message: string } | null;
 
@@ -184,6 +185,17 @@ export default function OnboardForm({
           <p className="hero-subtitle">
             Complete your profile to unlock member tools.
           </p>
+        </div>
+      </section>
+
+      <section className="discord-link-cta">
+        <div className="discord-link-cta__inner">
+          <h3 className="discord-link-cta__title">Discord Linking Required</h3>
+          <p className="discord-link-cta__body">
+            In order to get access to the site again please link your Discord
+            account so we can connect your membership to the Discord Server.
+          </p>
+          <ConnectWithDiscordButton className="discord-connect-button" />
         </div>
       </section>
 

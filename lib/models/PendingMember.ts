@@ -55,6 +55,7 @@ const PendingMemberSchema = new Schema(
     hometown: { type: String },
     resumeUrl: { type: String },
     profilePicUrl: { type: String },
+    discordId: { type: String, unique: true, sparse: true },
     socialLinks: { type: Map, of: String, default: {} },
 
     preferredStatus: {

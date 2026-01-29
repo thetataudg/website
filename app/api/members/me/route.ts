@@ -30,6 +30,7 @@ type PendingMemberDoc = {
   submittedAt?: Date;
   reviewedAt?: Date;
   reviewComments?: string;
+  discordId?: string;
 };
 
 export async function GET(req: Request) {
@@ -49,42 +50,43 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId"
     )
     .lean() as any;
 
-  if (member && !Array.isArray(member)) {
-    logger.info({ clerkId, rollNo: member.rollNo }, "Member/me GET successful");
-    return NextResponse.json(
-      {
-        memberId: member._id?.toString(),
-        rollNo: member.rollNo,
-        profilePicUrl: await maybePresignUrl(member.profilePicUrl),
-        resumeUrl: await maybePresignUrl(member.resumeUrl),
-        role: member.role,
-        status: member.status,
-        isECouncil: member.isECouncil,
-        ecouncilPosition: member.ecouncilPosition,
-        isCommitteeHead: member.isCommitteeHead,
-        needsProfileReview: member.needsProfileReview,
-        needsPermissionReview: member.needsPermissionReview,
-      },
-      { status: 200 }
-    );
-  }
+    if (member && !Array.isArray(member)) {
+        logger.info({ clerkId, rollNo: member.rollNo }, "Member/me GET successful");
+        return NextResponse.json(
+            {
+                memberId: member._id?.toString(),
+                rollNo: member.rollNo,
+                profilePicUrl: await maybePresignUrl(member.profilePicUrl),
+                resumeUrl: await maybePresignUrl(member.resumeUrl),
+                role: member.role,
+                status: member.status,
+                isECouncil: member.isECouncil,
+                ecouncilPosition: member.ecouncilPosition,
+                isCommitteeHead: member.isCommitteeHead,
+                needsProfileReview: member.needsProfileReview,
+                needsPermissionReview: member.needsPermissionReview,
+                discordId: member.discordId || null,
+            },
+            { status: 200 }
+        );
+    }
 
   const pending = (await PendingMember.findOne({ clerkId }).lean()) as
     | PendingMemberDoc
     | null;
-  if (pending) {
-    logger.info(
-      { clerkId, rollNo: pending.rollNo },
-      "Member/me GET served pending profile"
-    );
-    return NextResponse.json(
-      {
-        memberId: null,
-        pending: true,
+    if (pending) {
+        logger.info(
+            { clerkId, rollNo: pending.rollNo },
+            "Member/me GET served pending profile"
+        );
+        return NextResponse.json(
+            {
+                memberId: null,
+                pending: true,
         pendingId: pending._id?.toString(),
         rollNo: pending.rollNo,
         role: "member",
@@ -96,12 +98,13 @@ export async function GET(req: Request) {
         needsPermissionReview: pending.isECouncil,
         pendingStatus: pending.status,
         pendingSubmittedAt: pending.submittedAt?.toISOString(),
-        pendingReviewComments: pending.reviewComments,
-        pendingReviewedAt: pending.reviewedAt?.toISOString(),
-      },
-      { status: 200 }
-    );
-  }
+                pendingReviewComments: pending.reviewComments,
+                pendingReviewedAt: pending.reviewedAt?.toISOString(),
+                discordId: pending.discordId || null,
+            },
+            { status: 200 }
+        );
+    }
 
   logger.error({ clerkId }, "Member not found for /api/members/me GET");
   return NextResponse.json({ error: "Profile not found" }, { status: 404 });
