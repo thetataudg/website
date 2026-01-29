@@ -21,6 +21,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import LoadingState, { LoadingSpinner } from "../components/LoadingState";
 import { useRouter } from "next/navigation";
+import ConnectWithDiscordButton from "@/components/ConnectWithDiscordButton";
 
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [userData, setUserData] = useState<any>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [showQr, setShowQr] = useState(false);
@@ -50,6 +52,16 @@ export default function Dashboard() {
     (provider: keyof typeof walletUrls) => () => {
       window.open(walletUrls[provider], "_blank", "noopener");
     };
+
+  const needsDiscordLink =
+    !loadingUserData &&
+    Boolean(userData?.memberId) &&
+    !userData?.discordId &&
+    !userData?.pending;
+
+  useEffect(() => {
+    setShowLinkModal(needsDiscordLink);
+  }, [needsDiscordLink]);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -82,6 +94,7 @@ export default function Dashboard() {
           isAdmin: data.role === "admin" || data.role === "superadmin",
           rollNo: data.rollNo,
           memberId: data.memberId,
+          discordId: data.discordId || null,
         });
 
       } catch (error) {
@@ -619,6 +632,23 @@ export default function Dashboard() {
                 */}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {showLinkModal && (
+        <div
+          className="discord-link-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Link your Discord account"
+        >
+          <div className="discord-link-modal__card">
+            <h3 className="discord-link-modal__title">Discord Linking Required</h3>
+            <p>
+              In order to get access to the site again please link your Discord
+              account so we can connect your membership to the Discord Server.
+            </p>
+            <ConnectWithDiscordButton className="discord-link-modal__button" />
           </div>
         </div>
       )}

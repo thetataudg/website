@@ -7,6 +7,7 @@ import type { MemberDoc } from "@/types/member";
 import ProfileInfoEditor from "./ProfileInfoEditor";
 import PhotoUploader from "./PhotoUploader";
 import ResumeUploader from "./ResumeUploader";
+import ConnectWithDiscordButton from "@/components/ConnectWithDiscordButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { RedirectToSignIn, useAuth, useUser } from "@clerk/nextjs";
@@ -137,6 +138,9 @@ export default function ProfileClient({ member, committees }: ProfileClientProps
                 >
                   {editing ? "Cancel" : "Edit Profile"}
                 </button>
+              )}
+              {canEdit && !member.discordId && (
+                <ConnectWithDiscordButton className="discord-connect-button" />
               )}
             </div>
 

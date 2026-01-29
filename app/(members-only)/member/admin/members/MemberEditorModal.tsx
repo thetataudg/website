@@ -39,6 +39,7 @@ export interface MemberData {
   fName: string;
   lName: string;
   clerkId?: string;
+  discordId?: string;
   role: "superadmin" | "admin" | "member";
   status?: "Active" | "Alumni" | "Removed" | "Deceased";
   isECouncil: boolean;
@@ -128,6 +129,7 @@ export default function MemberEditorModal({
     ecouncilPosition: member.ecouncilPosition,
     isCommitteeHead: member.isCommitteeHead,
     familyLine: member.familyLine,
+    discordId: member.discordId || "",
     big: getMemberId(member.bigs?.[0]),
     little: getMemberId(member.littles?.[0]),
     headline: member.headline || "",
@@ -178,17 +180,18 @@ export default function MemberEditorModal({
 
   useEffect(() => {
     if (!show) return;
-      setForm({
-        rollNo: member.rollNo,
-        fName: member.fName,
-        lName: member.lName,
-        status: member.status || "Active",
+    setForm({
+      rollNo: member.rollNo,
+      fName: member.fName,
+      lName: member.lName,
+      status: member.status || "Active",
       role: member.role,
       isHidden: Boolean(member.isHidden),
       isECouncil: member.isECouncil,
       ecouncilPosition: member.ecouncilPosition,
       isCommitteeHead: member.isCommitteeHead,
       familyLine: member.familyLine,
+      discordId: member.discordId || "",
       big: getMemberId(member.bigs?.[0]),
       little: getMemberId(member.littles?.[0]),
       headline: member.headline || "",
@@ -304,6 +307,7 @@ export default function MemberEditorModal({
     setError(null);
 
     const gradYear = Number(form.gradYear);
+    const discordIdValue = form.discordId.trim();
     const payload: Partial<MemberData> = {
       rollNo: form.rollNo.trim(),
       fName: form.fName.trim(),
@@ -314,6 +318,7 @@ export default function MemberEditorModal({
       ecouncilPosition: form.isECouncil ? form.ecouncilPosition : "",
       isCommitteeHead: form.isCommitteeHead,
       familyLine: form.familyLine,
+      discordId: discordIdValue || undefined,
       bigs: form.big ? [form.big] : [],
       littles: form.little ? [form.little] : [],
       headline: form.headline.trim(),
@@ -496,6 +501,24 @@ export default function MemberEditorModal({
                       <option value="Removed">Removed</option>
                       <option value="Deceased">Deceased</option>
                     </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">
+                      Discord User ID{" "}
+                      <a
+                        href="https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        (how to find it)
+                      </a>
+                    </label>
+                    <input
+                      className="form-control"
+                      value={form.discordId}
+                      onChange={(e) => update("discordId", e.target.value)}
+                      placeholder="123456789012345678"
+                    />
                   </div>
                   <div className="form-check mb-3">
                     <input

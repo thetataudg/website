@@ -10,32 +10,47 @@ const bungee = Bungee({
   weight: "400",
 });
 
-const rushEvents = [
+type RushEvent = {
+  date: string;
+  time: string;
+  title: string;
+  location: string;
+  year: number;
+};
+
+const rushEvents: RushEvent[] = [
   {
     date: "January 23",
     time: "7:00 PM",
     title: "Berk Bash",
     location: "GWC 487",
+    year: 2026,
   },
   {
     date: "January 27",
     time: "7:00 PM",
     title: "Engineers in Service",
     location: "GWC 487",
+    year: 2026,
   },
   {
     date: "January 28",
     time: "7:00 PM",
     title: "Wings & Wits: Jeopardy Night",
     location: "MU 241A (Ventana A)",
+    year: 2026,
   },
   {
     date: "January 30",
     time: "7:00 PM",
     title: "Meet the House",
     location: "TKDR D101/102",
+    year: 2026,
   },
 ];
+
+const parseEventDate = (event: RushEvent) =>
+  new Date(`${event.date} ${event.year} ${event.time}`);
 
 const faqs = [
   {
@@ -140,6 +155,14 @@ const quoteStyles = [
 
 export default function Rush() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const upcomingEvents = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return rushEvents
+      .map((event) => ({ ...event, dateValue: parseEventDate(event) }))
+      .filter((event) => event.dateValue >= today)
+      .sort((a, b) => a.dateValue.getTime() - b.dateValue.getTime());
+  }, []);
 
   useEffect(() => {
     const elements = Array.from(document.querySelectorAll(".reveal"));
@@ -217,20 +240,26 @@ export default function Rush() {
               Remaining Spring 2026 Events
             </h3>
             <div className="mt-6 space-y-5">
-              {rushEvents.map((event) => (
-                <div key={`${event.title}-${event.date}`} className="flex items-start gap-4">
-                  <div className="mt-2 h-3 w-3 rounded-full bg-[#b3202a]" />
-                  <div>
-                    <p className="text-sm font-semibold uppercase text-[#7a0104]">
-                      {event.date} · {event.time}
-                    </p>
-                    <p className="text-lg font-semibold text-[#1b0f0f]">
-                      {event.title}
-                    </p>
-                    <p className="text-sm text-[#1b0f0f]/70">{event.location}</p>
+              {upcomingEvents.length ? (
+                upcomingEvents.map((event) => (
+                  <div key={`${event.title}-${event.date}`} className="flex items-start gap-4">
+                    <div className="mt-2 h-3 w-3 rounded-full bg-[#b3202a]" />
+                    <div>
+                      <p className="text-sm font-semibold uppercase text-[#7a0104]">
+                        {event.date} · {event.time}
+                      </p>
+                      <p className="text-lg font-semibold text-[#1b0f0f]">
+                        {event.title}
+                      </p>
+                      <p className="text-sm text-[#1b0f0f]/70">{event.location}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-base text-[#1b0f0f]">
+                  Rush for this semester is now over.
+                </p>
+              )}
             </div>
           </div>
         </div>

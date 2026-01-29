@@ -1,0 +1,318 @@
+{
+  "emailToUser": {
+    "vinny.24@asu.edu": {
+      "userId": "908772994632020009",
+      "channelId": "1466527461511659621",
+      "savedAt": 1769717804336
+    },
+    "dhyaan.panchal@asu.edu": {
+      "userId": "908772994632020009",
+      "channelId": "1466527461511659621",
+      "savedAt": 1769717816804
+    }
+  },
+  "userToEmail": {
+    "908772994632020009": "dhyaan.panchal@asu.edu"
+  },
+  "inviteIdToDiscord": {
+    "inv_38weFMTXi3RE2ChGH2svFbBWHgR": {
+      "userId": "908772994632020009",
+      "email": "vinny.24@asu.edu",
+      "channelId": "1466515489495715911",
+      "savedAt": 1769714955743
+    },
+    "inv_38wk2umOYsUaUTYQcbSa0AxsezH": {
+      "userId": "908772994632020009",
+      "email": "dhyaan.panchal@asu.edu",
+      "channelId": "1466527461511659621",
+      "savedAt": 1769717816804
+    }
+  },
+  "pendingIdToDiscord": {
+    "697bb5daa0c294f33ee95dd2": {
+      "inviteId": "inv_38weFMTXi3RE2ChGH2svFbBWHgR"
+    },
+    "697bc0f09bac3b669e43afcf": {
+      "inviteId": "inv_38wk2umOYsUaUTYQcbSa0AxsezH",
+      "userId": "908772994632020009",
+      "email": "dhyaan.panchal@asu.edu",
+      "channelId": "1466527461511659621",
+      "savedAt": 1769717816804
+    }
+  },
+  "botConfig": {
+    "adminChannelId": "",
+    "adminRoleId": "",
+    "activeRoleId": "",
+    "alumniRoleId": "",
+    "committeeRoleMap": {
+      "PROJECT": "1466102568274104432",
+      "TECHNOLOGY": "1466102692949659831"
+    },
+    "majorRoleMap": {
+      "COMPUTER_SCIENCE_SOFTWARE_ENGINEERING": "1466265964231397428",
+      "AEROSPACE": "1466265969268752496",
+      "ACTIVE": "1466105135640875182",
+      "BOT": "1243765673927249931",
+      "MEMBERSHIP_INTEGRITY": "1466102740295094303",
+      "PENDING_VERIFICATIONS": "1413384733005713428",
+      "PROJECT": "1466102568274104432",
+      "BOT_ECOUNCIL": "1413435208849690635",
+      "EVERYONE": "1243740151809577032",
+      "TECHNOLOGY": "1466102692949659831",
+      "GH_CONTRIBUTORS": "1339112247078944791",
+      "COMMITTEE_MEMBER": "1247393014205120575",
+      "COMMITTEE_HEAD": "1243765798921830531",
+      "COMPUTER_SCIENCE": "1466102933350387888",
+      "ADMIN": "1413383523288748052",
+      "BOT_MOD": "1413434861510983732",
+      "ALUMNI": "1466105159003279491",
+      "BOT_ADMIN": "1413435044168597595",
+      "CSE110_TECH_SUPPORT": "1340102208246513725",
+      "A": "1243765963820765226",
+      "ROBOTICS": "1466102972231450780",
+      "RANDOM": "1366969824378486904",
+      "ONBOARDING_STEP_1_ANNOUNCEMENTS": "1466496664943595707",
+      "ONBOARDING_STEP_2_COMMITTEE_ONLY": "1466496820573245756",
+      "ONBOARDING_STEP_3_COUNTING_CHANNEL": "1466496977528422451",
+      "CRIMINAL_JUSTICE": "1466528647438401676",
+      "VERIFIED_ROLE": "1466561003754881046"
+    },
+    "linksChannelId": "1413407819801169942",
+    "onboardingSteps": [
+      {
+        "id": "1769710452117",
+        "name": "Announcements",
+        "channelId": "1247395842160201781",
+        "description": "This is a channel where all announcements will be posted.",
+        "roleId": "1466496664943595707",
+        "createdAt": "2026-01-29T18:14:12.117Z"
+      },
+      {
+        "id": "1769710489054",
+        "name": "Committee Only",
+        "channelId": "1361587280434696262",
+        "description": "This is where all Committee related messages will be sent.",
+        "roleId": "1466496820573245756",
+        "createdAt": "2026-01-29T18:14:49.054Z"
+      },
+      {
+        "id": "1769710526326",
+        "name": "Counting Channel",
+        "channelId": "1340105422668959824",
+        "description": "This is where we have the counting bot and we can count upwards and keep a streak going",
+        "roleId": "1466496977528422451",
+        "createdAt": "2026-01-29T18:15:26.326Z"
+      }
+    ],
+    "roleCache": {
+      "@everyone": "1243740151809577032",
+      "everyone": "1243740151809577032",
+      "Bot": "1243765673927249931",
+      "bot": "1243765673927249931",
+      "Committee Head": "1243765798921830531",
+      "committee head": "1243765798921830531",
+      "a": "1243765963820765226",
+      "Committee Member": "1247393014205120575",
+      "committee member": "1247393014205120575",
+      "GH Contributors": "1339112247078944791",
+      "gh contributors": "1339112247078944791",
+      "CSE110 Tech Support": "1340102208246513725",
+      "cse110 tech support": "1340102208246513725",
+      "counting": "1340105515870453894",
+      "Random": "1366969824378486904",
+      "random": "1366969824378486904",
+      "Admin": "1413383523288748052",
+      "admin": "1413383523288748052",
+      "Pending Verifications": "1413384733005713428",
+      "pending verifications": "1413384733005713428",
+      "(bot) Mod": "1413434861510983732",
+      "bot mod": "1413434861510983732",
+      "(bot) admin": "1413435044168597595",
+      "bot admin": "1413435044168597595",
+      "(bot) ecouncil": "1413435208849690635",
+      "bot ecouncil": "1413435208849690635",
+      "Project": "1466102568274104432",
+      "project": "1466102568274104432",
+      "Technology": "1466102692949659831",
+      "technology": "1466102692949659831",
+      "Membership Integrity": "1466102740295094303",
+      "membership integrity": "1466102740295094303",
+      "Computer Science": "1466102933350387888",
+      "computer science": "1466102933350387888",
+      "Robotics": "1466102972231450780",
+      "robotics": "1466102972231450780",
+      "Active": "1466105135640875182",
+      "active": "1466105135640875182",
+      "Alumni": "1466105159003279491",
+      "alumni": "1466105159003279491",
+      "Theta Tau DG": "1466175298549583894",
+      "theta tau dg": "1466175298549583894",
+      "TTDG Utilities": "1466197613253492778",
+      "ttdg utilities": "1466197613253492778",
+      "Computer Science (Software Engineering)": "1466265964231397428",
+      "computer science software engineering": "1466265964231397428",
+      "Aerospace": "1466265969268752496",
+      "aerospace": "1466265969268752496",
+      "Onboarding Step 1 - Announcements": "1466496664943595707",
+      "onboarding step 1 announcements": "1466496664943595707",
+      "Onboarding Step 2 - Committee Only": "1466496820573245756",
+      "onboarding step 2 committee only": "1466496820573245756",
+      "Onboarding Step 3 - Counting Channel": "1466496977528422451",
+      "onboarding step 3 counting channel": "1466496977528422451",
+      "Criminal Justice": "1466528647438401676",
+      "criminal justice": "1466528647438401676",
+      "Verified Role": "1466561003754881046",
+      "verified role": "1466561003754881046"
+    },
+    "verifiedRoleId": "1466561003754881046"
+  },
+  "forms": {
+    "1": {
+      "purpose": "This is a test purpose, please ignore this",
+      "link": "https://thetatau-dg.org",
+      "roleId": "1247393014205120575",
+      "deadline": "2026-01-29T08:02:29.853Z",
+      "remindIntervalMs": 14400000,
+      "creatorId": "716691367702823013",
+      "channelId": "1243740152304767038",
+      "createdAt": "2026-01-29T04:02:34.196Z",
+      "active": true,
+      "id": "1",
+      "_id": "1",
+      "reminders": {
+        "121063744901087232": {
+          "lastSent": 1769659541424,
+          "acknowledged": false
+        },
+        "485066370304966657": {
+          "lastSent": 1769659543130,
+          "acknowledged": false
+        },
+        "554454467920134144": {
+          "lastSent": 1769659545296,
+          "acknowledged": false
+        },
+        "716691367702823013": {
+          "lastSent": 1769659547648,
+          "acknowledged": false
+        },
+        "740793407219433522": {
+          "lastSent": 1769659549906,
+          "acknowledged": false
+        },
+        "1274151334592909454": {
+          "lastSent": 1769659550986,
+          "acknowledged": false
+        }
+      },
+      "acknowledged": []
+    },
+    "2": {
+      "purpose": "This is a test purpose please ignore this",
+      "link": "https://thetatau-dg.org",
+      "roleId": "1247393014205120575",
+      "deadline": "2026-01-29T08:15:56.287Z",
+      "remindIntervalMs": 14400000,
+      "creatorId": "716691367702823013",
+      "channelId": "1243740152304767038",
+      "createdAt": "2026-01-29T04:15:58.052Z",
+      "active": true,
+      "id": "2",
+      "_id": "2",
+      "reminders": {
+        "121063744901087232": {
+          "lastSent": 1769660159249,
+          "acknowledged": false
+        },
+        "485066370304966657": {
+          "lastSent": 1769660159660,
+          "acknowledged": false
+        },
+        "554454467920134144": {
+          "lastSent": 1769660160178,
+          "acknowledged": false
+        },
+        "716691367702823013": {
+          "lastSent": 1769660160728,
+          "acknowledged": false
+        },
+        "740793407219433522": {
+          "lastSent": 1769660162723,
+          "acknowledged": false
+        },
+        "1274151334592909454": {
+          "lastSent": 1769660163638,
+          "acknowledged": false
+        }
+      },
+      "acknowledged": [
+        {
+          "userId": "716691367702823013",
+          "username": "vinnyy.24",
+          "timestamp": "2026-01-29T04:16:20.757Z"
+        }
+      ],
+      "messageId": "1466285721118572758"
+    },
+    "3": {
+      "purpose": "This is a test purpose please ignore",
+      "link": "https://thetatau-dg.org",
+      "roleIds": [
+        "1413435208849690635",
+        "1413383523288748052"
+      ],
+      "deadline": "2026-01-29T05:01:34.453Z",
+      "remindIntervalMs": 14400000,
+      "creatorId": "716691367702823013",
+      "channelId": "1243740152304767038",
+      "createdAt": "2026-01-29T04:56:41.781Z",
+      "active": true,
+      "id": "3",
+      "_id": "3",
+      "reminders": {
+        "121063744901087232": {
+          "lastSent": 1769662602837,
+          "acknowledged": false
+        },
+        "716691367702823013": {
+          "lastSent": 1769662603551,
+          "acknowledged": false
+        }
+      },
+      "acknowledged": [],
+      "messageId": "1466295971905409116"
+    },
+    "4": {
+      "purpose": "Cuz I'm cool",
+      "link": "https://google.com",
+      "roleIds": [
+        "1413435208849690635"
+      ],
+      "deadline": "2026-01-29T19:03:48.393Z",
+      "remindIntervalMs": 14400000,
+      "creatorId": "121063744901087232",
+      "channelId": "1413407819801169942",
+      "createdAt": "2026-01-29T18:03:53.565Z",
+      "active": true,
+      "id": "4",
+      "_id": "4",
+      "reminders": {
+        "121063744901087232": {
+          "lastSent": 1769709834564,
+          "acknowledged": false
+        }
+      },
+      "acknowledged": [
+        {
+          "userId": "121063744901087232",
+          "username": "b34ver",
+          "timestamp": "2026-01-29T18:04:13.874Z"
+        }
+      ],
+      "messageId": "1466494075866845257"
+    }
+  },
+  "nextFormId": 5,
+  "onboardingProgress": {}
+}
