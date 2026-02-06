@@ -20,7 +20,7 @@ async function requireECouncil(req: Request) {
 export async function POST(req: Request) {
   try {
     await requireECouncil(req);
-    const { type, options, pledges, title } = await req.json();
+    const { type, options, pledges, rushees, title } = await req.json();
     if (type === "Election") {
       if (!Array.isArray(options) || options.length < 1) {
         return NextResponse.json({ error: "Invalid vote type or options" }, { status: 400 });
@@ -31,12 +31,19 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Invalid pledge list" }, { status: 400 });
       }
     }
+    if (type === "Bidding") {
+      if (!Array.isArray(rushees) || rushees.length < 1) {
+        return NextResponse.json({ error: "Invalid rushee list" }, { status: 400 });
+      }
+    }
     // Create vote in suspended state (started: false, ended: false)
     const vote = await Vote.create({
       type,
       title: type === "Election" ? title : undefined,
       options: type === "Election" ? options : [],
       pledges: type === "Pledge" ? pledges : [],
+      rushees: type === "Bidding" ? rushees : [],
+      snapBids: type === "Bidding" ? [] : undefined,
       round: type === "Pledge" ? "board" : undefined,
       started: false,
       ended: false,
@@ -171,7 +178,7 @@ export async function GET(req: Request) {
       
       const votes = await Vote.find({}).sort({ createdAt: 1 }).lean();
       return NextResponse.json({ 
-        votes: votes.map(v => ({
+        votes: votes.map((v: any) => ({
           _id: v._id,
           type: v.type,
           title: v.title,
@@ -288,6 +295,38 @@ export async function GET(req: Request) {
         boardResults,
         blackballResults,
         totalVotes: new Set(validVotes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
+        voterListVerified: vote.voterListVerified || false,
+      });
+    } else if (vote.type === "Bidding") {
+      // Filter out invalidated ballots
+      const validVotes = vote.votes.filter((v: any) => 
+        !vote.invalidatedBallots?.includes(v.clerkId)
+      );
+      
+      // Bidding results
+      const biddingResults: Record<string, { bid: number; noBid: number }> = {};
+      
+      for (const rushee of vote.rushees) {
+        biddingResults[rushee] = { bid: 0, noBid: 0 };
+        
+        for (const v of validVotes) {
+          if (v.rushee === rushee) {
+            if (v.choice === "Bid") biddingResults[rushee].bid++;
+            if (v.choice === "No Bid") biddingResults[rushee].noBid++;
+          }
+        }
+      }
+      
+      return NextResponse.json({
+        type: vote.type,
+        rushees: vote.rushees,
+        snapBids: vote.snapBids || [],
+        started: vote.started,
+        ended: vote.ended,
+        startedAt: vote.startedAt?.toISOString() || null,
+        endTime: vote.endTime?.toISOString() || null,
+        biddingResults,
+        totalVotes: new Set(validVotes.map((v: any) => v.clerkId)).size, // Count unique voters
         voterListVerified: vote.voterListVerified || false,
       });
     }

@@ -180,6 +180,53 @@ export async function POST(req: Request) {
         
         return NextResponse.json({ success: true });
       }
+    } else if (vote.type === "Bidding") {
+      // Support batch ballot submission for Bidding
+      if (Array.isArray(body.ballot)) {
+        const isProxy = !!body.proxy;
+        // If vote hasn't started, only allow proxy submissions
+        if (!vote.started && !isProxy) {
+          return NextResponse.json({ error: "Vote not started" }, { status: 400 });
+        }
+        
+        // Build array of all votes to insert
+        const votesToInsert: any[] = [];
+        
+        for (const item of body.ballot) {
+          const { rushee, choice } = item;
+          if (!vote.rushees.includes(rushee)) {
+            return NextResponse.json({ error: `Invalid rushee: ${rushee}` }, { status: 400 });
+          }
+          
+          const validChoices = ["Bid", "No Bid", "Abstain"];
+          if (!validChoices.includes(choice)) {
+            return NextResponse.json({ error: `Invalid choice for ${rushee}` }, { status: 400 });
+          }
+          
+          votesToInsert.push({ clerkId, rushee, choice, proxy: isProxy });
+        }
+        
+        // Use atomic update to prevent race condition
+        const rusheeNames = body.ballot.map((b: any) => b.rushee);
+        const result = await Vote.updateOne(
+          {
+            _id: vote._id,
+            ended: false,
+            "votes": { $not: { $elemMatch: { clerkId, rushee: { $in: rusheeNames } } } }
+          },
+          {
+            $push: {
+              votes: { $each: votesToInsert }
+            }
+          }
+        );
+        
+        if (result.matchedCount === 0) {
+          return NextResponse.json({ error: "Already voted for one or more rushees or vote has ended" }, { status: 400 });
+        }
+        
+        return NextResponse.json({ success: true });
+      }
     }
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });
   } catch (err: any) {
@@ -259,6 +306,31 @@ export async function GET(req: Request) {
         votedPledges,
         abstainedPledges,
         totalVotes: new Set(vote.votes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
+        voterListVerified: vote.voterListVerified || false,
+      });
+    } else if (vote.type === "Bidding") {
+      // For each rushee, check if user has voted
+      const votedRushees: Record<string, boolean> = {};
+      const abstainedRushees: Record<string, boolean> = {};
+      for (const rushee of vote.rushees) {
+        const rusheeVote = vote.votes.find(
+          (v: any) => v.clerkId === clerkId && v.rushee === rushee
+        );
+        votedRushees[rushee] = !!rusheeVote;
+        abstainedRushees[rushee] = rusheeVote?.choice === "Abstain";
+      }
+      return NextResponse.json({
+        _id: vote._id,
+        type: vote.type,
+        rushees: vote.rushees,
+        snapBids: vote.snapBids || [],
+        started: vote.started,
+        ended: vote.ended,
+        startedAt: vote.startedAt?.toISOString() || null,
+        endTime: vote.endTime?.toISOString() || null,
+        votedRushees,
+        abstainedRushees,
+        totalVotes: new Set(vote.votes.map((v: any) => v.clerkId)).size, // Count unique voters
         voterListVerified: vote.voterListVerified || false,
       });
     }

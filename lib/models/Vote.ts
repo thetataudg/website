@@ -1,10 +1,12 @@
 import mongoose, { Schema } from "mongoose";
 
 const VoteSchema = new Schema({
-  type: { type: String, required: true }, // "Election" or "Pledge"
+  type: { type: String, required: true }, // "Election", "Pledge", or "Bidding"
   title: { type: String }, // Optional title for Election votes
   options: [{ type: String }], // for Election
   pledges: [{ type: String }], // for Pledge
+  rushees: [{ type: String }], // for Bidding
+  snapBids: [{ type: String }], // Array of rushee names that have been snap bidded (for Bidding)
   round: { type: String, enum: ["board", "blackball"], default: "board" }, // for Pledge
   started: { type: Boolean, default: false },
   ended: { type: Boolean, default: false },
@@ -18,7 +20,8 @@ const VoteSchema = new Schema({
     {
       clerkId: { type: String, required: true },
       pledge: { type: String }, // for Pledge
-      choice: { type: String, required: true }, // "Continue", "Board", "Blackball", or election option
+      rushee: { type: String }, // for Bidding
+      choice: { type: String, required: true }, // "Continue", "Board", "Blackball", "Bid", "No Bid", or election option
       round: { type: String }, // "board" or "blackball"
       proxy: { type: Boolean, default: false }, // whether this vote was submitted as a proxy before the vote started
     },
