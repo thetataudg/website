@@ -75,6 +75,7 @@ const PendingMemberSchema = new Schema(
       default: "pending",
     },
     submittedAt: { type: Date, default: () => new Date() },
+    inviteId: { type: String },
     reviewedBy: { type: String }, // clerkId of the admin
     reviewedAt: { type: Date },
     reviewComments: { type: String },

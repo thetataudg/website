@@ -42,7 +42,7 @@ const rushEvents: RushEvent[] = [
   },
   {
     date: "January 30",
-    time: "7:00 PM",
+    time: "6:00 PM",
     title: "Meet the House",
     location: "TKDR D101/102",
     year: 2026,

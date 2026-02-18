@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Navbar from "./components/Navbar.js";
+import LockdownGuard from "./components/LockdownGuard";
 import { ClerkProvider } from "@clerk/nextjs";
 
 import { config } from "@fortawesome/fontawesome-svg-core";
@@ -27,7 +28,7 @@ export default function RootLayout({
       <html lang="en">
         <body className="members-shell" data-theme="light">
           <Navbar />
-
+          <LockdownGuard />
           {children}
         </body>
       </html>

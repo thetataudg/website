@@ -23,6 +23,14 @@ import LoadingState, { LoadingSpinner } from "../components/LoadingState";
 import { useRouter } from "next/navigation";
 import ConnectWithDiscordButton from "@/components/ConnectWithDiscordButton";
 
+type LockdownInfo = {
+  active: boolean;
+  reason: string;
+  durationMinutes: number;
+  startedAt: string | null;
+  endsAt: string | null;
+};
+
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
@@ -43,6 +51,8 @@ export default function Dashboard() {
   const [codeError, setCodeError] = useState<string | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isCommitteeHead, setIsCommitteeHead] = useState(false);
+  const [lockdownState, setLockdownState] = useState<LockdownInfo | null>(null);
+  const [lockdownLoading, setLockdownLoading] = useState(true);
   const walletUrls = {
     google: "#",
     apple: "#",
@@ -114,10 +124,40 @@ export default function Dashboard() {
   }, [isSignedIn]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const fetchState = async () => {
+      try {
+        const res = await fetch("/api/lockdown", { signal: controller.signal });
+        if (!res.ok) throw new Error("Unable to load lockdown status");
+        const payload = await res.json();
+        setLockdownState({
+          active: Boolean(payload.active),
+          reason: payload.reason || "",
+          durationMinutes: Number(payload.durationMinutes || 0),
+          startedAt: payload.startedAt || null,
+          endsAt: payload.endsAt || null,
+        });
+      } catch (err) {
+        console.error("Failed to load lockdown state", err);
+      } finally {
+        setLockdownLoading(false);
+      }
+    };
+    fetchState();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
     if (needsOnboarding) {
       router.replace("/member/onboard");
     }
   }, [needsOnboarding, router]);
+
+  useEffect(() => {
+    if (lockdownLoading || !lockdownState?.active || !userData) return;
+    if (userData.isAdmin || userData.isECouncil) return;
+    router.replace("/member/lockdown");
+  }, [lockdownLoading, lockdownState, userData, router]);
 
   useEffect(() => {
     if (!userData?.memberId) return;
