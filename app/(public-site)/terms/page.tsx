@@ -108,7 +108,7 @@ export default function TermsOfService() {
           Your Responsibilities & Our Commitments
         </h2>
         <p className="mt-4 max-w-3xl text-lg text-[#1b0f0f]/80">
-          This page governs how you interact with theta-tau.org and the services
+          This page governs how you interact with thetatau-dg.org and the services
           we provide, including automated data sync to Discord, Clerk-authenticated
           dashboards, and recruitment forms. Following these terms helps keep the
           chapter community secure and accessible.

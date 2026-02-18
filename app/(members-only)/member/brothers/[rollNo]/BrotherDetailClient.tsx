@@ -65,6 +65,15 @@ export default function BrotherDetailClient({
   }, [isSignedIn]);
 
   useEffect(() => {
+    if (!showPreview) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowPreview(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showPreview]);
+
+  useEffect(() => {
     const now = new Date();
     const start = new Date();
     start.setDate(now.getDate() - 30);
@@ -555,9 +564,15 @@ export default function BrotherDetailClient({
       {showPreview && (
         <div
           className="modal fade show"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowPreview(false);
+          }}
           style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
         >
-          <div className="modal-dialog modal-xl modal-dialog-centered">
+          <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
             <div className="modal-content">
               <div className="modal-header bg-light">
                 <h5 className="modal-title">Résumé Preview</h5>
@@ -567,7 +582,7 @@ export default function BrotherDetailClient({
                   onClick={() => setShowPreview(false)}
                 />
               </div>
-              <div className="modal-body p-0" style={{ height: "85vh" }}>
+              <div className="modal-body p-0" style={{ height: "clamp(320px, 70vh, 900px)" }}>
                 <object
                   data={member.resumeUrl + "#toolbar=0&navpanes=0&scrollbar=0"}
                   type="application/pdf"
@@ -581,6 +596,23 @@ export default function BrotherDetailClient({
                     </a>
                   </p>
                 </object>
+              </div>
+              <div className="modal-footer">
+                <a
+                  href={member.resumeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-secondary"
+                >
+                  Open in New Tab
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowPreview(false)}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

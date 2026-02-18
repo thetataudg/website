@@ -81,12 +81,8 @@ export async function PATCH(
     assignIf("awards", ensureArray(updates.awards));
     assignIf("customSections", ensureArray(updates.customSections));
     assignIf("socialLinks", updates.socialLinks);
-    if (updates.preferredStatus && memberStatusOptions.includes(updates.preferredStatus)) {
-      sanitized.preferredStatus = updates.preferredStatus;
-    }
-    if (updates.preferredRole && memberRoleOptions.includes(updates.preferredRole)) {
-      sanitized.preferredRole = updates.preferredRole;
-    }
+    assignIf("discordId", updates.discordId?.trim?.());
+    assignIf("inviteId", updates.inviteId?.trim?.());
 
     if (sanitized.rollNo && sanitized.rollNo !== pending.rollNo) {
       const existingMember = await Member.findOne({ rollNo: sanitized.rollNo }).lean();
