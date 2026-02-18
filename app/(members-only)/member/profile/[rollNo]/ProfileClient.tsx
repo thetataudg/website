@@ -1,7 +1,7 @@
 // app/(members-only)/member/profile/[rollNo]/ProfileClient.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MemberDoc } from "@/types/member";
 import ProfileInfoEditor from "./ProfileInfoEditor";
@@ -34,6 +34,15 @@ export default function ProfileClient({ member, committees }: ProfileClientProps
 
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  useEffect(() => {
+    if (!showPreviewModal) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowPreviewModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showPreviewModal]);
 
   if (!isLoaded) {
     return (
@@ -375,9 +384,15 @@ export default function ProfileClient({ member, committees }: ProfileClientProps
       {showPreviewModal && (
         <div
           className="modal fade show"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowPreviewModal(false);
+          }}
           style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
         >
-          <div className="modal-dialog modal-xl modal-dialog-centered">
+          <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
             <div className="modal-content">
               <div className="modal-header bg-light">
                 <h5 className="modal-title">Resume Preview</h5>
@@ -387,7 +402,7 @@ export default function ProfileClient({ member, committees }: ProfileClientProps
                   onClick={() => setShowPreviewModal(false)}
                 />
               </div>
-              <div className="modal-body p-0" style={{ height: "85vh" }}>
+              <div className="modal-body p-0" style={{ height: "clamp(320px, 70vh, 900px)" }}>
                 <object
                   data={member.resumeUrl + "#toolbar=0&navpanes=0&scrollbar=0"}
                   type="application/pdf"
@@ -401,6 +416,23 @@ export default function ProfileClient({ member, committees }: ProfileClientProps
                     </a>
                   </p>
                 </object>
+              </div>
+              <div className="modal-footer">
+                <a
+                  href={member.resumeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-secondary"
+                >
+                  Open in New Tab
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowPreviewModal(false)}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

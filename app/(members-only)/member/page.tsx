@@ -11,12 +11,10 @@ import {
   faTimes,
   faTriangleExclamation,
   faHourglass,
-  faUser,
-  faAddressCard,
   faNoteSticky,
   faCheckToSlot,
   faCalendar,
-  faGear,
+  faGem,
   faUsersCog,
 } from "@fortawesome/free-solid-svg-icons";
 import LoadingState, { LoadingSpinner } from "../components/LoadingState";
@@ -30,6 +28,69 @@ type LockdownInfo = {
   startedAt: string | null;
   endsAt: string | null;
 };
+
+type DashboardEvent = {
+  _id: string;
+  name: string;
+  committeeId?: string | null;
+  startTime: string;
+  endTime: string;
+  location?: string;
+  status: string;
+};
+
+type DashboardCommittee = {
+  _id: string;
+  name: string;
+};
+
+type GemRequirementKey =
+  | "generalConference"
+  | "committeeMeetings"
+  | "brotherhood"
+  | "service"
+  | "professionalism"
+  | "rush"
+  | "fso"
+  | "lockIn"
+  | "gpa";
+
+type GemMemberSnapshot = {
+  memberId: string;
+  totalSatisfied: number;
+  hasCompletedGem: boolean;
+  satisfiedRequirements: GemRequirementKey[];
+  gem: {
+    rush: {
+      total: number;
+      required: number;
+    };
+    gpa: {
+      value: number | null;
+      threshold: number;
+      satisfied: boolean;
+    };
+  };
+};
+
+type GemStatusResponse = {
+  members: GemMemberSnapshot[];
+};
+
+const GEM_REQUIREMENTS: GemRequirementKey[] = [
+  "generalConference",
+  "committeeMeetings",
+  "brotherhood",
+  "service",
+  "professionalism",
+  "rush",
+  "fso",
+  "lockIn",
+  "gpa",
+];
+
+const GOOGLE_CALENDAR_EMBED_SRC =
+  "https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=America%2FPhoenix&showPrint=0&title=Theta%20Tau%20Delta%20Gamma&src=Y18yMzNkMGFlNjA2NTg2YTcyNjg0MDMxMzg5MTZkYmMxYWUzZjk5MjNiZWU1MzBhY2NhNWIzOWRkYmIxZGM1MDU1QGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&src=Y180NThhYjlhNGIzOTRjOTA1MjI3NDBiZmNlOTRkNmFlZTk2NzI2MTBkMTI3NzU1YzAyN2U0OWFjMmJhZDMwOWNjQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&color=%238b1b23&color=%23e1b21e";
 
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -50,9 +111,19 @@ export default function Dashboard() {
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(0);
   const [codeError, setCodeError] = useState<string | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isCommitteeHead, setIsCommitteeHead] = useState(false);
   const [lockdownState, setLockdownState] = useState<LockdownInfo | null>(null);
   const [lockdownLoading, setLockdownLoading] = useState(true);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [homePanelsLoading, setHomePanelsLoading] = useState(false);
+  const [homePanelsError, setHomePanelsError] = useState<string | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
+  const [committeeMeetings, setCommitteeMeetings] = useState<DashboardEvent[]>(
+    []
+  );
+  const [committeeNames, setCommitteeNames] = useState<Record<string, string>>(
+    {}
+  );
+  const [gemSnapshot, setGemSnapshot] = useState<GemMemberSnapshot | null>(null);
   const walletUrls = {
     google: "#",
     apple: "#",
@@ -121,7 +192,7 @@ export default function Dashboard() {
     }
 
     if (isSignedIn) fetchUserData();
-  }, [isSignedIn]);
+  }, [isSignedIn, router]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -158,32 +229,6 @@ export default function Dashboard() {
     if (userData.isAdmin || userData.isECouncil) return;
     router.replace("/member/lockdown");
   }, [lockdownLoading, lockdownState, userData, router]);
-
-  useEffect(() => {
-    if (!userData?.memberId) return;
-    const loadCommitteeHead = async () => {
-      try {
-        const res = await fetch(
-          `/api/committees?memberId=${encodeURIComponent(userData.memberId)}`
-        );
-        if (!res.ok) return;
-        const committees = await res.json();
-        const isHead = Array.isArray(committees)
-          ? committees.some((c: any) => {
-              const headId =
-                typeof c.committeeHeadId === "string"
-                  ? c.committeeHeadId
-                  : c.committeeHeadId?._id;
-              return headId === userData.memberId;
-            })
-          : false;
-        setIsCommitteeHead(isHead);
-      } catch (error) {
-        console.error("Committee head check failed:", error);
-      }
-    };
-    loadCommitteeHead();
-  }, [userData?.memberId]);
 
   useEffect(() => {
     if (!showQr || !userData?.memberId) {
@@ -247,6 +292,120 @@ export default function Dashboard() {
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, [codeExpiresAt]);
+
+  useEffect(() => {
+    if (!showCalendarModal) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowCalendarModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showCalendarModal]);
+
+  useEffect(() => {
+    if (!userData?.memberId || !userData?.userHasProfile) return;
+    let cancelled = false;
+
+    const loadHomePanels = async () => {
+      setHomePanelsLoading(true);
+      setHomePanelsError(null);
+      try {
+        const committeeUrl =
+          userData.isAdmin || userData.isECouncil
+            ? "/api/committees"
+            : `/api/committees?memberId=${encodeURIComponent(userData.memberId)}`;
+
+        const [eventsRes, committeesRes, gemRes] = await Promise.all([
+          fetch("/api/events?status=scheduled,ongoing"),
+          fetch(committeeUrl),
+          fetch("/api/gem/status"),
+        ]);
+
+        if (!eventsRes.ok) {
+          throw new Error("Unable to load upcoming events.");
+        }
+
+        const events = (await eventsRes.json()) as DashboardEvent[];
+        const committees = committeesRes.ok
+          ? ((await committeesRes.json()) as DashboardCommittee[])
+          : [];
+
+        const nameLookup = committees.reduce<Record<string, string>>(
+          (lookup, committee) => {
+            if (committee?._id && committee?.name) {
+              lookup[committee._id] = committee.name;
+            }
+            return lookup;
+          },
+          {}
+        );
+        const committeeIdSet = new Set(Object.keys(nameLookup));
+
+        const now = Date.now();
+        const sortedUpcoming = events
+          .filter((event) => {
+            const endTime = new Date(event.endTime).getTime();
+            return (
+              Number.isFinite(endTime) &&
+              endTime >= now &&
+              event.status !== "cancelled"
+            );
+          })
+          .sort(
+            (a, b) =>
+              new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+          );
+
+        const chapterEvents = sortedUpcoming
+          .filter((event) => !event.committeeId)
+          .slice(0, 4);
+
+        const myCommitteeEvents = sortedUpcoming
+          .filter((event) => {
+            const committeeId = event.committeeId || "";
+            return Boolean(committeeId) && committeeIdSet.has(committeeId);
+          })
+          .slice(0, 4);
+
+        let memberGemSnapshot: GemMemberSnapshot | null = null;
+        if (gemRes.ok) {
+          const gemPayload = (await gemRes.json()) as GemStatusResponse;
+          memberGemSnapshot =
+            gemPayload.members.find((member) => member.memberId === userData.memberId) ||
+            gemPayload.members[0] ||
+            null;
+        }
+
+        if (cancelled) return;
+        setCommitteeNames(nameLookup);
+        setUpcomingEvents(chapterEvents);
+        setCommitteeMeetings(myCommitteeEvents);
+        setGemSnapshot(memberGemSnapshot);
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load homepage panels:", error);
+        setHomePanelsError("We couldn't load homepage cards right now.");
+        setUpcomingEvents([]);
+        setCommitteeMeetings([]);
+      } finally {
+        if (!cancelled) {
+          setHomePanelsLoading(false);
+        }
+      }
+    };
+
+    loadHomePanels();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    userData?.memberId,
+    userData?.userHasProfile,
+    userData?.isAdmin,
+    userData?.isECouncil,
+  ]);
 
   if (!isLoaded || loadingUserData) {
     return <LoadingState message="Loading dashboard..." />;
@@ -372,7 +531,6 @@ export default function Dashboard() {
     isAdmin,
     needsPermissionReview,
     needsProfileReview,
-    rollNo,
   } = userData;
 
   const userTypeDetails = [
@@ -383,82 +541,26 @@ export default function Dashboard() {
     .filter(Boolean)
     .join(", ");
 
-  const privileges = [
-    { label: "Edit Profile", access: userHasProfile },
-    { label: "Directory", access: userHasProfile },
-    { label: "Minutes", access: userHasProfile },
-    { label: "Vote", access: userHasProfile && type === "Active" },
-    { label: "Admin Voting", access: isECouncil },
-    { label: "Events", access: userHasProfile },
-    { label: "Admin Users", access: isAdmin },
-  ];
+  const eventDateFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const eventTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Phoenix",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const formatEventDate = (value: string) =>
+    eventDateFormatter.format(new Date(value));
+  const formatEventTime = (value: string) =>
+    eventTimeFormatter.format(new Date(value));
 
-  // Quick access buttons
-  const quickAccessButtons = [
-    {
-      label: "My Profile",
-      href: rollNo ? `/member/profile/${rollNo}` : "#",
-      icon: faUser,
-      enabled: userHasProfile,
-      variant: "primary",
-    },
-    {
-      label: "Brothers",
-      href: "/member/brothers",
-      icon: faAddressCard,
-      enabled: userHasProfile,
-      variant: "success",
-    },
-    {
-      label: "Minutes",
-      href: "/member/minutes",
-      icon: faNoteSticky,
-      enabled: userHasProfile,
-      variant: "info",
-    },
-    // {
-    //   label: "Minutes",
-    //   href: "/member/minutes",
-    //   icon: faNoteSticky,
-    //   enabled: userHasProfile,
-    //   variant: "info",
-    // },
-    {
-      label: "Vote",
-      href: "/member/vote",
-      icon: faCheckToSlot,
-      enabled: userHasProfile && type === "Active",
-      variant: "warning",
-    },
-    {
-       label: "Events",
-       href: "/member/events",
-       icon: faCalendar,
-       enabled: userHasProfile,
-       variant: "secondary",
-    }, 
-    {
-      label: "Admin",
-      href: "/member/admin",
-      icon: faGear,
-      enabled: isAdmin,
-      variant: "danger",
-    },
-    {
-      label: "Manage Events",
-      href: "/member/events/manage",
-      icon: faCalendar,
-      enabled: (isAdmin || isECouncil) && userHasProfile,
-      variant: "secondary",
-    },
-    {
-      label: "Committee Events",
-      href: "/member/events/committee",
-      icon: faCalendar,
-      enabled: (isAdmin || isECouncil || isCommitteeHead) && userHasProfile,
-      variant: "secondary",
-    },
-  ];
+  const gemCompletionCount = gemSnapshot?.totalSatisfied || 0;
+  const gemCompletionPercent = Math.round(
+    (gemCompletionCount / GEM_REQUIREMENTS.length) * 100
+  );
 
   const statusUpdates: { type: "alert" | "info" | "success"; icon: any; text: string }[] = [];
   if (!userHasProfile) {
@@ -482,22 +584,6 @@ export default function Dashboard() {
       text: "Your profile changes are awaiting review.",
     });
   }
-  if (userHasProfile && !needsPermissionReview && !needsProfileReview) {
-    statusUpdates.push({
-      type: "success",
-      icon: faCheck,
-      text: `Your profile is ${
-        type === "Active" ? "active" : type.toLowerCase()
-      }, granting ${
-        isAdmin
-          ? "admin privileges"
-          : isECouncil
-          ? "extended privileges"
-          : "normal privileges"
-      } on the chapter tool.`,
-    });
-  }
-
   return (
     <div className="member-dashboard">
       <section className="member-hero bento-card">
@@ -553,48 +639,156 @@ export default function Dashboard() {
         </section>
       )}
 
-      <div className="bento-grid">
-        <section className="bento-card bento-quick">
+      <div className="bento-grid member-home-grid">
+        <section className="bento-card home-panel home-panel--events">
           <div className="bento-title">
             <span className="icon-pill">
-              <FontAwesomeIcon icon={faAddressCard} />
+              <FontAwesomeIcon icon={faCalendar} />
             </span>
-            Quick access
+            Upcoming chapter events
           </div>
-          <div className="quick-grid">
-            {quickAccessButtons
-              .filter((button) => button.enabled)
-              .map((button, index) => (
-                <Link href={button.href} className="quick-card" key={index}>
-                  <span className="quick-icon">
-                    <FontAwesomeIcon icon={button.icon} />
-                  </span>
-                  <span className="quick-label">{button.label}</span>
-                </Link>
+          <p className="home-panel__subtitle">
+            Chapter-wide events you can plan for this week.
+          </p>
+          {homePanelsError && (
+            <div className="home-panel__error">{homePanelsError}</div>
+          )}
+          {homePanelsLoading ? (
+            <div className="home-panel__loading">
+              <LoadingSpinner />
+              <span>Loading events...</span>
+            </div>
+          ) : upcomingEvents.length > 0 ? (
+            <div className="home-feed-list">
+              {upcomingEvents.map((event) => (
+                <article key={event._id} className="home-feed-item">
+                  <div className="home-feed-item__date">
+                    {formatEventDate(event.startTime)}
+                  </div>
+                  <div className="home-feed-item__content">
+                    <h3>{event.name}</h3>
+                    <div className="home-feed-item__meta">
+                      <span>
+                        {formatEventTime(event.startTime)} -{" "}
+                        {formatEventTime(event.endTime)}
+                      </span>
+                      {event.location ? <span>{event.location}</span> : null}
+                    </div>
+                  </div>
+                </article>
               ))}
-          </div>
+            </div>
+          ) : (
+            <p className="home-panel__empty">
+              No chapter events are scheduled right now.
+            </p>
+          )}
+          <Link href="/member/events" className="tt-btn tt-btn-outline tt-btn-compact">
+            View all events
+          </Link>
         </section>
 
-        <section className="bento-card bento-permissions">
+        <section className="bento-card home-panel home-panel--committees">
           <div className="bento-title">
             <span className="icon-pill">
-              <FontAwesomeIcon icon={faGear} />
+              <FontAwesomeIcon icon={faUsersCog} />
             </span>
-            Permissions
+            Committee meetings
           </div>
-          <div className="perm-list">
-            {privileges.map((priv, index) => (
-              <div className="perm-item" key={index}>
-                <span>{priv.label}</span>
-                <FontAwesomeIcon
-                  icon={priv.access ? faCheck : faTimes}
-                  className={`status-icon ${
-                    priv.access ? "text-success" : "text-danger"
-                  }`}
-                />
+          <p className="home-panel__subtitle">
+            Meetings for committees you are currently assigned to.
+          </p>
+          {homePanelsLoading ? (
+            <div className="home-panel__loading">
+              <LoadingSpinner />
+              <span>Loading committee meetings...</span>
+            </div>
+          ) : committeeMeetings.length > 0 ? (
+            <div className="home-feed-list">
+              {committeeMeetings.map((event) => (
+                <article key={event._id} className="home-feed-item">
+                  <div className="home-feed-item__date">
+                    {formatEventDate(event.startTime)}
+                  </div>
+                  <div className="home-feed-item__content">
+                    <h3>{event.name}</h3>
+                    <div className="home-feed-item__meta">
+                      <span>
+                        {event.committeeId
+                          ? committeeNames[event.committeeId] || "Committee"
+                          : "Committee"}
+                      </span>
+                      <span>
+                        {formatEventTime(event.startTime)} -{" "}
+                        {formatEventTime(event.endTime)}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="home-panel__empty">
+              No committee meetings are scheduled yet.
+            </p>
+          )}
+          <Link
+            href="/member/events"
+            className="tt-btn tt-btn-outline tt-btn-compact"
+          >
+            Open events page
+          </Link>
+        </section>
+
+        <Link href="/member/gem" className="bento-card home-gem-card">
+          <div className="bento-title">
+            <span className="icon-pill">
+              <FontAwesomeIcon icon={faGem} />
+            </span>
+            GEM progress
+          </div>
+          {homePanelsLoading && !gemSnapshot ? (
+            <div className="home-panel__loading">
+              <LoadingSpinner />
+              <span>Loading GEM status...</span>
+            </div>
+          ) : gemSnapshot ? (
+            <>
+              <div className="home-gem-card__stats">
+                <strong>
+                  {gemCompletionCount}/{GEM_REQUIREMENTS.length}
+                </strong>
+                <span>{gemSnapshot.hasCompletedGem ? "On track" : "Needs attention"}</span>
               </div>
-            ))}
+              <div className="home-gem-card__progress" aria-hidden="true">
+                <span style={{ width: `${Math.max(gemCompletionPercent, 8)}%` }} />
+              </div>
+              <div className="home-gem-card__detail">
+                <span>Needed to meet GEM: 5/9</span>
+              </div>
+            </>
+          ) : (
+            <p className="home-panel__empty">GEM status unavailable.</p>
+          )}
+        </Link>
+
+        <section className="bento-card home-calendar-card">
+          <div className="bento-title">
+            <span className="icon-pill">
+              <FontAwesomeIcon icon={faCalendar} />
+            </span>
+            Chapter calendar
           </div>
+          <p className="home-panel__subtitle">
+            Open the shared Google calendar in a themed popup without leaving this page.
+          </p>
+          <button
+            type="button"
+            className="tt-btn tt-btn-primary"
+            onClick={() => setShowCalendarModal(true)}
+          >
+            Open calendar
+          </button>
         </section>
       </div>
 
@@ -648,7 +842,7 @@ export default function Dashboard() {
                   )}
                 </p>
                 
-                {/*
+                
                 <button
                   type="button"
                   className="wallet-btn wallet-btn--google"
@@ -669,8 +863,44 @@ export default function Dashboard() {
                   </span>
                   Add to Apple Wallet
                 </button>
-                */}
+                
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCalendarModal && (
+        <div
+          className="home-calendar-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Chapter calendar"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowCalendarModal(false);
+            }
+          }}
+        >
+          <div className="home-calendar-modal__dialog">
+            <div className="home-calendar-modal__header">
+              <h5>Delta Gamma Calendar</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowCalendarModal(false)}
+                aria-label="Close calendar"
+              />
+            </div>
+            <div className="home-calendar-modal__frame">
+              <iframe
+                src={GOOGLE_CALENDAR_EMBED_SRC}
+                title="Theta Tau Delta Gamma calendar"
+                width="100%"
+                height="600"
+                frameBorder="0"
+                scrolling="no"
+                loading="lazy"
+              />
             </div>
           </div>
         </div>

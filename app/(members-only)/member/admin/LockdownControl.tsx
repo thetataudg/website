@@ -129,28 +129,33 @@ export default function LockdownControl() {
   }
 
   return (
-    <section className="bento-card admin-lockdown-card">
-      <header className="admin-lockdown-card__header">
+    <section className="bento-card admin-table-card">
+      <div className="admin-members-header mb-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-[#f5d79a]">Lockdown Control</p>
-          <h3 className="mt-1 text-2xl font-semibold">
+          <h2 className="mb-1">Lockdown Control</h2>
+          <p className="text-muted mb-0">
             {state.active ? "Lockdown is active" : "Lockdown is cleared"}
-          </h3>
+          </p>
         </div>
-        <p className="text-sm text-white/70">
-          Countdown: <span className="font-semibold text-[#f4c12c]">{countdown}</span>
+        <div className="text-end">
+          <p className="text-muted mb-1">Countdown</p>
+          <p className="fw-semibold mb-0">{countdown}</p>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <p className="text-muted mb-1">Last updated by {state.createdBy || "leadership"}.</p>
+        <p className="text-muted mb-1">
+          Reason: <span className="fw-semibold">{state.reason || "(none provided)"}</span>
         </p>
-      </header>
-      <div className="admin-lockdown-card__body">
-        <p className="text-sm text-white/80">Last updated by {state.createdBy || "leadership"}.</p>
-        <p className="text-sm text-white/70">
-          Reason: <span className="font-semibold text-white">{state.reason || "(none provided)"}</span>
-        </p>
-        <p className="text-sm text-white/70">
+        <p className="text-muted mb-0">
           Started {formatArizona(state.startedAt)} · Scheduled end {formatArizona(state.endsAt)}
         </p>
-        <div className="flex flex-col gap-3 mt-4">
-          <label className="text-sm font-semibold">Reason</label>
+      </div>
+
+      <div className="row g-3">
+        <div className="col-12">
+          <label className="form-label">Reason</label>
           <input
             type="text"
             className="form-control"
@@ -158,7 +163,9 @@ export default function LockdownControl() {
             placeholder="Why are we locked down?"
             onChange={(event) => setReason(event.target.value)}
           />
-          <label className="text-sm font-semibold">Duration (minutes)</label>
+        </div>
+        <div className="col-md-6">
+          <label className="form-label">Duration (minutes)</label>
           <input
             type="number"
             min={5}
@@ -167,25 +174,37 @@ export default function LockdownControl() {
             onChange={(event) => setDuration(Number(event.target.value))}
           />
         </div>
-        <div className="admin-lockdown-card__actions">
-          <button
-            className="tt-button-primary"
-            onClick={() => submit("engage")}
-            disabled={saving}
-          >
-            {saving ? <LoadingSpinner size="sm" /> : "Engage Lockdown"}
-          </button>
-          <button
-            className="tt-button-secondary"
-            onClick={() => submit("release")}
-            disabled={saving || !state.active}
-          >
-            {saving ? <LoadingSpinner size="sm" /> : "Release Lockdown"}
-          </button>
-        </div>
-        {message && <p className="mt-2 text-sm text-green-300">{message}</p>}
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
       </div>
+
+      <div className="d-flex flex-wrap gap-2 mt-3">
+        <button
+          className="btn btn-primary d-inline-flex align-items-center"
+          onClick={() => submit("engage")}
+          disabled={saving}
+        >
+          {saving && <LoadingSpinner size="sm" className="me-2" />}
+          Engage Lockdown
+        </button>
+        <button
+          className="btn btn-outline-secondary d-inline-flex align-items-center"
+          onClick={() => submit("release")}
+          disabled={saving || !state.active}
+        >
+          {saving && <LoadingSpinner size="sm" className="me-2" />}
+          Release Lockdown
+        </button>
+      </div>
+
+      {message && (
+        <div className="alert alert-success mt-3" role="alert">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="alert alert-danger mt-3" role="alert">
+          {error}
+        </div>
+      )}
     </section>
   );
 }

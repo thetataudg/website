@@ -146,8 +146,7 @@ export default function MemberLockdownPage() {
             type="button"
             className="tt-button-primary"
             onClick={() => {
-              window.location.assign("/lockdown");
-              window.location.reload();
+              window.location.href = "/lockdown";
             }}
           >
             Lockdown status
