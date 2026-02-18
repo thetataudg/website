@@ -57,7 +57,24 @@ const sanitizeFileName = (name: string) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 
-const uploadMinutesFile = async (file: File, slug: string) => {
+type FileLike = {
+  name: string;
+  size: number;
+  type?: string;
+  arrayBuffer: () => Promise<ArrayBuffer>;
+};
+
+const isFileLike = (value: unknown): value is FileLike => {
+  if (!value || typeof value !== "object") return false;
+  const maybe = value as Partial<FileLike>;
+  return (
+    typeof maybe.name === "string" &&
+    typeof maybe.size === "number" &&
+    typeof maybe.arrayBuffer === "function"
+  );
+};
+
+const uploadMinutesFile = async (file: FileLike, slug: string) => {
   if (!minutesBucket) throw new Error("Minutes bucket not configured");
   if (file.size > maxFileBytes) {
     throw new Error("File too large");
@@ -160,7 +177,7 @@ export async function PATCH(
 
     const contentType = req.headers.get("content-type") || "";
     let payload: any = {};
-    let uploadedFile: File | null = null;
+    let uploadedFile: FileLike | null = null;
     if (contentType.includes("multipart/form-data")) {
       const form = await req.formData();
       payload.startTime = String(form.get("startTime") || "");
@@ -171,7 +188,7 @@ export async function PATCH(
       payload.executiveSummary = String(form.get("executiveSummary") || "");
       payload.eventId = form.get("eventId");
       const maybeFile = form.get("minutesFile");
-      if (maybeFile instanceof File) {
+      if (isFileLike(maybeFile)) {
         uploadedFile = maybeFile;
       }
     } else {

@@ -312,10 +312,9 @@ export default function Dashboard() {
       setHomePanelsLoading(true);
       setHomePanelsError(null);
       try {
-        const committeeUrl =
-          userData.isAdmin || userData.isECouncil
-            ? "/api/committees"
-            : `/api/committees?memberId=${encodeURIComponent(userData.memberId)}`;
+        const committeeUrl = `/api/committees?memberId=${encodeURIComponent(
+          userData.memberId
+        )}`;
 
         const [eventsRes, committeesRes, gemRes] = await Promise.all([
           fetch("/api/events?status=scheduled,ongoing"),

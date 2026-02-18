@@ -6,8 +6,14 @@ import MembersList, { MemberData } from "./MembersList";
 
 export default async function BrothersPage() {
   const headerList = headers();
-  const host = headerList.get("host")!;
-  const proto = process.env.VERCEL_ENV === "production" ? "https" : "http";
+  const host = headerList.get("x-forwarded-host") || headerList.get("host");
+  if (!host) {
+    return <Unauthorized />;
+  }
+  const forwardedProto = headerList.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const proto =
+    forwardedProto ||
+    (host.includes("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
   const base = `${proto}://${host}`;
   const cookie = headerList.get("cookie");
 
@@ -19,7 +25,9 @@ export default async function BrothersPage() {
     return <Unauthorized />;
   }
   const me = await meRes.json();
-  const isRestricted = !me.memberId || Boolean(me.pending);
+  const status = String(me.status || "").toLowerCase();
+  const allowedStatus = status === "active" || status === "alumni";
+  const isRestricted = !me.memberId || Boolean(me.pending) || !allowedStatus;
   if (isRestricted) {
     return <Unauthorized />;
   }
