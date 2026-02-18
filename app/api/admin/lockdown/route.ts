@@ -6,6 +6,12 @@ import { getAuth } from "@clerk/nextjs/server";
 
 const LOCKDOWN_KEY = "global";
 
+type AdminUser = {
+  role?: "admin" | "superadmin" | "member" | string;
+  fName?: string;
+  lName?: string;
+};
+
 const serialize = (doc: any) => {
   if (!doc) return {
     active: false,
@@ -32,8 +38,9 @@ async function ensureAdmin(req: NextRequest) {
     throw new Error("Unauthorized");
   }
   await connectDB();
-  const user = await Member.findOne({ clerkId: userId }).lean();
-  if (!user || !["admin", "superadmin"].includes(user.role)) {
+  const rawUser = await Member.findOne({ clerkId: userId }).lean();
+  const user = (Array.isArray(rawUser) ? null : rawUser) as AdminUser | null;
+  if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
     throw new Error("Unauthorized");
   }
   return user;
