@@ -62,7 +62,7 @@ export default function PhotoUploader({
     setRawFile(null);
     setFile(null);
     setPreview(initialUrl || "");
-    setEditorImage(null);
+    setEditorImage(initialUrl || null);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setOutputSize(defaultOutputSize);
@@ -75,7 +75,7 @@ export default function PhotoUploader({
       setRawFile(null);
       setFile(null);
       setPreview(initialUrl || "");
-      setEditorImage(null);
+      setEditorImage(initialUrl || null);
       onError("File too large. Max size is 5 MB.");
       return;
     }
@@ -83,7 +83,7 @@ export default function PhotoUploader({
       setRawFile(null);
       setFile(null);
       setPreview(initialUrl || "");
-      setEditorImage(null);
+      setEditorImage(initialUrl || null);
       onError("Please select an image file.");
       return;
     }
@@ -91,7 +91,7 @@ export default function PhotoUploader({
     setFile(f);
     if (!f) {
       setPreview(initialUrl || "");
-      setEditorImage(null);
+      setEditorImage(initialUrl || null);
       return;
     }
 
@@ -107,8 +107,14 @@ export default function PhotoUploader({
   const loadImage = useCallback((src: string) => {
     return new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
+      image.crossOrigin = "anonymous";
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Failed to load selected image."));
+      image.onerror = () =>
+        reject(
+          new Error(
+            "Failed to load image for editing. If this is an existing photo, reselect it and try again."
+          )
+        );
       image.src = src;
     });
   }, []);
@@ -168,12 +174,13 @@ export default function PhotoUploader({
   };
 
   const resetEdits = () => {
-    if (!rawFile || !editorImage) return;
+    if (!editorImage) return;
     setFile(rawFile);
-    setPreview(editorImage);
+    setPreview(rawFile ? editorImage : initialUrl || "");
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setOutputSize(defaultOutputSize);
+    setCroppedAreaPixels(null);
   };
 
   const handleUpload = async () => {
@@ -314,7 +321,7 @@ export default function PhotoUploader({
                     type="button"
                     className="btn btn-sm photo-editor__btn photo-editor__btn--reset"
                     onClick={resetEdits}
-                    disabled={uploading || processing || !rawFile}
+                    disabled={uploading || processing || !editorImage}
                   >
                     Reset
                   </button>
