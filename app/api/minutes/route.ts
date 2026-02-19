@@ -30,6 +30,23 @@ const minutesBucketValue = getMinutesBucket();
 
 export const runtime = "nodejs";
 
+type FileLike = {
+  name: string;
+  size: number;
+  type?: string;
+  arrayBuffer: () => Promise<ArrayBuffer>;
+};
+
+const isFileLike = (value: unknown): value is FileLike => {
+  if (!value || typeof value !== "object") return false;
+  const maybe = value as Partial<FileLike>;
+  return (
+    typeof maybe.name === "string" &&
+    typeof maybe.size === "number" &&
+    typeof maybe.arrayBuffer === "function"
+  );
+};
+
 export async function GET(req: Request) {
   try {
     const clerkId = await requireAuth(req as any);
@@ -96,7 +113,7 @@ export async function POST(req: Request) {
     const quorumRaw = String(form.get("quorumRequired") || "").toLowerCase();
     const summaryRaw = String(form.get("executiveSummary") || "").trim();
     const eventIdRaw = String(form.get("eventId") || "").trim();
-    const file = form.get("minutesFile");
+    const minutesFileEntry = form.get("minutesFile");
 
     if (!startRaw || !endRaw || !activesRaw) {
       return NextResponse.json(
@@ -105,12 +122,13 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!(file instanceof File)) {
+    if (!isFileLike(minutesFileEntry)) {
       return NextResponse.json(
         { error: "Minutes file must be provided" },
         { status: 400 }
       );
     }
+    const file = minutesFileEntry;
 
     const ext = path.extname(file.name || "").toLowerCase();
     if (ext !== ".pdf") {
