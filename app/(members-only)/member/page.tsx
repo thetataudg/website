@@ -841,7 +841,7 @@ export default function Dashboard() {
                   )}
                 </p>
                 
-                
+                {/*
                 <button
                   type="button"
                   className="wallet-btn wallet-btn--google"
@@ -862,7 +862,7 @@ export default function Dashboard() {
                   </span>
                   Add to Apple Wallet
                 </button>
-                
+                */}
               </div>
             </div>
           </div>
