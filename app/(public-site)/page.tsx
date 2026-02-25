@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Bungee } from "next/font/google";
 import { useEffect, useRef, useState } from "react";
+import TypingAnimation from "./components/TypingAnimation";
 
 import { FaUsers, FaGraduationCap, FaBuilding } from "react-icons/fa"
 
@@ -87,21 +88,31 @@ export default function Home() {
     <main className="bg-[#120a0a] pb-16 text-white">
       <section className="relative min-h-[85vh] w-full">
         <Image
-          src="/TauGamma-Gradient.jpg"
+          src="/homepage-hero.jpg"
           fill
           priority
           alt="ASU Theta Tau members standing in professional dress"
-          className="object-cover"
+          className="object-cover brightness-[0.40] contrast-[1.06] saturate-[0.96]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-[#120a0a]" />
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-x-0 top-0 hidden h-[24%] bg-gradient-to-b from-black/45 to-transparent md:block" />
+        <div className="absolute inset-x-0 bottom-0 h-[56%] bg-gradient-to-b from-transparent via-[#120a0a]/65 to-[#120a0a]" />
         <div className="relative z-10 flex min-h-[85vh] flex-col items-center justify-center px-6 text-center reveal">
-          <p className="mb-3 text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+          <p className="mb-3 text-sm uppercase tracking-[0.35em] text-[#f5d79a] drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
             Theta Tau - Delta Gamma
           </p>
-          <h1 className={`${bungee.className} text-4xl sm:text-6xl lg:text-7xl text-[#b3202a]`}>
-            Forging Future Engineers
+          <h1 className={`${bungee.className} text-4xl sm:text-6xl lg:text-7xl text-[#f8ead4] drop-shadow-[0_6px_20px_rgba(0,0,0,0.85)]`}>
+            <span className="block">Forging Future</span>
+            <span className="block min-h-[1.2em] text-[#f0c12c]">
+              <TypingAnimation
+                words={["Engineers", "Leaders", "Innovators", "Brothers"]}
+                pauseMs={1250}
+                typeSpeed={90}
+                deleteSpeed={55}
+              />
+            </span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg text-white/90">
+          <p className="mt-5 max-w-2xl text-lg text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
             A professional co-ed engineering fraternity.
           </p>
           <a
