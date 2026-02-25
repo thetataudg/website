@@ -1,10 +1,9 @@
-"use client"; // ref: https://stackoverflow.com/questions/74965849/youre-importing-a-component-that-needs-usestate-it-only-works-in-a-client-comp
+"use client";
 
-import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Bungee } from "next/font/google";
 import Link from "next/link";
-import React from "react";
 import Image from "next/image";
+import { FaEnvelope, FaGithub, FaInstagram } from "react-icons/fa";
 
 const bungee = Bungee({
   subsets: ["latin"],
@@ -12,142 +11,97 @@ const bungee = Bungee({
   weight: "400",
 });
 
+const socialLinks = [
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/thetataudg/",
+    icon: FaInstagram,
+  },
+  {
+    label: "Email",
+    href: "mailto:general@thetatau-dg.org",
+    icon: FaEnvelope,
+  },
+  {
+    label: "GitHub",
+    href: "https://github.com/roenw/ThetaTau-Website",
+    icon: FaGithub,
+  },
+];
+
+const legalLinks = [
+  { label: "Privacy", href: "/privacy-policy" },
+  { label: "Terms", href: "/terms" },
+];
+
 const Footer = () => {
   return (
-    <footer className="bg-[#120a0a] px-4 pb-0 pt-12 text-[#1b0f0f]">
-      <div className="mx-auto w-full max-w-[1400px] rounded-[32px] bg-[#fbf6dc] px-8 py-12 shadow-[0_14px_32px_rgba(0,0,0,0.4)] sm:px-12">
-        <div className="grid gap-10 lg:grid-cols-[auto,1fr] lg:items-start">
-          <div className="flex items-center gap-6">
+    <footer className="bg-[#120a0a] px-0 pb-0 pt-20 text-[#f8ead4] sm:px-3">
+      <div className="w-full overflow-hidden border-y border-[#f5d79a]/30 bg-[linear-gradient(170deg,#1b0f0f_8%,#120a0a_62%,#0f0808_100%)]">
+        <div className="mx-auto w-full max-w-[1400px] px-6 pb-2 pt-8 sm:px-10 sm:pt-10">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <Link href="/" className="flex items-center gap-4">
             <Image
               src="/crest-transparent.png"
-              width={160}
-              height={160}
+              width={56}
+              height={56}
               alt="Theta Tau crest"
-              className="h-auto w-[120px] sm:w-[150px]"
+              className="h-12 w-12"
             />
             <div>
-              <Link href="/" className="flex items-center">
-                <span className={`${bungee.className} text-3xl uppercase tracking-[0.2em] text-[#7a0104]`}>
-                  Theta Tau
-                </span>
-              </Link>
-              <p className={`${bungee.className} mt-2 text-base uppercase text-[#1b0f0f]`}>
-                Delta Gamma Chapter
+              <p className={`${bungee.className} text-lg uppercase tracking-[0.2em] text-[#cf3640]`}>
+                Theta Tau
               </p>
-              <p className={`${bungee.className} mt-2 text-base uppercase text-[#1b0f0f]`}>
-                Arizona State University
+              <p className="text-sm text-[#f8ead4]/80">Delta Gamma Chapter</p>
+              <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-[#f8ead4]/58">
+                Copyright © 2026 Theta Tau Delta Gamma. All rights reserved.
               </p>
             </div>
-          </div>
+          </Link>
 
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.4fr,0.85fr,0.75fr,0.85fr] lg:gap-6">
-            <div>
-              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
-                Contacts
-              </h2>
-              <ul className="space-y-3 text-base text-[#1b0f0f] whitespace-nowrap">
-                <li>Regent - Roen Wainscoat</li>
-                <li>Vice Regent - Kyler Eenhuis</li>
-                <li>Rush Chair - Pari Pandey</li>
-                <li>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              {socialLinks.map((item) => {
+                const Icon = item.icon;
+                return (
                   <a
-                    className="underline underline-offset-4"
-                    href="mailto:general@thetatau-dg.org"
+                    key={item.label}
+                    href={item.href}
+                    target={item.href.startsWith("http") ? "_blank" : undefined}
+                    rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+                    aria-label={item.label}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#f5d79a]/35 bg-[#120a0a]/65 text-[#f8ead4] transition hover:-translate-y-[1px] hover:border-[#f5d79a] hover:bg-[#1f1111]"
                   >
-                    Email Us
+                    <Icon className="h-4 w-4" />
                   </a>
-                </li>
-              </ul>
+                );
+              })}
             </div>
 
-            <div>
-              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
-                Links
-              </h2>
-              <ul className="space-y-3 text-base text-[#1b0f0f]">
-                <li>
-                  <Link href="/about" className="underline underline-offset-4">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/rush" className="underline underline-offset-4">
-                    Rush
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/merch" className="underline underline-offset-4">
-                    Merch
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
-                Members Only
-              </h2>
-              <div className="text-base text-[#1b0f0f]">
-                <SignedOut>
-                  <SignInButton
-                    signUpForceRedirectUrl="/member/onboard"
-                    signUpFallbackRedirectUrl="/member/onboard"
-                  />
-                </SignedOut>
-                <SignedIn>
-                  <UserButton />
-                </SignedIn>
-              </div>
-            </div>
-
-            <div>
-              <h2 className={`${bungee.className} mb-4 text-sm uppercase tracking-[0.2em] text-[#7a0104]`}>
-                Pillars
-              </h2>
-              <ul className="space-y-3 text-base text-[#1b0f0f]">
-                <li>
-                  <Link
-                    href="/about#brotherhood"
-                    className="underline underline-offset-4"
-                  >
-                    Brotherhood
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/about#professionalism"
-                    className="underline underline-offset-4"
-                  >
-                    Professionalism
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/about#service"
-                    className="underline underline-offset-4"
-                  >
-                    Service
-                  </Link>
-                </li>
-              </ul>
+            <div className="flex items-center gap-2">
+              {legalLinks.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f8ead4]/92 transition hover:border-[#f5d79a]/70 hover:text-[#f5d79a]"
+                >
+                  {item.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
-      <div className="mt-10 bg-[#4a0b0b] px-4 py-4 text-[#fbf6dc]">
-        <div className={`${bungee.className} mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-4 text-xs uppercase tracking-[0.2em] sm:flex-row`}>
-          <span>Copyright © 2025 Theta Tau Delta Gamma. All rights reserved.</span>
-          <div className="flex items-center gap-6">
-            <a href="https://www.instagram.com/thetataudg/" target="_blank">
-              Instagram
-            </a>
-            <a href="mailto:general@thetatau-dg.org">Email</a>
-            <a href="https://github.com/roenw/ThetaTau-Website" target="_blank">
-              GitHub
-            </a>
+        <div className="mt-6 border-t border-white/10">
+          <div className="overflow-hidden px-1 sm:px-2">
+            <div
+              aria-hidden="true"
+              className={`${bungee.className} footer-aurora-text pointer-events-none -mb-[0.08em] whitespace-nowrap text-center text-[clamp(5.5rem,15.6vw,15rem)] leading-[0.82] tracking-[0.02em]`}
+            >
+              THETA TAU
+            </div>
           </div>
-          <Link href="/privacy-policy">Privacy Policy</Link>
         </div>
       </div>
     </footer>
