@@ -183,7 +183,22 @@ export default function BrothersPage() {
   const regularActiveMembers = useMemo(() => {
     if (filter !== "Active") return filteredMembers;
     const boardRollNos = new Set(executiveBoardMembers.map((m) => m.rollNo));
-    return filteredMembers.filter((m) => !boardRollNos.has(m.rollNo));
+    const nonBoardMembers = filteredMembers.filter((m) => !boardRollNos.has(m.rollNo));
+    
+    // Sort by profile photo presence first, then by roll number
+    return nonBoardMembers.sort((a, b) => {
+      const aHasPhoto = Boolean(a.profilePicUrl);
+      const bHasPhoto = Boolean(b.profilePicUrl);
+      
+      // If one has photo and other doesn't, prioritize the one with photo
+      if (aHasPhoto && !bHasPhoto) return -1;
+      if (!aHasPhoto && bHasPhoto) return 1;
+      
+      // If both have or both don't have photos, sort by roll number
+      const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
+      const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
+      return aNum - bNum;
+    });
   }, [filteredMembers, filter, executiveBoardMembers]);
 
   const officersEcouncil = useMemo(() => {
@@ -305,7 +320,7 @@ export default function BrothersPage() {
                 <div>
                   <div className="mb-5 flex items-center justify-between">
                     <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
-                      E-Council
+                      Executive Board
                     </h3>
                     <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
                       {officersEcouncil.length} members
@@ -388,7 +403,7 @@ export default function BrothersPage() {
                 <div>
                   <div className="mb-5 flex items-center justify-between">
                     <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
-                      Committee Heads
+                      Committee Chairs
                     </h3>
                     <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
                       {officersCommitteeHeads.length} members
@@ -642,7 +657,16 @@ export default function BrothersPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              <div>
+                <div className="mb-5 flex items-center justify-between">
+                  <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                    {filter === "Alumni" ? "Alumni Members" : "Active Members"}
+                  </h3>
+                  <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                    {filteredMembers.length} members
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {filteredMembers.map((member, index) => (
                   <div
                     key={member.rollNo}
@@ -718,6 +742,7 @@ export default function BrothersPage() {
                     </div>
                   </div>
                 ))}
+              </div>
               </div>
             )}
           </>
