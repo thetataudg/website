@@ -1004,7 +1004,7 @@ export default function AdminGemDashboardPage() {
                 </div>
                 <div className="modal-body">
                   <p className="mb-1">
-                    {detailMember.totalSatisfied}/9 requirements satisfied.
+                    {Math.min(detailMember.totalSatisfied, 5)}/5 requirements satisfied.
                   </p>
                   <p className="text-muted small mb-3">
                     General: {detailMember.gem.general.attended}/{detailMember.generalTarget || detailMember.gem.general.total} · Rush: {detailMember.gem.rush.total}/{status?.rushTarget ?? 0}
