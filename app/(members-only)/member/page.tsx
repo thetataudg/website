@@ -558,7 +558,7 @@ export default function Dashboard() {
 
   const gemCompletionCount = gemSnapshot?.totalSatisfied || 0;
   const gemCompletionPercent = Math.round(
-    (gemCompletionCount / GEM_REQUIREMENTS.length) * 100
+    (gemCompletionCount / 5) * 100
   );
 
   const statusUpdates: { type: "alert" | "info" | "success"; icon: any; text: string }[] = [];
@@ -753,18 +753,30 @@ export default function Dashboard() {
             </div>
           ) : gemSnapshot ? (
             <>
-              <div className="home-gem-card__stats">
-                <strong>
-                  {gemCompletionCount}/{GEM_REQUIREMENTS.length}
-                </strong>
-                <span>{gemSnapshot.hasCompletedGem ? "On track" : "Needs attention"}</span>
-              </div>
-              <div className="home-gem-card__progress" aria-hidden="true">
-                <span style={{ width: `${Math.max(gemCompletionPercent, 8)}%` }} />
-              </div>
-              <div className="home-gem-card__detail">
-                <span>Needed to meet GEM: 5/9</span>
-              </div>
+              {gemSnapshot.hasCompletedGem ? (
+                <div className="home-gem-card__completed">
+                  <strong>
+                    <FontAwesomeIcon icon={faCheck} className="home-gem-card__check-icon" />
+                    GEM Satistifed
+                  </strong>
+                  <span>{gemCompletionCount}/5 requirements met</span>
+                </div>
+              ) : (
+                <>
+                  <div className="home-gem-card__stats">
+                    <strong>
+                      {gemCompletionCount}/5
+                    </strong>
+                    <span>Needs attention</span>
+                  </div>
+                  <div className="home-gem-card__progress" aria-hidden="true">
+                    <span style={{ width: `${Math.max(gemCompletionPercent, 8)}%` }} />
+                  </div>
+                  <div className="home-gem-card__detail">
+                    <span>Needed to meet GEM: 5</span>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <p className="home-panel__empty">GEM status unavailable.</p>
@@ -904,10 +916,10 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {showLinkModal && (
+      {/* {showLinkModal && (
         <div
           className="discord-link-modal"
-          role="dialog"
+/Applications/Super Productivity.app/Contents/Resources/app.asar/.tmp/angular-dist/browser/index.html          role="dialog"
           aria-modal="true"
           aria-label="Link your Discord account"
         >
@@ -920,7 +932,7 @@ export default function Dashboard() {
             <ConnectWithDiscordButton className="discord-link-modal__button" />
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

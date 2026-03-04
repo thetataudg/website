@@ -147,6 +147,15 @@ export default function MemberNavbar() {
     (userData.role === "admin" ||
       userData.role === "superadmin" ||
       userData.isECouncil);
+  const isPrivilegedUser =
+    userData &&
+    (userData.role === "admin" ||
+      userData.role === "superadmin" ||
+      userData.isECouncil);
+  const isAdmin =
+    userData &&
+    (userData.role === "admin" ||
+      userData.role === "superadmin");
   const canSeeGem = Boolean(userData?.memberId);
   const showEventsDropdown = canSeeCommitteeEvents || canSeeManageEvents;
 
@@ -221,15 +230,41 @@ export default function MemberNavbar() {
                   </li>
                 )}
 
-                {userData && (userData.role === "admin" || userData.role === "superadmin") && (
-                  <li className="nav-item">
-                    <Link
-                      className={`nav-link ${isActive("/member/admin") ? "active" : ""
+                {isPrivilegedUser && (
+                  <li className="nav-item dropdown">
+                    <a
+                      className={`nav-link dropdown-toggle ${isActive("/member/admin") ? "active" : ""
                         }`}
-                      href="/member/admin"
+                      href="#"
+                      id="adminDropdown"
+                      role="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
                     >
                       Admin
-                    </Link>
+                    </a>
+                    <ul className="dropdown-menu" aria-labelledby="adminDropdown">
+                      {isAdmin && (
+                        <li>
+                          <Link
+                            className={`dropdown-item ${isActive("/member/admin/members") ? "active" : ""
+                              }`}
+                            href="/member/admin/members"
+                          >
+                            User Management
+                          </Link>
+                        </li>
+                      )}
+                      <li>
+                        <Link
+                          className={`dropdown-item ${isActive("/member/admin/gem") ? "active" : ""
+                            }`}
+                          href="/member/admin/gem"
+                        >
+                          GEM Records
+                        </Link>
+                      </li>
+                    </ul>
                   </li>
                 )}
 

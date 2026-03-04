@@ -22,14 +22,14 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [me, setMe] = useState<{ role: string; rollNo: string } | null>(null);
+  const [me, setMe] = useState<{ role: string; rollNo: string; isECouncil: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/members/me")
       .then((r) => r.json())
       .then((d) => {
-        setMe({ role: d.role, rollNo: d.rollNo });
+        setMe({ role: d.role, rollNo: d.rollNo, isECouncil: d.isECouncil });
         setLoading(false);
       })
       .catch(() => {
@@ -42,7 +42,10 @@ export default function AdminLayout({
     return <LoadingState message="Loading admin console..." />;
   }
 
-  if (!me || (me.role !== "admin" && me.role !== "superadmin")) {
+  const isAdmin = me && (me.role === "admin" || me.role === "superadmin");
+  const isPrivileged = isAdmin || (me && me.isECouncil);
+
+  if (!isPrivileged) {
     return (
       <div className="container">
         <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
@@ -51,6 +54,11 @@ export default function AdminLayout({
         </div>
       </div>
     );
+  }
+
+  // Only show tabs for actual admins
+  if (!isAdmin) {
+    return <div className="member-dashboard">{children}</div>;
   }
 
   return (

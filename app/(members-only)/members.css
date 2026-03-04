@@ -63,6 +63,18 @@
   color: #fff;
 }
 
+.members-shell[data-theme="dark"] .members-navbar .dropdown-item.active {
+  background: rgba(139, 27, 35, 0.25);
+  color: var(--tt-red);
+  font-weight: 600;
+}
+
+.members-shell[data-theme="dark"] .members-navbar .dropdown-item.active:hover,
+.members-shell[data-theme="dark"] .members-navbar .dropdown-item.active:focus {
+  background: rgba(139, 27, 35, 0.25);
+  color: var(--tt-red);
+}
+
 .members-shell[data-theme="dark"] .theme-toggle {
   background: rgba(18, 26, 36, 0.92);
   color: var(--tt-ink);
@@ -174,6 +186,19 @@
 .members-navbar .dropdown-item:hover,
 .members-navbar .dropdown-item:focus {
   background: rgba(225, 178, 30, 0.14);
+  color: var(--tt-ink);
+}
+
+.members-navbar .dropdown-item.active {
+  background: rgba(139, 27, 35, 0.1);
+  color: var(--tt-red);
+  font-weight: 600;
+}
+
+.members-navbar .dropdown-item.active:hover,
+.members-navbar .dropdown-item.active:focus {
+  background: rgba(139, 27, 35, 0.1);
+  color: var(--tt-red);
 }
 
 .members-navbar__actions {
@@ -2650,6 +2675,32 @@
   font-size: 0.9rem;
 }
 
+.home-gem-card__completed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-gem-card__completed strong {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-family: "Fraunces", Georgia, serif;
+  color: var(--tt-red);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-gem-card__completed span {
+  font-size: 0.95rem;
+  color: var(--tt-ink-soft);
+  font-weight: 600;
+}
+
+.home-gem-card__check-icon {
+  color: #28a745;
+}
+
 .home-gem-card__missing {
   font-size: 0.9rem;
   color: var(--tt-ink-soft);
@@ -2761,6 +2812,10 @@
 
 .members-shell[data-theme="dark"] .home-gem-card__cta {
   color: #ffc627;
+}
+
+.members-shell[data-theme="dark"] .home-gem-card__check-icon {
+  color: #4ade80;
 }
 
 .members-shell[data-theme="dark"] .home-calendar-card {
