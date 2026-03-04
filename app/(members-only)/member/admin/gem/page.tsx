@@ -921,8 +921,8 @@ export default function AdminGemDashboardPage() {
                       <div className="text-muted small">#{member.rollNo || "N/A"}</div>
                     </td>
                     <td>
-                      <div>{member.totalSatisfied}/9 satisfied</div>
-                      <div className="text-muted small">Needs {Math.max(0, 5 - member.totalSatisfied)} more</div>
+                      <div>{Math.min(member.totalSatisfied, 5)}/5 satisfied</div>
+                      <div className="text-muted small">Needs {Math.max(0, 5 - member.totalSatisfied)} more to reach 5 required</div>
                       <div className="text-muted small">
                         General: {member.gem.general.attended}/{member.generalTarget || member.gem.general.total}
                       </div>
