@@ -293,7 +293,7 @@ export default function BrothersPage() {
                         className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
                         style={{ transitionDelay: `${index * 60}ms` }}
                       >
-                        <div className="relative h-56 w-full">
+                        <div className="relative w-full" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               src={member.profilePicUrl}
@@ -388,7 +388,7 @@ export default function BrothersPage() {
                         className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
                         style={{ transitionDelay: `${index * 60}ms` }}
                       >
-                        <div className="relative h-56 w-full">
+                        <div className="relative w-full" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               src={member.profilePicUrl}
@@ -475,7 +475,7 @@ export default function BrothersPage() {
                     className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
                     style={{ transitionDelay: `${index * 60}ms` }}
                   >
-                    <div className="relative h-56 w-full">
+                    <div className="relative w-full" style={{ aspectRatio: "3/4" }}>
                       {member.profilePicUrl ? (
                         <img
                           src={member.profilePicUrl}
