@@ -211,6 +211,12 @@ export default function BrotherProfile({
     loadCommittees();
   }, [params.rollNo]);
 
+  useEffect(() => {
+    if (member) {
+      document.title = `${member.fName} ${member.lName} | ASU Theta Tau, Delta Gamma Chapter`;
+    }
+  }, [member]);
+
   if (loading) {
     return (
       <main className="bg-[#120a0a] pb-16 text-white">

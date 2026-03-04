@@ -139,13 +139,13 @@ export default function MembersList({
                     <img
                       src={m.profilePicUrl}
                       className="card-img-top"
-                      style={{ objectFit: "cover", height: 200 }}
+                      style={{ objectFit: "cover", aspectRatio: "3/4" }}
                       alt={`${m.fName} ${m.lName}`}
                     />
                   ) : (
                     <div
                       className="bg-light d-flex align-items-center justify-content-center"
-                      style={{ height: 200 }}
+                      style={{ aspectRatio: "3/4" }}
                     >
                       <FontAwesomeIcon
                         icon={faUserCircle}
