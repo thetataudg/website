@@ -203,7 +203,24 @@ export default function BrothersPage() {
 
   const officersEcouncil = useMemo(() => {
     if (filter !== "Officers") return [];
-    return filteredMembers.filter((m) => m.isECouncil);
+    const ecouncilMembers = filteredMembers.filter((m) => m.isECouncil);
+    
+    // Sort by executive board positions
+    const board: Member[] = [];
+    executiveBoardPositions.forEach((position) => {
+      const member = ecouncilMembers.find(
+        (m) => m.ecouncilPosition === position
+      );
+      if (member) {
+        board.push(member);
+      }
+    });
+    
+    // Add any remaining e-council members who don't match the standard positions
+    const boardRollNos = new Set(board.map((m) => m.rollNo));
+    const remaining = ecouncilMembers.filter((m) => !boardRollNos.has(m.rollNo));
+    
+    return [...board, ...remaining];
   }, [filteredMembers, filter]);
 
   const officersCommitteeHeads = useMemo(() => {
