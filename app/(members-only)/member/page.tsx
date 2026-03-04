@@ -757,7 +757,7 @@ export default function Dashboard() {
                 <div className="home-gem-card__completed">
                   <strong>
                     <FontAwesomeIcon icon={faCheck} className="home-gem-card__check-icon" />
-                    GEM Satistifed
+                    GEM Satisfied
                   </strong>
                   <span>{gemCompletionCount}/5 requirements met</span>
                 </div>
