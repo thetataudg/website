@@ -919,7 +919,7 @@ export default function Dashboard() {
       {/* {showLinkModal && (
         <div
           className="discord-link-modal"
-/Applications/Super Productivity.app/Contents/Resources/app.asar/.tmp/angular-dist/browser/index.html          role="dialog"
+          role="dialog"
           aria-modal="true"
           aria-label="Link your Discord account"
         >
