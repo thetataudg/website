@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import LoadingState, { LoadingSpinner } from "../../components/LoadingState";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 type GemRequirementKey =
   | "generalConference"
@@ -144,19 +146,7 @@ export default function GemDashboardPage() {
     end: "",
     semester: "",
   });
-  const [gpaInputs, setGpaInputs] = useState<Record<string, string>>({});
-  const [savingMember, setSavingMember] = useState<string | null>(null);
   const [hasSeededFilters, setHasSeededFilters] = useState(false);
-  const [memberFilters, setMemberFilters] = useState({
-    role: "all",
-    name: "",
-    gpa: "all",
-    meeting: "all",
-  });
-  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
-  const [detailMember, setDetailMember] = useState<GemMember | null>(null);
-  const [gpaModalMember, setGpaModalMember] = useState<GemMember | null>(null);
-  const [gpaModalValue, setGpaModalValue] = useState("");
   const [viewer, setViewer] = useState<{
     memberId: string;
     role: string;
@@ -181,6 +171,10 @@ export default function GemDashboardPage() {
       if (options.start) params.set("start", options.start);
       if (options.end) params.set("end", options.end);
       if (options.semester) params.set("semester", options.semester);
+      // Only show the viewer's own GEM data
+      if (viewer?.memberId) {
+        params.set("memberId", viewer.memberId);
+      }
       const res = await fetch(
         `/api/gem/status${params.toString() ? `?${params.toString()}` : ""}`
       );
@@ -206,13 +200,13 @@ export default function GemDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewer]);
 
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
+    if (isLoaded && isSignedIn && viewer && !viewerLoading) {
       loadStatus();
     }
-  }, [isLoaded, isSignedIn, loadStatus]);
+  }, [isLoaded, isSignedIn, viewer, viewerLoading, loadStatus]);
 
   useEffect(() => {
     rangeFiltersRef.current = rangeFilters;
@@ -251,16 +245,6 @@ export default function GemDashboardPage() {
     }
   }, [isLoaded, isSignedIn]);
 
-  useEffect(() => {
-    if (!status) return;
-    const nextInputs: Record<string, string> = {};
-    status.members.forEach((member) => {
-      nextInputs[member.memberId] =
-        member.gem.gpa.value !== null ? String(member.gem.gpa.value) : "";
-    });
-    setGpaInputs(nextInputs);
-  }, [status]);
-
   const handleSearch = () => {
     loadStatus(rangeFilters);
   };
@@ -272,51 +256,7 @@ export default function GemDashboardPage() {
     return date.toLocaleDateString("en-US");
   };
 
-  const handleUpdateGpa = async (memberId: string, valueOverride?: string) => {
-    if (!status) return;
-    const raw = valueOverride ?? gpaInputs[memberId];
-    const payload: Record<string, any> = {
-      memberId,
-      semester: status.semesterName,
-    };
-    if (raw === "") {
-      payload.gpa = null;
-    } else {
-      payload.gpa = Number(raw);
-      if (Number.isNaN(payload.gpa)) {
-        setError("GPA must be a valid number");
-        return;
-      }
-    }
-    setSavingMember(memberId);
-    try {
-      const res = await fetch("/api/gem/status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as any;
-        throw new Error(data?.error || "Failed to update GPA");
-      }
-      await loadStatus();
-    } catch (err: any) {
-      setError(err?.message || "Unable to save GPA");
-    } finally {
-      setSavingMember(null);
-    }
-  };
 
-  const handleSaveGpa = async () => {
-    if (!gpaModalMember) return;
-    await handleUpdateGpa(gpaModalMember.memberId, gpaModalValue);
-    closeGpaModal();
-  };
-
-  const isPrivileged =
-    viewer?.role === "admin" ||
-    viewer?.role === "superadmin" ||
-    Boolean(viewer?.isECouncil);
 
   const currentMember =
     viewer && status
@@ -431,99 +371,6 @@ export default function GemDashboardPage() {
     }
   }, [viewerRequirementCards.length]);
 
-  const capitalizeNamePart = (value?: string) => {
-    if (!value) return "";
-    const trimmed = value.trim();
-    if (!trimmed) return "";
-    return `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}`;
-  };
-
-  const formatMemberName = (member: GemMember) => {
-    const first = capitalizeNamePart(member.fName);
-    const last = capitalizeNamePart(member.lName);
-    const fullName = [first, last].filter(Boolean).join(" ").trim();
-    return fullName || "Unknown";
-  };
-
-  const memberRoleLabel = (member: GemMember) => member.status || "Active";
-
-  const statusMembers = useMemo(() => status?.members || [], [status]);
-  const visibleMembers = useMemo(
-    () =>
-      statusMembers.filter((member) => {
-        return member.role !== "superadmin";
-      }),
-    [statusMembers]
-  );
-  const roleOptions = useMemo(() => {
-    const options = new Set<string>();
-    visibleMembers.forEach((member) => {
-      options.add(memberRoleLabel(member));
-    });
-    return Array.from(options);
-  }, [visibleMembers]);
-
-  const filteredMembers = useMemo(() => {
-    if (!visibleMembers.length) return [];
-    const nameFilter = memberFilters.name.trim().toLowerCase();
-    return visibleMembers.filter((member) => {
-      const name = formatMemberName(member).toLowerCase();
-      if (nameFilter && !name.includes(nameFilter)) {
-        return false;
-      }
-      if (memberFilters.role !== "all" && memberRoleLabel(member) !== memberFilters.role) {
-        return false;
-      }
-      const gpaValue = member.gem.gpa.value;
-      if (memberFilters.gpa === "added" && gpaValue === null) {
-        return false;
-      }
-      if (memberFilters.gpa === "missing" && gpaValue !== null) {
-        return false;
-      }
-      if (memberFilters.meeting === "meeting" && !member.hasCompletedGem) {
-        return false;
-      }
-      if (memberFilters.meeting === "not" && member.hasCompletedGem) {
-        return false;
-      }
-      return true;
-    });
-  }, [visibleMembers, memberFilters]);
-
-  const openDetailModal = (member: GemMember) => setDetailMember(member);
-  const closeDetailModal = () => setDetailMember(null);
-  const openGpaModal = (member: GemMember) => setGpaModalMember(member);
-  const closeGpaModal = () => {
-    setGpaModalMember(null);
-    setGpaModalValue("");
-  };
-
-  useEffect(() => {
-    if (!detailMember || !status) return;
-    const refreshed = status.members.find(
-      (member) => member.memberId === detailMember.memberId
-    );
-    if (refreshed && refreshed !== detailMember) {
-      setDetailMember(refreshed);
-    }
-  }, [detailMember, status]);
-
-  useEffect(() => {
-    if (!gpaModalMember || !status) return;
-    const refreshed = status.members.find(
-      (member) => member.memberId === gpaModalMember.memberId
-    );
-    if (refreshed && refreshed !== gpaModalMember) {
-      setGpaModalMember(refreshed);
-    }
-  }, [gpaModalMember, status]);
-
-  useEffect(() => {
-    if (!gpaModalMember) return;
-    setGpaModalValue(gpaInputs[gpaModalMember.memberId] ?? "");
-  }, [gpaInputs, gpaModalMember]);
-
   if (!isLoaded) {
     return <LoadingState message="Validating session..." />;
   }
@@ -547,14 +394,13 @@ export default function GemDashboardPage() {
     return <LoadingState message="Loading GEM standing..." />;
   }
 
-  if (!isPrivileged) {
-    return (
-      <div className="member-dashboard gem-dashboard">
-        <section className="bento-card gem-hero">
+  return (
+    <div className="member-dashboard gem-dashboard">
+      <section className="bento-card gem-hero">
           <div className="d-flex flex-column flex-md-row justify-content-between gap-3">
             <div>
               <p className="hero-eyebrow text-muted">GEM Tracker</p>
-              <h1 className="hero-title mb-1">My GEM standing</h1>
+              <h1 className="hero-title mb-1">GEM Status</h1>
               {status && (
                 <p className="text-muted small mb-1">
                   Semester: {status.semesterName} (
@@ -563,7 +409,7 @@ export default function GemDashboardPage() {
               )}
               {currentMember && (
                 <p className="h5 mb-0">
-                  {currentMember.totalSatisfied}/9 requirements satisfied
+                  {currentMember.totalSatisfied}/5 requirements satisfied
                 </p>
               )}
             </div>
@@ -574,7 +420,11 @@ export default function GemDashboardPage() {
                     currentMember.hasCompletedGem ? "bg-success" : "bg-danger"
                   } fs-6 px-3 py-2`}
                 >
-                  {currentMember.hasCompletedGem ? "Meeting GEM" : "Not meeting GEM"}
+                  <FontAwesomeIcon
+                    icon={currentMember.hasCompletedGem ? faCheck : faTimes}
+                    className="me-2"
+                  />
+                  {currentMember.hasCompletedGem ? "GEM Satisfied" : "GEM Not Satisfied"}
                 </span>
               ) : (
                 <span className="text-muted small">GEM data pending</span>
@@ -683,449 +533,4 @@ export default function GemDashboardPage() {
         )}
       </div>
     );
-  }
-
-  return (
-    <div className="member-dashboard gem-dashboard">
-      <section className="bento-card gem-hero">
-        <div className="d-flex flex-column flex-md-row justify-content-between gap-3">
-          <div>
-            <p className="hero-eyebrow text-muted">GEM Tracker</p>
-            <h1 className="hero-title mb-1">GEM Tracker</h1>
-            {status && (
-              <p className="text-muted small mb-1">
-                Semester: {status.semesterName} (
-                {formatDateShort(status.startDate)} → {formatDateShort(status.endDate)})
-              </p>
-            )}
-              <p className="text-muted small mb-0">
-                Showing {filteredMembers.length} / {visibleMembers.length} members
-              </p>
-          </div>
-          <div className="d-flex gap-2 align-items-center">
-            <button
-              type="button"
-              className={`btn btn-sm ${viewMode === "cards" ? "btn-primary" : "btn-outline-secondary"}`}
-              onClick={() => setViewMode("cards")}
-            >
-              Cards
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${viewMode === "list" ? "btn-primary" : "btn-outline-secondary"}`}
-              onClick={() => setViewMode("list")}
-            >
-              List
-            </button>
-          </div>
-        </div>
-        <div className="border-top mt-3 pt-3">
-          <div className="row g-3">
-            <div className="col-sm-6 col-md-3 col-xl-2">
-              <label className="form-label small text-muted">Role</label>
-              <select
-                className="form-select form-select-sm"
-                value={memberFilters.role}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, role: e.target.value }))
-                }
-              >
-                <option value="all">All roles</option>
-                {roleOptions.map((option) => (
-                  <option value={option} key={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-sm-6 col-md-4 col-xl-3">
-              <label className="form-label small text-muted">Name</label>
-              <input
-                type="text"
-                className="form-control form-control-sm"
-                placeholder="Search by name"
-                value={memberFilters.name}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, name: e.target.value }))
-                }
-              />
-            </div>
-            <div className="col-sm-6 col-md-3 col-xl-2">
-              <label className="form-label small text-muted">Start date</label>
-              <input
-                type="date"
-                className="form-control form-control-sm"
-                value={rangeFilters.start}
-                onChange={(e) =>
-                  setRangeFilters((prev) => ({ ...prev, start: e.target.value }))
-                }
-              />
-            </div>
-            <div className="col-sm-6 col-md-3 col-xl-2">
-              <label className="form-label small text-muted">End date</label>
-              <input
-                type="date"
-                className="form-control form-control-sm"
-                value={rangeFilters.end}
-                onChange={(e) =>
-                  setRangeFilters((prev) => ({ ...prev, end: e.target.value }))
-                }
-              />
-            </div>
-            <div className="col-sm-6 col-md-3 col-xl-2">
-              <label className="form-label small text-muted">Semester</label>
-              <input
-                type="text"
-                className="form-control form-control-sm"
-                placeholder="e.g., Fall 2024"
-                value={rangeFilters.semester}
-                onChange={(e) =>
-                  setRangeFilters((prev) => ({ ...prev, semester: e.target.value }))
-                }
-              />
-            </div>
-            <div className="col-sm-6 col-md-3 col-xl-2">
-              <label className="form-label small text-muted">GPA</label>
-              <select
-                className="form-select form-select-sm"
-                value={memberFilters.gpa}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, gpa: e.target.value }))
-                }
-              >
-                {GPA_FILTER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-sm-6 col-md-3 col-xl-2">
-              <label className="form-label small text-muted">GEM status</label>
-              <select
-                className="form-select form-select-sm"
-                value={memberFilters.meeting}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, meeting: e.target.value }))
-                }
-              >
-                <option value="all">All</option>
-                <option value="meeting">Meeting GEM</option>
-                <option value="not">Not meeting GEM</option>
-              </select>
-            </div>
-          </div>
-          <div className="d-flex justify-content-end mt-2">
-            <button
-              type="button"
-              className="btn btn-primary px-4"
-              onClick={handleSearch}
-              disabled={loading}
-            >
-              {loading ? "Searching..." : "Search"}
-            </button>
-          </div>
-        </div>
-        {error && (
-          <div className="alert alert-warning mt-3 mb-0" role="alert">
-            {error}
-          </div>
-        )}
-        {loading && <LoadingState message="Loading GEM standings..." />}
-      </section>
-      <section className="bento-card mt-3">
-        {viewMode === "cards" ? (
-          filteredMembers.length === 0 ? (
-            <p className="text-muted text-center py-4 mb-0">
-              No members match the current filters.
-            </p>
-          ) : (
-            <div className="row g-3">
-              {filteredMembers.map((member) => {
-                const isMeeting = member.hasCompletedGem;
-                const needed = Math.max(0, 5 - member.totalSatisfied);
-                const cardTheme = isMeeting
-                  ? "gem-card--met"
-                  : "gem-card--missed";
-                const highlight = isMeeting
-                  ? "gem-card__status--good"
-                  : "gem-card__status--warn";
-                return (
-                  <div key={member.memberId} className="col-12 col-md-6 col-xl-4">
-                    <article
-                      className={`gem-card h-100 ${cardTheme}`}
-                      role="button"
-                      onClick={() => openDetailModal(member)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <div className="card-body d-flex flex-column h-100">
-                        <div className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>{formatMemberName(member)}</strong>
-                            <div className="text-muted small">{memberRoleLabel(member)}</div>
-                            <div className="text-muted small">#{member.rollNo || "N/A"}</div>
-                          </div>
-                          <span className={`gem-card__status ${highlight}`}>
-                            {isMeeting ? "Meeting GEM" : "Not meeting GEM"}
-                          </span>
-                        </div>
-                        <div className="mt-3">
-                          <p className="mb-1 fw-semibold">{member.totalSatisfied}/9 satisfied</p>
-                          <p className="text-muted small mb-2">Needs {needed} more</p>
-                          <p className="text-muted small mb-1">
-                            General: {member.gem.general.attended}/{member.generalTarget || member.gem.general.total}
-                          </p>
-                          <p className="text-muted small">
-                            Rush: {member.gem.rush.total}/{status?.rushTarget ?? 0}
-                          </p>
-                          {member.committees.length > 0 && (
-                            <p className="text-muted small mb-0">
-                              {member.committees.join(" · ")}
-                            </p>
-                          )}
-                        </div>
-                        <div className="mt-auto d-flex justify-content-between align-items-center">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openGpaModal(member);
-                            }}
-                          >
-                            GPA
-                          </button>
-                          <small className="text-muted small mb-0">Tap card for details</small>
-                        </div>
-                      </div>
-                    </article>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-hover align-middle">
-              <thead>
-                <tr>
-                  <th>Member</th>
-                  <th>Progress</th>
-                  <th>Status</th>
-                  <th>GPA</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMembers.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="text-center text-muted">
-                      No members match the current filters.
-                    </td>
-                  </tr>
-                )}
-                {filteredMembers.map((member) => (
-                  <tr key={member.memberId}>
-                    <td>
-                      <strong>{formatMemberName(member)}</strong>
-                      <div className="text-muted small">{memberRoleLabel(member)}</div>
-                      <div className="text-muted small">#{member.rollNo || "N/A"}</div>
-                    </td>
-                    <td>
-                      <div>{member.totalSatisfied}/9 satisfied</div>
-                      <div className="text-muted small">Needs {Math.max(0, 5 - member.totalSatisfied)} more</div>
-                      <div className="text-muted small">
-                        General: {member.gem.general.attended}/{member.generalTarget || member.gem.general.total}
-                      </div>
-                      <div className="text-muted small">
-                        Rush: {member.gem.rush.total}/{status?.rushTarget ?? 0}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${member.hasCompletedGem ? "bg-success" : "bg-danger"}`}>
-                        {member.hasCompletedGem ? "Meeting GEM" : "Not meeting GEM"}
-                      </span>
-                      {member.committees.length > 0 && (
-                        <div className="text-muted small mt-1">
-                          {member.committees.join(" · ")}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={() => openGpaModal(member)}
-                      >
-                        GPA
-                      </button>
-                      {member.gemRecordUpdatedAt && (
-                        <div className="text-muted small mt-1">
-                          Last saved: {new Date(member.gemRecordUpdatedAt).toLocaleDateString()}
-                        </div>
-                      )}
-                      {!member.gemRecordUpdatedAt && member.gem.gpa.value !== null && (
-                        <div className="text-muted small mt-1">Last saved: N/A</div>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => openDetailModal(member)}
-                      >
-                        Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      {detailMember && (
-        <>
-          <div
-            className="modal fade show d-block"
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="modal-dialog modal-dialog-centered modal-xl" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <div>
-                    <h5 className="modal-title">GEM details — {formatMemberName(detailMember)}</h5>
-                    <p className="text-muted small mb-0">
-                      {memberRoleLabel(detailMember)} · #{detailMember.rollNo || "N/A"}
-                    </p>
-                    {detailMember.committees.length > 0 && (
-                      <p className="text-muted small mb-0">
-                        Committees: {detailMember.committees.join(" · ")}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={closeDetailModal}
-                  />
-                </div>
-                <div className="modal-body">
-                  <p className="mb-1">
-                    {detailMember.totalSatisfied}/9 requirements satisfied.
-                  </p>
-                  <p className="text-muted small mb-3">
-                    General: {detailMember.gem.general.attended}/{detailMember.generalTarget || detailMember.gem.general.total} · Rush: {detailMember.gem.rush.total}/{status?.rushTarget ?? 0}
-                  </p>
-                  <div className="row g-3">
-                    {buildRequirementCards(detailMember).map((card) => (
-                      <div key={card.key} className="col-12 col-md-6">
-                        <article className="card h-100 border">
-                          <div className="card-body p-3">
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                              <h3 className="h6 mb-0">{card.label}</h3>
-                              <span
-                                className={`badge ${
-                                  card.satisfied ? "bg-success" : "bg-danger"
-                                }`}
-                              >
-                                {card.satisfied ? "Complete" : "Incomplete"}
-                              </span>
-                            </div>
-                            <p className="mb-1 text-muted">{card.detail}</p>
-                            {card.hint && <small className="text-muted">{card.hint}</small>}
-                          </div>
-                        </article>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={() => openGpaModal(detailMember)}
-                  >
-                    GPA
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={closeDetailModal}>
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </>
-      )}
-      {gpaModalMember && (
-        <>
-          <div
-            className="modal fade show d-block"
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="modal-dialog modal-dialog-centered" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">GPA for {formatMemberName(gpaModalMember)}</h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={closeGpaModal}
-                  />
-                </div>
-                <div className="modal-body">
-                  <p className="text-muted small mb-2">
-                    Threshold: {gpaModalMember.gem.gpa.threshold.toFixed(1)}
-                  </p>
-                  {gpaModalMember.gemRecordUpdatedAt && (
-                    <p className="text-muted small mb-3">
-                      Last saved: {new Date(gpaModalMember.gemRecordUpdatedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                  <label className="form-label">GPA</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={4}
-                    step={0.01}
-                    className="form-control"
-                    value={gpaModalValue}
-                    onChange={(e) => setGpaModalValue(e.target.value)}
-                  />
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleSaveGpa}
-                    disabled={savingMember === gpaModalMember.memberId}
-                  >
-                    {savingMember === gpaModalMember.memberId ? (
-                      <>
-                        <LoadingSpinner size="sm" className="me-2" />
-                        Saving
-                      </>
-                    ) : (
-                      "Save"
-                    )}
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={closeGpaModal}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </>
-      )}
-    </div>
-  );
 }

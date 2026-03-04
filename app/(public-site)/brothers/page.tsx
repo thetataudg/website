@@ -157,6 +157,50 @@ export default function BrothersPage() {
     });
   }, [members, filter, query]);
 
+  const executiveBoardPositions = [
+    "Regent",
+    "Vice Regent",
+    "Marshal",
+    "Treasurer",
+    "Scribe",
+    "Corresponding Secretary",
+  ];
+
+  const executiveBoardMembers = useMemo(() => {
+    if (filter !== "Active") return [];
+    const board: Member[] = [];
+    executiveBoardPositions.forEach((position) => {
+      const member = filteredMembers.find(
+        (m) => m.isECouncil && m.ecouncilPosition === position
+      );
+      if (member) {
+        board.push(member);
+      }
+    });
+    return board;
+  }, [filteredMembers, filter]);
+
+  const regularActiveMembers = useMemo(() => {
+    if (filter !== "Active") return filteredMembers;
+    const boardRollNos = new Set(executiveBoardMembers.map((m) => m.rollNo));
+    const nonBoardMembers = filteredMembers.filter((m) => !boardRollNos.has(m.rollNo));
+    
+    // Sort by profile photo presence first, then by roll number
+    return nonBoardMembers.sort((a, b) => {
+      const aHasPhoto = Boolean(a.profilePicUrl);
+      const bHasPhoto = Boolean(b.profilePicUrl);
+      
+      // If one has photo and other doesn't, prioritize the one with photo
+      if (aHasPhoto && !bHasPhoto) return -1;
+      if (!aHasPhoto && bHasPhoto) return 1;
+      
+      // If both have or both don't have photos, sort by roll number
+      const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
+      const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
+      return aNum - bNum;
+    });
+  }, [filteredMembers, filter, executiveBoardMembers]);
+
   const officersEcouncil = useMemo(() => {
     if (filter !== "Officers") return [];
     return filteredMembers.filter((m) => m.isECouncil);
@@ -276,13 +320,13 @@ export default function BrothersPage() {
                 <div>
                   <div className="mb-5 flex items-center justify-between">
                     <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
-                      E-Council
+                      Executive Board
                     </h3>
                     <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
                       {officersEcouncil.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {officersEcouncil.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -290,10 +334,10 @@ export default function BrothersPage() {
                         tabIndex={0}
                         onClick={() => handleCardNavigate(member.rollNo)}
                         onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
-                        className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-                        style={{ transitionDelay: `${index * 60}ms` }}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative h-56 w-full">
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               src={member.profilePicUrl}
@@ -306,37 +350,25 @@ export default function BrothersPage() {
                                 member.rollNo
                               )}`}
                             >
-                              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-3xl font-semibold text-white/90">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
                                 {getInitials(member.fName, member.lName)}
                               </div>
-                              <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                                Theta Tau
-                              </span>
                             </div>
                           )}
-                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                         </div>
-                        <div className="p-6">
-                          <p className="text-xs uppercase tracking-[0.35em] text-[#f5d79a]">
-                            #{member.rollNo} • {member.status || "Member"}
-                          </p>
-                          <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
                             {member.fName} {member.lName}
                           </h3>
-                          <p className="mt-2 text-sm text-white/70">
-                            {member.majors?.length ? member.majors.join(", ") : "Engineering"}
-                          </p>
                           {member.ecouncilPosition && (
-                            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">
+                            <p className="mt-1 text-xs text-[#f5d79a]">
                               {member.ecouncilPosition}
                             </p>
                           )}
-                          {member.gradYear && (
-                            <p className="mt-1 text-sm text-white/60">
-                              Class of {member.gradYear}
-                            </p>
-                          )}
-                          <div className="mt-4 flex items-center gap-4 text-white/70">
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
                             {member.socialLinks?.linkedin && (
                               <a
                                 href={member.socialLinks.linkedin}
@@ -346,7 +378,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaLinkedin />
+                                <FaLinkedin size={14} />
                               </a>
                             )}
                             {member.socialLinks?.github && (
@@ -358,7 +390,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaGithub />
+                                <FaGithub size={14} />
                               </a>
                             )}
                           </div>
@@ -371,13 +403,13 @@ export default function BrothersPage() {
                 <div>
                   <div className="mb-5 flex items-center justify-between">
                     <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
-                      Committee Heads
+                      Committee Chairs
                     </h3>
                     <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
                       {officersCommitteeHeads.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {officersCommitteeHeads.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -385,10 +417,10 @@ export default function BrothersPage() {
                         tabIndex={0}
                         onClick={() => handleCardNavigate(member.rollNo)}
                         onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
-                        className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-                        style={{ transitionDelay: `${index * 60}ms` }}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative h-56 w-full">
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               src={member.profilePicUrl}
@@ -401,37 +433,25 @@ export default function BrothersPage() {
                                 member.rollNo
                               )}`}
                             >
-                              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-3xl font-semibold text-white/90">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
                                 {getInitials(member.fName, member.lName)}
                               </div>
-                              <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                                Theta Tau
-                              </span>
                             </div>
                           )}
-                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                         </div>
-                        <div className="p-6">
-                          <p className="text-xs uppercase tracking-[0.35em] text-[#f5d79a]">
-                            #{member.rollNo} • {member.status || "Member"}
-                          </p>
-                          <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
                             {member.fName} {member.lName}
                           </h3>
-                          <p className="mt-2 text-sm text-white/70">
-                            {member.majors?.length ? member.majors.join(", ") : "Engineering"}
+                          {member.isCommitteeHead && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              Committee Chair
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
                           </p>
-                          {getHeadCommittees(member.rollNo).length > 0 && (
-                            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">
-                              {getHeadCommittees(member.rollNo).join(", ")}
-                            </p>
-                          )}
-                          {member.gradYear && (
-                            <p className="mt-1 text-sm text-white/60">
-                              Class of {member.gradYear}
-                            </p>
-                          )}
-                          <div className="mt-4 flex items-center gap-4 text-white/70">
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
                             {member.socialLinks?.linkedin && (
                               <a
                                 href={member.socialLinks.linkedin}
@@ -441,7 +461,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaLinkedin />
+                                <FaLinkedin size={14} />
                               </a>
                             )}
                             {member.socialLinks?.github && (
@@ -453,7 +473,180 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaGithub />
+                                <FaGithub size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : filter === "Active" && executiveBoardMembers.length > 0 ? (
+              <div className="space-y-10">
+                <div>
+                  <div className="mb-5 flex items-center justify-between">
+                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                      Executive Board
+                    </h3>
+                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                      {executiveBoardMembers.length} members
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {executiveBoardMembers.map((member, index) => (
+                      <div
+                        key={member.rollNo}
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => handleCardNavigate(member.rollNo)}
+                        onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
+                      >
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                          {member.profilePicUrl ? (
+                            <img
+                              src={member.profilePicUrl}
+                              alt={`${member.fName} ${member.lName}`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-full w-full flex-col items-center justify-center bg-gradient-to-br ${getGradientClass(
+                                member.rollNo
+                              )}`}
+                            >
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
+                                {getInitials(member.fName, member.lName)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
+                            {member.fName} {member.lName}
+                          </h3>
+                          {member.ecouncilPosition && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              {member.ecouncilPosition}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
+                            {member.socialLinks?.linkedin && (
+                              <a
+                                href={member.socialLinks.linkedin}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="LinkedIn"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaLinkedin size={14} />
+                              </a>
+                            )}
+                            {member.socialLinks?.github && (
+                              <a
+                                href={member.socialLinks.github}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="GitHub"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaGithub size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-5 flex items-center justify-between">
+                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                      Active Members
+                    </h3>
+                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                      {regularActiveMembers.length} members
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {regularActiveMembers.map((member, index) => (
+                      <div
+                        key={member.rollNo}
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => handleCardNavigate(member.rollNo)}
+                        onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
+                      >
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                          {member.profilePicUrl ? (
+                            <img
+                              src={member.profilePicUrl}
+                              alt={`${member.fName} ${member.lName}`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-full w-full flex-col items-center justify-center bg-gradient-to-br ${getGradientClass(
+                                member.rollNo
+                              )}`}
+                            >
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
+                                {getInitials(member.fName, member.lName)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
+                            {member.fName} {member.lName}
+                          </h3>
+                          {member.isECouncil && member.ecouncilPosition && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              {member.ecouncilPosition}
+                            </p>
+                          )}
+                          {member.isCommitteeHead && !member.isECouncil && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              Committee Chair
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
+                            {member.socialLinks?.linkedin && (
+                              <a
+                                href={member.socialLinks.linkedin}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="LinkedIn"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaLinkedin size={14} />
+                              </a>
+                            )}
+                            {member.socialLinks?.github && (
+                              <a
+                                href={member.socialLinks.github}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="GitHub"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaGithub size={14} />
                               </a>
                             )}
                           </div>
@@ -464,7 +657,16 @@ export default function BrothersPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div>
+                <div className="mb-5 flex items-center justify-between">
+                  <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                    {filter === "Alumni" ? "Alumni Members" : "Active Members"}
+                  </h3>
+                  <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                    {filteredMembers.length} members
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {filteredMembers.map((member, index) => (
                   <div
                     key={member.rollNo}
@@ -472,10 +674,10 @@ export default function BrothersPage() {
                     tabIndex={0}
                     onClick={() => handleCardNavigate(member.rollNo)}
                     onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
-                    className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-                    style={{ transitionDelay: `${index * 60}ms` }}
+                    className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                    style={{ transitionDelay: `${index * 40}ms` }}
                   >
-                    <div className="relative h-56 w-full">
+                    <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                       {member.profilePicUrl ? (
                         <img
                           src={member.profilePicUrl}
@@ -488,37 +690,30 @@ export default function BrothersPage() {
                             member.rollNo
                           )}`}
                         >
-                          <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-3xl font-semibold text-white/90">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
                             {getInitials(member.fName, member.lName)}
                           </div>
-                          <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                            Theta Tau
-                          </span>
                         </div>
                       )}
-                      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                     </div>
-                    <div className="p-6">
-                      <p className="text-xs uppercase tracking-[0.35em] text-[#f5d79a]">
-                        #{member.rollNo} • {member.status || "Member"}
-                      </p>
-                      <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
+                    <div className="mt-3">
+                      <h3 className="text-base font-semibold text-white">
                         {member.fName} {member.lName}
                       </h3>
-                      <p className="mt-2 text-sm text-white/70">
-                        {member.majors?.length ? member.majors.join(", ") : "Engineering"}
+                      {member.isECouncil && member.ecouncilPosition && (
+                        <p className="mt-1 text-xs text-[#f5d79a]">
+                          {member.ecouncilPosition}
+                        </p>
+                      )}
+                      {member.isCommitteeHead && !member.isECouncil && (
+                        <p className="mt-1 text-xs text-[#f5d79a]">
+                          Committee Chair
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-white/60">
+                        #{member.rollNo}
                       </p>
-                      {getHeadCommittees(member.rollNo).length > 0 && (
-                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">
-                          {getHeadCommittees(member.rollNo).join(", ")}
-                        </p>
-                      )}
-                      {member.gradYear && (
-                        <p className="mt-1 text-sm text-white/60">
-                          Class of {member.gradYear}
-                        </p>
-                      )}
-                      <div className="mt-4 flex items-center gap-4 text-white/70">
+                      <div className="mt-2 flex items-center gap-3 text-white/50">
                         {member.socialLinks?.linkedin && (
                           <a
                             href={member.socialLinks.linkedin}
@@ -528,7 +723,7 @@ export default function BrothersPage() {
                             className="transition hover:text-[#e2ab16]"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <FaLinkedin />
+                            <FaLinkedin size={14} />
                           </a>
                         )}
                         {member.socialLinks?.github && (
@@ -540,13 +735,14 @@ export default function BrothersPage() {
                             className="transition hover:text-[#e2ab16]"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <FaGithub />
+                            <FaGithub size={14} />
                           </a>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
+              </div>
               </div>
             )}
           </>

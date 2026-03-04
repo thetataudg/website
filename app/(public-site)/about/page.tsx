@@ -339,7 +339,7 @@ export default function About() {
           <div className="grid grid-cols-2 gap-4">
             <Image
               alt="Chapter group photo"
-              src="/group_1.jpg"
+              src="/IZ_Regionals_Pool.jpg"
               width={520}
               height={640}
               className="h-full w-full rounded-[28px] object-cover"
@@ -354,7 +354,7 @@ export default function About() {
               />
               <Image
                 alt="Brotherhood moment"
-                src="/group_3.jpg"
+                src="/skiing_summit.jpeg"
                 width={520}
                 height={320}
                 className="h-full w-full rounded-[28px] object-cover"

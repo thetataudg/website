@@ -211,6 +211,12 @@ export default function BrotherProfile({
     loadCommittees();
   }, [params.rollNo]);
 
+  useEffect(() => {
+    if (member) {
+      document.title = `${member.fName} ${member.lName} | ASU Theta Tau, Delta Gamma Chapter`;
+    }
+  }, [member]);
+
   if (loading) {
     return (
       <main className="bg-[#120a0a] pb-16 text-white">
@@ -233,13 +239,20 @@ export default function BrotherProfile({
         </section>
 
         <section className="mx-auto mt-10 w-full max-w-6xl px-6 sm:px-10">
-          <div className="grid gap-8 lg:grid-cols-[0.9fr,1.1fr]">
-            <div className="rounded-[28px] bg-[#120a0a] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
-              <div className="h-[320px] w-full animate-pulse rounded-[22px] bg-white/10" />
-              <div className="mt-6 space-y-3">
-                <div className="h-4 w-40 animate-pulse rounded-full bg-white/10" />
-                <div className="h-6 w-56 animate-pulse rounded-full bg-white/10" />
-                <div className="h-4 w-28 animate-pulse rounded-full bg-white/10" />
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="rounded-[28px] bg-[#120a0a] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.35)] lg:flex lg:gap-6">
+              {/* Photo skeleton */}
+              <div className="lg:w-2/5 lg:flex-shrink-0">
+                <div className="w-full animate-pulse rounded-[22px] bg-white/10" style={{ aspectRatio: "3/4" }} />
+              </div>
+              
+              {/* Info skeleton */}
+              <div className="mt-6 lg:mt-0 lg:flex-1 flex flex-col">
+                <div className="space-y-3 flex-1">
+                  <div className="h-4 w-40 animate-pulse rounded-full bg-white/10" />
+                  <div className="h-6 w-56 animate-pulse rounded-full bg-white/10" />
+                  <div className="h-4 w-28 animate-pulse rounded-full bg-white/10" />
+                </div>
                 <div className="mt-6 flex gap-3">
                   {["A", "B", "C"].map((key) => (
                     <div
@@ -316,125 +329,139 @@ export default function BrotherProfile({
               {member.pronouns}
             </span>
           )}
+          {member.isECouncil && member.ecouncilPosition && (
+            <span className="mt-3 inline-flex rounded-full bg-[#b3202a] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white">
+              {member.ecouncilPosition}
+            </span>
+          )}
         </div>
       </section>
 
       <section className="mx-4 mt-12 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
-        <div className="grid gap-10 lg:grid-cols-[0.9fr,1.1fr]">
-          <div className="rounded-[28px] bg-[#120a0a] p-6 text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
-            <div className="overflow-hidden rounded-[22px] bg-black/30">
-              {member.profilePicUrl ? (
-                <img
-                  src={member.profilePicUrl}
-                  alt={`${member.fName} ${member.lName}`}
-                  className="h-[360px] w-full object-cover"
-                />
-              ) : (
-                <div
-                  className={`flex h-[360px] w-full flex-col items-center justify-center bg-gradient-to-br ${getGradientClass(
-                    member.rollNo
-                  )}`}
-                >
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-white/10 text-4xl font-semibold text-white/90">
-                    {getInitials(member.fName, member.lName)}
+        <div className="grid gap-10 lg:grid-cols-2">
+          <div className="rounded-[28px] bg-[#120a0a] p-6 text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] lg:flex lg:gap-6">
+            {/* Photo side */}
+            <div className="lg:w-2/5 lg:flex-shrink-0">
+              <div className="overflow-hidden rounded-[22px] bg-black/30">
+                {member.profilePicUrl ? (
+                  <img
+                    src={member.profilePicUrl}
+                    alt={`${member.fName} ${member.lName}`}
+                    className="w-full object-cover"
+                    style={{ aspectRatio: "3/4" }}
+                  />
+                ) : (
+                  <div
+                    className={`flex w-full flex-col items-center justify-center bg-gradient-to-br ${getGradientClass(
+                      member.rollNo
+                    )}`}
+                    style={{ aspectRatio: "3/4" }}
+                  >
+                    <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-white/10 text-4xl font-semibold text-white/90">
+                      {getInitials(member.fName, member.lName)}
+                    </div>
+                    <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
+                      Theta Tau
+                    </span>
                   </div>
-                  <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                    Theta Tau
-                  </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-            <div className="mt-6 space-y-5">
-              <p className="text-base uppercase tracking-[0.35em] text-[#f5d79a]">
-                #{member.rollNo} • {member.status || "Member"}
-              </p>
-              {member.gradYear && (
-                <p className="text-lg text-white/90">Class of {member.gradYear}</p>
-              )}
-              {member.hometown && (
-                <p className="text-lg text-white/80">Hometown: {member.hometown}</p>
-              )}
-              {member.familyLine && (
-                <p className="text-lg text-white/80">Family Line: {member.familyLine}</p>
-              )}
-              {member.pledgeClass && (
-                <p className="text-lg text-white/80">Pledge Class: {member.pledgeClass}</p>
-              )}
-              {member.isCommitteeHead && (
-                <p className="text-lg text-white/85">
-                  Committee Head
-                  {headCommittees.length ? `: ${headCommittees.join(", ")}` : ": —"}
+            
+            {/* Info side */}
+            <div className="mt-6 lg:mt-0 lg:flex-1 flex flex-col">
+              <div className="space-y-5 flex-1">
+                <p className="text-base uppercase tracking-[0.35em] text-[#f5d79a]">
+                  #{member.rollNo} • {member.status || "Member"}
                 </p>
-              )}
-              {member.isECouncil && member.ecouncilPosition && (
-                <p className="text-lg text-white/85">E-Council: {member.ecouncilPosition}</p>
-              )}
-              {member.isECouncil && !member.ecouncilPosition && (
-                <p className="text-lg text-white/85">E-Council</p>
-              )}
-              {committees.length > 0 && (
-                <div className="pt-2">
-                  <p className="text-sm uppercase tracking-[0.25em] text-white/60">
-                    Committees
+                {member.gradYear && (
+                  <p className="text-lg text-white/90">Class of {member.gradYear}</p>
+                )}
+                {member.hometown && (
+                  <p className="text-lg text-white/80">Hometown: {member.hometown}</p>
+                )}
+                {member.pledgeClass && (
+                  <p className="text-lg text-white/80">Pledge Class: {member.pledgeClass}</p>
+                )}
+                {member.isCommitteeHead && (
+                  <p className="text-lg text-white/85">
+                    Committee Chair
+                    {headCommittees.length ? `: ${headCommittees.join(", ")}` : ": —"}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    {committees.map((committee) => (
-                      <span
-                        key={committee}
-                        className="rounded-full border border-white/15 px-4 py-1.5 text-sm uppercase tracking-[0.22em] text-white/85"
-                      >
-                        {committee}
-                      </span>
-                    ))}
+                )}
+                <p className="text-lg text-white/80">
+                  Family Line: {member.familyLine || "—"}
+                </p>
+                <p className="text-lg text-white/80">
+                  Big{bigs.length !== 1 ? "s" : ""}: {bigs.length > 0 ? renderMemberLinks(bigs) : "—"}
+                </p>
+                <p className="text-lg text-white/80">
+                  Little{littles.length !== 1 ? "s" : ""}: {littles.length > 0 ? renderMemberLinks(littles) : "—"}
+                </p>
+                {committees.length > 0 && (
+                  <div className="pt-2">
+                    <p className="text-sm uppercase tracking-[0.25em] text-white/60">
+                      Committees
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {committees.map((committee) => (
+                        <span
+                          key={committee}
+                          className="rounded-full border border-white/15 px-4 py-1.5 text-sm uppercase tracking-[0.22em] text-white/85"
+                        >
+                          {committee}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-            <div className="mt-8 flex items-center gap-6 text-2xl text-white/90">
-              {member.socialLinks?.linkedin && (
-                <a
-                  href={normalizeExternalUrl(member.socialLinks.linkedin)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="LinkedIn"
-                  className="transition hover:text-[#e2ab16]"
-                >
-                  <FaLinkedin />
-                </a>
-              )}
-              {member.socialLinks?.github && (
-                <a
-                  href={normalizeExternalUrl(member.socialLinks.github)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="GitHub"
-                  className="transition hover:text-[#e2ab16]"
-                >
-                  <FaGithub />
-                </a>
-              )}
-              {member.socialLinks?.instagram && (
-                <a
-                  href={normalizeExternalUrl(member.socialLinks.instagram)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Instagram"
-                  className="transition hover:text-[#e2ab16]"
-                >
-                  <FaInstagram />
-                </a>
-              )}
-              {member.socialLinks?.website && (
-                <a
-                  href={normalizeExternalUrl(member.socialLinks.website)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Website"
-                  className="transition hover:text-[#e2ab16]"
-                >
-                  <FaGlobe />
-                </a>
-              )}
+                )}
+              </div>
+              <div className="mt-8 flex items-center gap-6 text-2xl text-white/90">
+                {member.socialLinks?.linkedin && (
+                  <a
+                    href={normalizeExternalUrl(member.socialLinks.linkedin)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="LinkedIn"
+                    className="transition hover:text-[#e2ab16]"
+                  >
+                    <FaLinkedin />
+                  </a>
+                )}
+                {member.socialLinks?.github && (
+                  <a
+                    href={normalizeExternalUrl(member.socialLinks.github)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="GitHub"
+                    className="transition hover:text-[#e2ab16]"
+                  >
+                    <FaGithub />
+                  </a>
+                )}
+                {member.socialLinks?.instagram && (
+                  <a
+                    href={normalizeExternalUrl(member.socialLinks.instagram)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Instagram"
+                    className="transition hover:text-[#e2ab16]"
+                  >
+                    <FaInstagram />
+                  </a>
+                )}
+                {member.socialLinks?.website && (
+                  <a
+                    href={normalizeExternalUrl(member.socialLinks.website)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Website"
+                    className="transition hover:text-[#e2ab16]"
+                  >
+                    <FaGlobe />
+                  </a>
+                )}
+              </div>
             </div>
           </div>
 
@@ -450,90 +477,28 @@ export default function BrotherProfile({
               </p>
             </div>
 
-            <div className="mt-6 grid gap-6 md:grid-cols-2">
-              <div className="rounded-[24px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
-                <h3 className={`${bungee.className} text-xl text-[#b3202a]`}>
-                  Academics
-                </h3>
-                <p className="mt-3 text-sm text-white/75">
-                  {member.majors?.length
-                    ? member.majors.join(", ")
-                    : "Engineering"}
-                </p>
-                {member.minors?.length ? (
-                  <p className="mt-2 text-sm text-white/60">
-                    Minors: {member.minors.join(", ")}
-                  </p>
-                ) : null}
-                {member.gradYear && (
-                  <p className="mt-2 text-sm text-white/60">
-                    Class of {member.gradYear}
-                  </p>
-                )}
-              </div>
-
-              <div className="rounded-[24px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
-                <h3 className={`${bungee.className} text-xl text-[#b3202a]`}>
-                  Fraternity
-                </h3>
-                <p className="mt-3 text-sm text-white/75">
-                  {member.familyLine ? `Family Line: ${member.familyLine}` : "Family Line: —"}
-                </p>
+            <div className="mt-6 rounded-[24px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
+              <h3 className={`${bungee.className} text-xl text-[#b3202a]`}>
+                Academics
+              </h3>
+              <p className="mt-3 text-sm text-white/75">
+                {member.majors?.length
+                  ? member.majors.join(", ")
+                  : "Engineering"}
+              </p>
+              {member.minors?.length ? (
                 <p className="mt-2 text-sm text-white/60">
-                  {member.pledgeClass ? `Pledge Class: ${member.pledgeClass}` : "Pledge Class: —"}
+                  Minors: {member.minors.join(", ")}
                 </p>
-                {member.isECouncil && member.ecouncilPosition && (
-                  <p className="mt-2 text-sm text-white/60">
-                    E-Council: {member.ecouncilPosition}
-                  </p>
-                )}
-              </div>
+              ) : null}
+              {member.gradYear && (
+                <p className="mt-2 text-sm text-white/60">
+                  Class of {member.gradYear}
+                </p>
+              )}
             </div>
 
-            {(bigs.length > 0 || littles.length > 0 || committees.length > 0) && (
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <div className="rounded-[24px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
-                  <h3 className={`${bungee.className} text-xl text-[#b3202a]`}>
-                    Lineage
-                  </h3>
-                  {bigs.length > 0 ? (
-                    <p className="mt-3 text-sm text-white/75">
-                      Big{bigs.length > 1 ? "s" : ""}:{" "}
-                      {renderMemberLinks(bigs)}
-                    </p>
-                  ) : (
-                    <p className="mt-3 text-sm text-white/60">Bigs: —</p>
-                  )}
-                  {littles.length > 0 ? (
-                    <p className="mt-2 text-sm text-white/70">
-                      Little{littles.length > 1 ? "s" : ""}:{" "}
-                      {renderMemberLinks(littles)}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-sm text-white/60">Littles: —</p>
-                  )}
-                </div>
-                <div className="rounded-[24px] bg-[#120a0a] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
-                  <h3 className={`${bungee.className} text-xl text-[#b3202a]`}>
-                    Committees
-                  </h3>
-                  {committees.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {committees.map((committee) => (
-                        <span
-                          key={committee}
-                          className="rounded-full border border-white/20 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/80"
-                        >
-                          {committee}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-white/60">No committees listed.</p>
-                  )}
-                </div>
-              </div>
-            )}
+
 
             {skills.length > 0 && (
               <div className="mt-6 rounded-[24px] bg-white p-6 text-[#1b0f0f] shadow-[0_10px_24px_rgba(0,0,0,0.12)]">
@@ -700,7 +665,7 @@ export default function BrotherProfile({
             </div>
 
             <Link href="/brothers" className="tt-button-secondary mt-8 inline-flex">
-              Back to brothers
+              Back to All Brothers
             </Link>
           </div>
         </div>
