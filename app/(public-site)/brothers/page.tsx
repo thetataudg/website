@@ -282,7 +282,7 @@ export default function BrothersPage() {
                       {officersEcouncil.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {officersEcouncil.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -290,10 +290,10 @@ export default function BrothersPage() {
                         tabIndex={0}
                         onClick={() => handleCardNavigate(member.rollNo)}
                         onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
-                        className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-                        style={{ transitionDelay: `${index * 60}ms` }}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative w-full" style={{ aspectRatio: "3/4" }}>
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               src={member.profilePicUrl}
@@ -306,37 +306,25 @@ export default function BrothersPage() {
                                 member.rollNo
                               )}`}
                             >
-                              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-3xl font-semibold text-white/90">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
                                 {getInitials(member.fName, member.lName)}
                               </div>
-                              <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                                Theta Tau
-                              </span>
                             </div>
                           )}
-                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                         </div>
-                        <div className="p-6">
-                          <p className="text-xs uppercase tracking-[0.35em] text-[#f5d79a]">
-                            #{member.rollNo} • {member.status || "Member"}
-                          </p>
-                          <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
                             {member.fName} {member.lName}
                           </h3>
-                          <p className="mt-2 text-sm text-white/70">
-                            {member.majors?.length ? member.majors.join(", ") : "Engineering"}
-                          </p>
                           {member.ecouncilPosition && (
-                            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">
+                            <p className="mt-1 text-xs text-[#f5d79a]">
                               {member.ecouncilPosition}
                             </p>
                           )}
-                          {member.gradYear && (
-                            <p className="mt-1 text-sm text-white/60">
-                              Class of {member.gradYear}
-                            </p>
-                          )}
-                          <div className="mt-4 flex items-center gap-4 text-white/70">
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
                             {member.socialLinks?.linkedin && (
                               <a
                                 href={member.socialLinks.linkedin}
@@ -346,7 +334,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaLinkedin />
+                                <FaLinkedin size={14} />
                               </a>
                             )}
                             {member.socialLinks?.github && (
@@ -358,7 +346,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaGithub />
+                                <FaGithub size={14} />
                               </a>
                             )}
                           </div>
@@ -377,7 +365,7 @@ export default function BrothersPage() {
                       {officersCommitteeHeads.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {officersCommitteeHeads.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -385,10 +373,10 @@ export default function BrothersPage() {
                         tabIndex={0}
                         onClick={() => handleCardNavigate(member.rollNo)}
                         onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
-                        className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-                        style={{ transitionDelay: `${index * 60}ms` }}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative w-full" style={{ aspectRatio: "3/4" }}>
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               src={member.profilePicUrl}
@@ -401,37 +389,25 @@ export default function BrothersPage() {
                                 member.rollNo
                               )}`}
                             >
-                              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-3xl font-semibold text-white/90">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
                                 {getInitials(member.fName, member.lName)}
                               </div>
-                              <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                                Theta Tau
-                              </span>
                             </div>
                           )}
-                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                         </div>
-                        <div className="p-6">
-                          <p className="text-xs uppercase tracking-[0.35em] text-[#f5d79a]">
-                            #{member.rollNo} • {member.status || "Member"}
-                          </p>
-                          <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
                             {member.fName} {member.lName}
                           </h3>
-                          <p className="mt-2 text-sm text-white/70">
-                            {member.majors?.length ? member.majors.join(", ") : "Engineering"}
-                          </p>
                           {getHeadCommittees(member.rollNo).length > 0 && (
-                            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">
+                            <p className="mt-1 text-xs text-[#f5d79a]">
                               {getHeadCommittees(member.rollNo).join(", ")}
                             </p>
                           )}
-                          {member.gradYear && (
-                            <p className="mt-1 text-sm text-white/60">
-                              Class of {member.gradYear}
-                            </p>
-                          )}
-                          <div className="mt-4 flex items-center gap-4 text-white/70">
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
                             {member.socialLinks?.linkedin && (
                               <a
                                 href={member.socialLinks.linkedin}
@@ -441,7 +417,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaLinkedin />
+                                <FaLinkedin size={14} />
                               </a>
                             )}
                             {member.socialLinks?.github && (
@@ -453,7 +429,7 @@ export default function BrothersPage() {
                                 className="transition hover:text-[#e2ab16]"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <FaGithub />
+                                <FaGithub size={14} />
                               </a>
                             )}
                           </div>
@@ -464,7 +440,7 @@ export default function BrothersPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {filteredMembers.map((member, index) => (
                   <div
                     key={member.rollNo}
@@ -472,10 +448,10 @@ export default function BrothersPage() {
                     tabIndex={0}
                     onClick={() => handleCardNavigate(member.rollNo)}
                     onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
-                    className="group reveal cursor-pointer overflow-hidden rounded-[28px] bg-[#1b0f0f] text-white shadow-[0_12px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-                    style={{ transitionDelay: `${index * 60}ms` }}
+                    className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                    style={{ transitionDelay: `${index * 40}ms` }}
                   >
-                    <div className="relative w-full" style={{ aspectRatio: "3/4" }}>
+                    <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                       {member.profilePicUrl ? (
                         <img
                           src={member.profilePicUrl}
@@ -488,37 +464,25 @@ export default function BrothersPage() {
                             member.rollNo
                           )}`}
                         >
-                          <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-3xl font-semibold text-white/90">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
                             {getInitials(member.fName, member.lName)}
                           </div>
-                          <span className="mt-3 text-xs uppercase tracking-[0.4em] text-white/70">
-                            Theta Tau
-                          </span>
                         </div>
                       )}
-                      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                     </div>
-                    <div className="p-6">
-                      <p className="text-xs uppercase tracking-[0.35em] text-[#f5d79a]">
-                        #{member.rollNo} • {member.status || "Member"}
-                      </p>
-                      <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
+                    <div className="mt-3">
+                      <h3 className="text-base font-semibold text-white">
                         {member.fName} {member.lName}
                       </h3>
-                      <p className="mt-2 text-sm text-white/70">
-                        {member.majors?.length ? member.majors.join(", ") : "Engineering"}
-                      </p>
                       {getHeadCommittees(member.rollNo).length > 0 && (
-                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">
+                        <p className="mt-1 text-xs text-[#f5d79a]">
                           {getHeadCommittees(member.rollNo).join(", ")}
                         </p>
                       )}
-                      {member.gradYear && (
-                        <p className="mt-1 text-sm text-white/60">
-                          Class of {member.gradYear}
-                        </p>
-                      )}
-                      <div className="mt-4 flex items-center gap-4 text-white/70">
+                      <p className="mt-1 text-xs text-white/60">
+                        #{member.rollNo}
+                      </p>
+                      <div className="mt-2 flex items-center gap-3 text-white/50">
                         {member.socialLinks?.linkedin && (
                           <a
                             href={member.socialLinks.linkedin}
@@ -528,7 +492,7 @@ export default function BrothersPage() {
                             className="transition hover:text-[#e2ab16]"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <FaLinkedin />
+                            <FaLinkedin size={14} />
                           </a>
                         )}
                         {member.socialLinks?.github && (
@@ -540,7 +504,7 @@ export default function BrothersPage() {
                             className="transition hover:text-[#e2ab16]"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <FaGithub />
+                            <FaGithub size={14} />
                           </a>
                         )}
                       </div>
