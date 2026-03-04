@@ -157,6 +157,35 @@ export default function BrothersPage() {
     });
   }, [members, filter, query]);
 
+  const executiveBoardPositions = [
+    "Regent",
+    "Vice Regent",
+    "Marshal",
+    "Treasurer",
+    "Scribe",
+    "Corresponding Secretary",
+  ];
+
+  const executiveBoardMembers = useMemo(() => {
+    if (filter !== "Active") return [];
+    const board: Member[] = [];
+    executiveBoardPositions.forEach((position) => {
+      const member = filteredMembers.find(
+        (m) => m.isECouncil && m.ecouncilPosition === position
+      );
+      if (member) {
+        board.push(member);
+      }
+    });
+    return board;
+  }, [filteredMembers, filter]);
+
+  const regularActiveMembers = useMemo(() => {
+    if (filter !== "Active") return filteredMembers;
+    const boardRollNos = new Set(executiveBoardMembers.map((m) => m.rollNo));
+    return filteredMembers.filter((m) => !boardRollNos.has(m.rollNo));
+  }, [filteredMembers, filter, executiveBoardMembers]);
+
   const officersEcouncil = useMemo(() => {
     if (filter !== "Officers") return [];
     return filteredMembers.filter((m) => m.isECouncil);
@@ -399,9 +428,182 @@ export default function BrothersPage() {
                           <h3 className="text-base font-semibold text-white">
                             {member.fName} {member.lName}
                           </h3>
-                          {getHeadCommittees(member.rollNo).length > 0 && (
+                          {member.isCommitteeHead && (
                             <p className="mt-1 text-xs text-[#f5d79a]">
-                              {getHeadCommittees(member.rollNo).join(", ")}
+                              Committee Chair
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
+                            {member.socialLinks?.linkedin && (
+                              <a
+                                href={member.socialLinks.linkedin}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="LinkedIn"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaLinkedin size={14} />
+                              </a>
+                            )}
+                            {member.socialLinks?.github && (
+                              <a
+                                href={member.socialLinks.github}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="GitHub"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaGithub size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : filter === "Active" && executiveBoardMembers.length > 0 ? (
+              <div className="space-y-10">
+                <div>
+                  <div className="mb-5 flex items-center justify-between">
+                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                      Executive Board
+                    </h3>
+                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                      {executiveBoardMembers.length} members
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {executiveBoardMembers.map((member, index) => (
+                      <div
+                        key={member.rollNo}
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => handleCardNavigate(member.rollNo)}
+                        onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
+                      >
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                          {member.profilePicUrl ? (
+                            <img
+                              src={member.profilePicUrl}
+                              alt={`${member.fName} ${member.lName}`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-full w-full flex-col items-center justify-center bg-gradient-to-br ${getGradientClass(
+                                member.rollNo
+                              )}`}
+                            >
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
+                                {getInitials(member.fName, member.lName)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
+                            {member.fName} {member.lName}
+                          </h3>
+                          {member.ecouncilPosition && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              {member.ecouncilPosition}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-white/60">
+                            #{member.rollNo}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-white/50">
+                            {member.socialLinks?.linkedin && (
+                              <a
+                                href={member.socialLinks.linkedin}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="LinkedIn"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaLinkedin size={14} />
+                              </a>
+                            )}
+                            {member.socialLinks?.github && (
+                              <a
+                                href={member.socialLinks.github}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="GitHub"
+                                className="transition hover:text-[#e2ab16]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <FaGithub size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-5 flex items-center justify-between">
+                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                      Active Members
+                    </h3>
+                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                      {regularActiveMembers.length} members
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {regularActiveMembers.map((member, index) => (
+                      <div
+                        key={member.rollNo}
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => handleCardNavigate(member.rollNo)}
+                        onKeyDown={(event) => handleCardKeyDown(event, member.rollNo)}
+                        className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
+                        style={{ transitionDelay: `${index * 40}ms` }}
+                      >
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                          {member.profilePicUrl ? (
+                            <img
+                              src={member.profilePicUrl}
+                              alt={`${member.fName} ${member.lName}`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-full w-full flex-col items-center justify-center bg-gradient-to-br ${getGradientClass(
+                                member.rollNo
+                              )}`}
+                            >
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-semibold text-white/90">
+                                {getInitials(member.fName, member.lName)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3">
+                          <h3 className="text-base font-semibold text-white">
+                            {member.fName} {member.lName}
+                          </h3>
+                          {member.isECouncil && member.ecouncilPosition && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              {member.ecouncilPosition}
+                            </p>
+                          )}
+                          {member.isCommitteeHead && !member.isECouncil && (
+                            <p className="mt-1 text-xs text-[#f5d79a]">
+                              Committee Chair
                             </p>
                           )}
                           <p className="mt-1 text-xs text-white/60">
@@ -474,9 +676,14 @@ export default function BrothersPage() {
                       <h3 className="text-base font-semibold text-white">
                         {member.fName} {member.lName}
                       </h3>
-                      {getHeadCommittees(member.rollNo).length > 0 && (
+                      {member.isECouncil && member.ecouncilPosition && (
                         <p className="mt-1 text-xs text-[#f5d79a]">
-                          {getHeadCommittees(member.rollNo).join(", ")}
+                          {member.ecouncilPosition}
+                        </p>
+                      )}
+                      {member.isCommitteeHead && !member.isECouncil && (
+                        <p className="mt-1 text-xs text-[#f5d79a]">
+                          Committee Chair
                         </p>
                       )}
                       <p className="mt-1 text-xs text-white/60">
