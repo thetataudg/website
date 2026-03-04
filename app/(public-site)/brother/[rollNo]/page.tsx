@@ -374,28 +374,24 @@ export default function BrotherProfile({
                 {member.hometown && (
                   <p className="text-lg text-white/80">Hometown: {member.hometown}</p>
                 )}
-                {member.familyLine && (
-                  <p className="text-lg text-white/80">Family Line: {member.familyLine}</p>
-                )}
                 {member.pledgeClass && (
                   <p className="text-lg text-white/80">Pledge Class: {member.pledgeClass}</p>
                 )}
                 {member.isCommitteeHead && (
                   <p className="text-lg text-white/85">
-                    Committee Head
+                    Committee Chair
                     {headCommittees.length ? `: ${headCommittees.join(", ")}` : ": —"}
                   </p>
                 )}
-                {bigs.length > 0 && (
-                  <p className="text-lg text-white/80">
-                    Big{bigs.length > 1 ? "s" : ""}: {renderMemberLinks(bigs)}
-                  </p>
-                )}
-                {littles.length > 0 && (
-                  <p className="text-lg text-white/80">
-                    Little{littles.length > 1 ? "s" : ""}: {renderMemberLinks(littles)}
-                  </p>
-                )}
+                <p className="text-lg text-white/80">
+                  Family Line: {member.familyLine || "—"}
+                </p>
+                <p className="text-lg text-white/80">
+                  Big{bigs.length !== 1 ? "s" : ""}: {bigs.length > 0 ? renderMemberLinks(bigs) : "—"}
+                </p>
+                <p className="text-lg text-white/80">
+                  Little{littles.length !== 1 ? "s" : ""}: {littles.length > 0 ? renderMemberLinks(littles) : "—"}
+                </p>
                 {committees.length > 0 && (
                   <div className="pt-2">
                     <p className="text-sm uppercase tracking-[0.25em] text-white/60">
