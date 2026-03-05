@@ -145,10 +145,25 @@ export default function Dashboard() {
   }, [needsDiscordLink]);
 
   useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      setUserData(null);
+      setLoadingUserData(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
     async function fetchUserData() {
+      setLoadingUserData(true);
       try {
-        const response = await axios.get("/api/members/me");
+        const response = await axios.get("/api/members/me", {
+          signal: controller.signal,
+          timeout: 12000,
+        });
         const data = response.data;
+        if (cancelled) return;
 
         console.log("API /api/members/me response:", data);
 
@@ -177,22 +192,33 @@ export default function Dashboard() {
           memberId: data.memberId,
           discordId: data.discordId || null,
         });
-
       } catch (error) {
+        if (cancelled) return;
         if (axios.isAxiosError(error) && error.response?.status === 404) {
           setNeedsOnboarding(true);
           router.replace("/member/onboard");
+        } else if (
+          axios.isAxiosError(error) &&
+          (error.code === "ECONNABORTED" || error.code === "ERR_CANCELED")
+        ) {
+          console.error("Timed out fetching /api/members/me", error);
         } else {
           console.error("Error fetching user data:", error);
         }
         setUserData(null);
       } finally {
-        setLoadingUserData(false);
+        if (!cancelled) {
+          setLoadingUserData(false);
+        }
       }
     }
 
-    if (isSignedIn) fetchUserData();
-  }, [isSignedIn, router]);
+    fetchUserData();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
     const controller = new AbortController();

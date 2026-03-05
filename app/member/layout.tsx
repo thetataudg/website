@@ -1,5 +1,3 @@
-import { ClerkProvider } from "@clerk/nextjs";
-
 export const metadata = {
   title: "Member Portal",
   description:
@@ -16,13 +14,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className="members-shell" data-theme="light">
-          <Navbar />
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <div className="members-shell" data-theme="light">
+      <Navbar />
+      {children}
+    </div>
   );
 }

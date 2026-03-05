@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import Script from 'next/script';
-import { ClerkProvider } from "@clerk/nextjs";
 
 import "../(public-site)/globals.css";
 
@@ -55,32 +54,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-    <html lang="en">
-      <body className={inter.className}>
-        {/* External Google Tag Manager script */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-R1HDPDN1XG"
-          strategy="beforeInteractive"
-        />
+    <>
+      {/* External Google Tag Manager script */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-R1HDPDN1XG"
+        strategy="beforeInteractive"
+      />
 
-        {/* Inline Google Tag Manager setup */}
-        <Script id="gtag-init" strategy="beforeInteractive">
-          {`
+      {/* Inline Google Tag Manager setup */}
+      <Script id="gtag-init" strategy="beforeInteractive">
+        {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-R1HDPDN1XG');
           `}
-        </Script>
+      </Script>
 
+      <div className={inter.className}>
         <Navbar />
 
         {children}
-            
+
         <Footer />
-      </body>
-    </html>
-    </ClerkProvider>
+      </div>
+    </>
   );
 }
