@@ -79,6 +79,7 @@ const Navbar = () => {
         onMouseMove={updateLiquidRefraction}
         onMouseLeave={resetLiquidRefraction}
       >
+        <span className="tt-liquid-nav-specular" aria-hidden="true" />
         <div className="relative z-10 flex items-center justify-between rounded-full bg-black/30 px-4 py-2.5 md:px-5 md:py-3">
           <a className="flex items-center gap-3" href="/" rel="noreferrer">
             <Image
