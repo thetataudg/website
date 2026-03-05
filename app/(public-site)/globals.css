@@ -398,6 +398,43 @@ p {
   opacity: 0.75;
 }
 
+.tt-liquid-nav-specular {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 18px rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(
+      190px 48px at calc(var(--mx) - 10%) calc(var(--my) - 38%),
+      rgba(255, 255, 255, 0.56),
+      rgba(255, 255, 255, 0) 66%
+    ),
+    radial-gradient(
+      130px 34px at calc(var(--mx) + 14%) calc(var(--my) + 42%),
+      rgba(248, 213, 155, 0.22),
+      rgba(248, 213, 155, 0) 70%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.08) 18%,
+      rgba(255, 255, 255, 0) 38%
+    );
+  mix-blend-mode: screen;
+  opacity: 0.62;
+  transition: opacity 180ms ease;
+}
+
+.tt-liquid-nav-shell:hover .tt-liquid-nav-specular {
+  opacity: 0.82;
+}
+
 @media (max-width: 768px) {
   .tt-liquid-nav-shell {
     background: rgba(8, 8, 8, 0.86);
@@ -411,6 +448,18 @@ p {
 
   .tt-liquid-nav-shell::before {
     opacity: 0.32;
+  }
+
+  .tt-liquid-nav-specular {
+    opacity: 0.45;
+    border-color: rgba(255, 255, 255, 0.2);
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 255, 255, 0.06) 26%,
+        rgba(255, 255, 255, 0) 44%
+      );
   }
 
   .logo-marquee {
