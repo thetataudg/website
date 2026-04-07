@@ -192,8 +192,8 @@ export default function AdminGemDashboardPage() {
       setStatus(payload);
       if (!hasSeededFiltersRef.current) {
         setRangeFilters({
-          start: payload.startDate.split("T")[0],
-          end: payload.endDate.split("T")[0],
+          start: payload.startDate,
+          end: payload.endDate,
           semester: payload.semesterName,
         });
         setHasSeededFilters(true);
@@ -267,7 +267,14 @@ export default function AdminGemDashboardPage() {
 
   const formatDateShort = (value?: string) => {
     if (!value) return "";
-    const date = new Date(value);
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const date = dateOnlyMatch
+      ? new Date(
+          Number(dateOnlyMatch[1]),
+          Number(dateOnlyMatch[2]) - 1,
+          Number(dateOnlyMatch[3])
+        )
+      : new Date(value);
     if (Number.isNaN(date.getTime())) return "";
     return date.toLocaleDateString("en-US");
   };
