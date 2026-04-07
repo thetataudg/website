@@ -7,7 +7,12 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import GemRecord from "@/lib/models/GemRecord";
 import logger from "@/lib/logger";
-import { GEM_GPA_THRESHOLD, parseSemesterRange, normalizeGemCategory } from "@/lib/gem";
+import {
+  GEM_GPA_THRESHOLD,
+  formatSemesterDate,
+  normalizeGemCategory,
+  parseSemesterRange,
+} from "@/lib/gem";
 
 const RUSH_TARGET = 5;
 
@@ -98,25 +103,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const hasFilters =
-      Boolean(searchParams.get("start")) ||
-      Boolean(searchParams.get("end")) ||
-      Boolean(searchParams.get("semester"));
-    let referenceDate: Date | undefined;
-    if (!hasFilters) {
-      const latestEvent = await Event.findOne({ status: { $ne: "cancelled" } })
-        .sort({ startTime: -1 })
-        .select("startTime")
-        .lean<{ startTime?: Date }>();
-      if (latestEvent?.startTime) {
-        referenceDate = new Date(latestEvent.startTime);
-      }
-    }
     const semesterRange = parseSemesterRange({
       start: searchParams.get("start"),
       end: searchParams.get("end"),
       semester: searchParams.get("semester"),
-      referenceDate,
     });
 
     const now = new Date();
@@ -378,8 +368,8 @@ const members = await Member.find({ status: "Active" })
     return NextResponse.json(
       {
         semesterName: semesterRange.name,
-        startDate: semesterRange.startDate.toISOString(),
-        endDate: semesterRange.endDate.toISOString(),
+        startDate: formatSemesterDate(semesterRange.startDate),
+        endDate: formatSemesterDate(semesterRange.endDate),
         generalTotal,
         generalTarget,
         rushTarget: RUSH_TARGET,

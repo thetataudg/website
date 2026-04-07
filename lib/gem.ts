@@ -1,3 +1,6 @@
+import { DateTime } from "luxon";
+import { ARIZONA_ZONE } from "./recurrence";
+
 export const GEM_CATEGORIES = [
   "general-conference",
   "committee-meeting",
@@ -38,25 +41,57 @@ function buildSemesterName(term: "Fall" | "Spring", year: number) {
   return `${term} ${year}`;
 }
 
+function buildSemesterBoundary(
+  year: number,
+  month: number,
+  day: number,
+  boundary: "start" | "end"
+) {
+  const base = DateTime.fromObject(
+    {
+      year,
+      month,
+      day,
+      hour: boundary === "start" ? 0 : 23,
+      minute: boundary === "start" ? 0 : 59,
+      second: boundary === "start" ? 0 : 59,
+      millisecond: boundary === "start" ? 0 : 999,
+    },
+    { zone: ARIZONA_ZONE }
+  );
+  return base.toJSDate();
+}
+
+function parseArizonaDateBoundary(value: string, boundary: "start" | "end") {
+  const parsed = DateTime.fromISO(value, { zone: ARIZONA_ZONE });
+  if (!parsed.isValid) return null;
+  return (boundary === "start" ? parsed.startOf("day") : parsed.endOf("day")).toJSDate();
+}
+
+export function formatSemesterDate(date: Date) {
+  return DateTime.fromJSDate(date, { zone: ARIZONA_ZONE }).toFormat("yyyy-MM-dd");
+}
+
 function getSemesterRangeForTerm(term: "Fall" | "Spring", year: number): SemesterRange {
   if (term === "Spring") {
     return {
       name: buildSemesterName("Spring", year),
-      startDate: new Date(year, 0, 1, 0, 0, 0, 0),
-      endDate: new Date(year, 5, 30, 23, 59, 59, 999),
+      startDate: buildSemesterBoundary(year, 1, 1, "start"),
+      endDate: buildSemesterBoundary(year, 7, 31, "end"),
     };
   }
   return {
     name: buildSemesterName("Fall", year),
-    startDate: new Date(year, 6, 1, 0, 0, 0, 0),
-    endDate: new Date(year, 11, 31, 23, 59, 59, 999),
+    startDate: buildSemesterBoundary(year, 8, 1, "start"),
+    endDate: buildSemesterBoundary(year, 12, 31, "end"),
   };
 }
 
 export function getDefaultSemesterRange(referenceDate = new Date()): SemesterRange {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth();
-  return month < 6
+  const arizonaReference = DateTime.fromJSDate(referenceDate, { zone: ARIZONA_ZONE });
+  const year = arizonaReference.year;
+  const month = arizonaReference.month;
+  return month <= 7
     ? getSemesterRangeForTerm("Spring", year)
     : getSemesterRangeForTerm("Fall", year);
 }
@@ -83,14 +118,13 @@ export function parseSemesterRange(params: {
   const referenceDate = params.referenceDate || new Date();
   const defaultRange = getDefaultSemesterRange(referenceDate);
 
-  const parseAsUtc = (value: string) => {
-    const utc = new Date(`${value}T00:00:00Z`);
-    return Number.isNaN(utc.getTime()) ? null : utc;
-  };
-
   if (params.start || params.end) {
-    const startDate = params.start ? parseAsUtc(params.start) : defaultRange.startDate;
-    const endDate = params.end ? parseAsUtc(params.end) : defaultRange.endDate;
+    const startDate = params.start
+      ? parseArizonaDateBoundary(params.start, "start")
+      : defaultRange.startDate;
+    const endDate = params.end
+      ? parseArizonaDateBoundary(params.end, "end")
+      : defaultRange.endDate;
     if (
       startDate &&
       endDate &&
@@ -122,9 +156,10 @@ export function parseSemesterRange(params: {
 }
 
 function deriveSemesterNameFromDate(date: Date): string {
-  const month = date.getUTCMonth();
-  const year = date.getUTCFullYear();
-  return month < 6 ? `Spring ${year}` : `Fall ${year}`;
+  const arizonaDate = DateTime.fromJSDate(date, { zone: ARIZONA_ZONE });
+  return arizonaDate.month <= 7
+    ? `Spring ${arizonaDate.year}`
+    : `Fall ${arizonaDate.year}`;
 }
 
 export function normalizeGemCategory(value?: string | null): GemCategory | null {
