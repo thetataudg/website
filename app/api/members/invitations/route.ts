@@ -6,9 +6,20 @@ import logger from "@/lib/logger";
 import { connectDB } from "@/lib/db";
 import { emailToSlug } from "@/utils/email-to-slug";
 import Member from "@/lib/models/Member";
+import { getRequestSource } from "@/lib/request-source";
 
 export async function GET(req: Request) {
   await connectDB();
+  const requestSource = getRequestSource(req);
+
+  logger.info(
+    {
+      event: "Members invitations request",
+      route: "/api/members/invitations",
+      source: requestSource,
+    },
+    "Request received"
+  );
 
   try {
     await requireRole(req as any, ["superadmin", "admin"]);
@@ -83,8 +94,18 @@ export async function POST(req: NextRequest) {
   // 2. If secret is valid, allow; else require admin
   const ENV_SECRET = process.env.INVITE_SECRET;
   let admin;
+  const requestSource = getRequestSource(req);
 
-  console.log("Secret:", secret, "ENV Secret:", ENV_SECRET);
+  logger.info(
+    {
+      event: "Members invitations invite request",
+      route: "/api/members/invitations",
+      source: requestSource,
+      secretProvided: Boolean(secret),
+      secretMatch: Boolean(secret && ENV_SECRET && secret === ENV_SECRET),
+    },
+    "Request received"
+  );
 
   if (secret && ENV_SECRET && secret === ENV_SECRET) {
     // Bypass admin check

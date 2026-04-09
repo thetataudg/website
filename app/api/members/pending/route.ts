@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { getRequestSource } from "@/lib/request-source";
 
 export async function GET(req: Request) {
   await connectDB();
@@ -20,8 +21,18 @@ export async function GET(req: Request) {
   const ENV_SECRET = process.env.INVITE_SECRET;
 
   let allow = false;
+  const requestSource = getRequestSource(req);
 
-  console.log("Secret:", secret, "ENV Secret:", ENV_SECRET);
+  logger.info(
+    {
+      event: "Members pending request",
+      route: "/api/members/pending",
+      source: requestSource,
+      secretProvided: Boolean(secret),
+      secretMatch: Boolean(secret && ENV_SECRET && secret === ENV_SECRET),
+    },
+    "Request received"
+  );
 
   if (secret && ENV_SECRET && secret === ENV_SECRET) {
     allow = true;
