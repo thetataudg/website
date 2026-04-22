@@ -180,7 +180,7 @@ export default function Home() {
               <div className="overflow-hidden bg-black/30 [border-radius:28%_72%_58%_42%/38%_48%_52%_62%]">
                 <Image
                   alt="Brotherhood"
-                  src="/brothers_1.JPG"
+                  src="/brothers_1.jpg"
                   width="449"
                   height="334"
                   className="h-[220px] w-full object-cover [border-radius:28%_72%_58%_42%/38%_48%_52%_62%]"
