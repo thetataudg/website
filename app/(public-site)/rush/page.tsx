@@ -207,7 +207,7 @@ export default function Rush() {
             Rush is now closed. Please fill out the interest form below to be notified when we start our rush process next semester.
           </p>
           <a
-            href="https://airtable.com/appQEL10mm4gp9XDx/pagGkFkzKTCxjJNU1/form"
+            href="https://airtable.com/app1DcIvp3XB5fdQU/pagGkFkzKTCxjJNU1/form"
             target="_blank"
             className="tt-button-primary mt-8"
           >
@@ -223,7 +223,7 @@ export default function Rush() {
               Why Rush Theta Tau?
             </h2>
             <p className="mt-4 text-xl leading-relaxed">
-              For engineering students at ASU, Theta Tau isn't just another organization. It's where careers are shaped, lasting friendships are built, and the kind of professional network that follows you beyond graduation starts to form. As the oldest and largest co-ed engineering fraternity in the nation, Theta Tau offers something most clubs can't: a proven path from student to engineer, backed by a brotherhood that invests in you. Whether you're looking to sharpen your technical edge, step into leadership, or find your people in a demanding major, rushing Theta Tau might be the most valuable decision you make at ASU.
+              For engineering students at ASU, Theta Tau isn't just another organization. It's where careers are shaped, lasting friendships are built, and the kind of professional network that follows you beyond graduation starts to form. As the oldest and largest co-ed engineering fraternity in the nation, Theta Tau offers something clubs can't: a proven path from student to engineer, backed by a brotherhood that invests in you. Whether you're looking to sharpen your technical edge, step into leadership, or find your people in a demanding major, rushing Theta Tau might be the most valuable decision you make at ASU.
             </p>
           </div>
           <div className="rounded-[28px] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
@@ -284,7 +284,7 @@ export default function Rush() {
                 chapter feel like home.
               </p>
               <a
-                href="https://airtable.com/appQEL10mm4gp9XDx/pagGkFkzKTCxjJNU1/form"
+                href="https://airtable.com/app1DcIvp3XB5fdQU/pagGkFkzKTCxjJNU1/form"
                 className="tt-button-primary mt-6 inline-flex"
               >
                 I'm Interested
