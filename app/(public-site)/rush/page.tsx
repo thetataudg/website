@@ -61,7 +61,7 @@ const faqs = [
   {
     question: "What is Pledging?",
     answer:
-      "Pledging is your chance to determine if Theta Tau is the right fit for you, and prepares you for becoming a member. Pledging is the next step after rush, and is a semester long process. You will get to meet all its members, learn about the history of the chapter and the fraternity, participate in professional and service events, and form bonds which will last the rest of your life. You will help pick your ‘big brother’ who is an active member that will guide you through the pledging process, and for many years to come.",
+      "Pledging is your chance to determine if Theta Tau is the right fit for you, and prepares you for becoming a member. Pledging is the next step after rush, and is a semester long process. You will get to meet all its members, learn about the history of the chapter and the fraternity, participate in professional and service events, and form bonds which will last the rest of your life. You'll also help pick your big brother, who is an active member that will guide you through the pledging process and for many years to come.",
   },
   {
     question: "Am I eligible to join?",
@@ -204,8 +204,7 @@ export default function Rush() {
             Rush Theta Tau
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-white/85">
-            Rush for the Spring 2026 semester is open. Fill out the interest form
-            and show up to our rush events on campus.
+            Rush is now closed. Please fill out the interest form below to be notified when we start our rush process next semester.
           </p>
           <a
             href="https://airtable.com/appQEL10mm4gp9XDx/pagGkFkzKTCxjJNU1/form"
@@ -224,12 +223,7 @@ export default function Rush() {
               Why Rush Theta Tau?
             </h2>
             <p className="mt-4 text-xl leading-relaxed">
-              Whether you want to build connections, develop professional skills,
-              or just come for the free pizza, there are plenty of reasons to rush
-              Theta Tau. For many engineering students at ASU, Theta Tau is a defining
-              part of their college experience. As the oldest and largest coed
-              engineering fraternity in the nation, joining Theta Tau opens a world
-              of possibilities for aspiring engineers.
+              For engineering students at ASU, Theta Tau isn't just another organization. It's where careers are shaped, lasting friendships are built, and the kind of professional network that follows you beyond graduation starts to form. As the oldest and largest co-ed engineering fraternity in the nation, Theta Tau offers something most clubs can't: a proven path from student to engineer, backed by a brotherhood that invests in you. Whether you're looking to sharpen your technical edge, step into leadership, or find your people in a demanding major, rushing Theta Tau might be the most valuable decision you make at ASU.
             </p>
           </div>
           <div className="rounded-[28px] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
@@ -257,7 +251,7 @@ export default function Rush() {
                 ))
               ) : (
                 <p className="text-base text-[#1b0f0f]">
-                  Rush for this semester is now over.
+                  Rush for this semester has ended.
                 </p>
               )}
             </div>
@@ -284,8 +278,8 @@ export default function Rush() {
                 The Theta Tau Start.
               </h2>
               <p className="mt-4 text-base text-[#1b0f0f]/80">
-                After you say “yes” to Theta Tau, you step into our new member
-                experience, a structured, supportive path that builds brotherhood,
+                After you say “yes” to Theta Tau, you step into our new member education
+                process: a structured and supportive path that builds brotherhood,
                 develops leadership, and connects you to the people who make this
                 chapter feel like home.
               </p>
@@ -301,7 +295,7 @@ export default function Rush() {
         </div>
       </section>
 
-      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal">
+      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal hidden"> {/* show this section only while rush is happening */}
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.05fr,0.95fr]">
           <div className="flex h-full flex-col items-center">
             <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
