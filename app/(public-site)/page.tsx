@@ -105,7 +105,7 @@ export default function Home() {
             <span className="block">Forging Future</span>
             <span className="block min-h-[1.2em] text-[#f0c12c]">
               <TypingAnimation
-                words={["Engineers", "Leaders", "Innovators", "Brothers"]}
+                words={["Leaders", "Engineers", "Entrepreneurs", "Innovators", "Visionaries", "Innovators", "Brothers"]}
                 pauseMs={1250}
                 typeSpeed={90}
                 deleteSpeed={55}
@@ -113,13 +113,13 @@ export default function Home() {
             </span>
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
-            A professional co-ed engineering fraternity.
+            The nation's oldest and foremost professional engineering fraternity.
           </p>
           <a
             href="/rush"
             className="tt-button-primary mt-8"
           >
-            Join Theta Tau
+            Rush Theta Tau
           </a>
         </div>
       </section>
@@ -149,7 +149,7 @@ export default function Home() {
                 Learn More
               </a>
               <a href="/rush" className="tt-button-primary text-center">
-                Join Theta Tau
+                Rush Theta Tau
               </a>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function Home() {
       <section className="mx-4 rounded-[36px] bg-[#fdf7df] py-24 lg:mx-10 reveal">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 text-center">
           <p className="text-xs uppercase tracking-[0.5em] text-[#7a0104]">
-            The Pillars
+            Our Pillars
           </p>
           <h2 className={`${bungee.className} mt-4 text-5xl text-[#b3202a]`}>
             What We Stand For
@@ -186,10 +186,10 @@ export default function Home() {
                   className="h-[220px] w-full object-cover [border-radius:28%_72%_58%_42%/38%_48%_52%_62%]"
                 />
               </div>
-              <h3 className={`${bungee.className} mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
+              <h3 className={`${bungee.className} text-center mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
                 Brotherhood
               </h3>
-              <p className="mt-4 text-base text-white/80">
+              <p className="mt-4 text-base text-center text-white/80">
                 A family of engineers who push each other to grow, lead, and show up.
               </p>
             </div>
@@ -197,7 +197,7 @@ export default function Home() {
               href="/brothers"
               className="tt-button-secondary mt-8 inline-flex w-full justify-center text-center"
             >
-              Meet the brothers
+              Meet Our Brothers
             </a>
           </div>
           <div className="flex h-full min-h-[520px] flex-col rounded-[32px] bg-[#120a0a] p-10 text-white shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
@@ -211,10 +211,10 @@ export default function Home() {
                   className="h-[220px] w-full object-cover object-top [border-radius:62%_38%_36%_64%/48%_62%_38%_52%]"
                 />
               </div>
-              <h3 className={`${bungee.className} mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
+              <h3 className={`${bungee.className} mt-6 text-2xl text-center tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
                 Professionalism
               </h3>
-              <p className="mt-4 text-base text-white/80">
+              <p className="mt-4 text-base text-center text-white/80">
                 Mentorship, career prep, and leadership training for engineers who want more.
               </p>
             </div>
@@ -222,7 +222,7 @@ export default function Home() {
               href="/about#professionalism"
               className="tt-button-secondary mt-8 inline-flex w-full justify-center text-center"
             >
-              Learn more
+              Learn More
             </a>
           </div>
           <div className="flex h-full min-h-[520px] flex-col rounded-[32px] bg-[#120a0a] p-10 text-white shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
@@ -236,10 +236,10 @@ export default function Home() {
                   className="h-[220px] w-full object-cover [border-radius:42%_58%_30%_70%/62%_40%_60%_38%]"
                 />
               </div>
-              <h3 className={`${bungee.className} mt-6 text-2xl tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
+              <h3 className={`${bungee.className} mt-6 text-2xl text-center tracking-[0.02em] text-[#b3202a] sm:text-3xl`}>
                 Service
               </h3>
-              <p className="mt-4 text-base text-white/80">
+              <p className="mt-4 text-base text-center text-white/80">
                 We build with purpose through outreach, philanthropy, and impact.
               </p>
             </div>
@@ -357,7 +357,7 @@ export default function Home() {
             all while empowering you to excel both personally and professionally.
           </p>
           <a href="/rush" className="tt-button-primary mt-8">
-            Join Theta Tau
+            Rush Theta Tau
           </a>
         </div>
       </section>

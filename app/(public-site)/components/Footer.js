@@ -52,7 +52,7 @@ const Footer = () => {
               <p className={`${bungee.className} text-lg uppercase tracking-[0.2em] text-[#cf3640]`}>
                 Theta Tau
               </p>
-              <p className="text-sm text-[#f8ead4]/80">Delta Gamma Chapter</p>
+              <p className="text-sm text-[#f8ead4]/80">Delta Gamma Chapter at Arizona State University</p>
               <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-[#f8ead4]/58">
                 Copyright © 2026 Theta Tau Delta Gamma. All rights reserved.
               </p>
