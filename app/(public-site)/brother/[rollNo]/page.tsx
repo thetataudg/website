@@ -393,9 +393,6 @@ export default function BrotherProfile({
                   Family Line: {member.familyLine || "—"}
                 </p>
                 <p className="text-lg text-white/80">
-                  Big{bigs.length !== 1 ? "s" : ""}: {bigs.length > 0 ? renderMemberLinks(bigs) : "—"}
-                </p>
-                <p className="text-lg text-white/80">
                   Little{littles.length !== 1 ? "s" : ""}: {littles.length > 0 ? renderMemberLinks(littles) : "—"}
                 </p>
                 {committees.length > 0 && (

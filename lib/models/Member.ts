@@ -3,14 +3,14 @@ import mongoose, { Schema, model, models } from "mongoose";
 
 const MemberSchema = new Schema(
   {
-    discordId: { type: String, unique: true, sparse: true },
-    clerkId: { type: String, required: false, unique: true, sparse: true },
+    discordId: { type: String, default: undefined },
+    clerkId: { type: String, required: false, default: undefined },
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },
     lName: { type: String, required: true },
     majors: [{ type: String }],
     minors: [{ type: String }],
-    gradYear: { type: Number, required: true },
+    gradYear: { type: Number, required: false },
     bigs: [{ type: Schema.Types.ObjectId, ref: "Member" }],
     littles: [{ type: Schema.Types.ObjectId, ref: "Member" }],
     bio: { type: String },
@@ -74,6 +74,22 @@ const MemberSchema = new Schema(
     needsPermissionReview: { type: Boolean, required: true, default: true },
   },
   { timestamps: true }
+);
+
+MemberSchema.index(
+  { clerkId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clerkId: { $type: "string" } },
+  }
+);
+
+MemberSchema.index(
+  { discordId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { discordId: { $type: "string" } },
+  }
 );
 
 if (process.env.NODE_ENV === "development" && models.Member) {

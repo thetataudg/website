@@ -45,6 +45,11 @@ const Navbar = () => {
       linkname: "Brothers",
       target: "/brothers",
     },
+    {
+      id: 7,
+      linkname: "Family Tree",
+      target: "/family-tree",
+    },
   ];
 
   const handleMemberNavigation = () => {
