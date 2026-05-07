@@ -255,13 +255,12 @@ function FamilyTreeViewport({
     const maxY = Math.max(...flow.nodes.map((node) => node.position.y));
     const bottomNodes = flow.nodes.filter((node) => node.position.y === maxY);
 
-    const targetNodes = flow.nodes;
     const centerX =
       bottomNodes.reduce((sum, node) => sum + node.position.x + NODE_WIDTH / 2, 0) /
       bottomNodes.length;
 
-    flowInstance.setCenter(centerX, maxY - NODE_HEIGHT * 2, {
-      zoom: 0.85,
+    flowInstance.setCenter(centerX + 16000, maxY - NODE_HEIGHT * 18, {
+      zoom: 0.7,
       duration: 0,
     });
 
