@@ -19,6 +19,7 @@ import type { FamilyTree, TreeEdge, TreeNode } from "@/lib/family-tree-utils";
 
 type VisualizationNodeData = TreeNode & {
   href: string;
+  isHighlighted: boolean;
 };
 
 const NODE_WIDTH = 130;
@@ -32,10 +33,15 @@ const getMemberSortKey = (node: TreeNode) =>
 
 function FamilyTreeNode({ data }: NodeProps<VisualizationNodeData>) {
   const isRemoved = data.status === "Removed";
+  const isHighlighted = data.isHighlighted;
 
   return (
     <div
-      className="w-[8.5rem] rounded-2xl border px-2 py-2 text-center shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition-transform duration-200 border-[#d9b36a]/40 bg-[#fff8ea] text-[#140d0d]"
+      className={`w-[8.5rem] rounded-2xl border px-2 py-2 text-center transition-transform duration-200 ${
+        isHighlighted
+          ? "scale-[1.08] border-[#b3202a] bg-[#fff2cc] text-[#140d0d] shadow-[0_0_0_4px_rgba(179,32,42,0.14),0_18px_36px_rgba(20,13,13,0.22)]"
+          : "border-[#d9b36a]/40 bg-[#fff8ea] text-[#140d0d] shadow-[0_10px_24px_rgba(0,0,0,0.14)]"
+      }`}
     >
       <Handle type="target" position={Position.Top} className="!bg-[#b3202a]" />
       <div>
@@ -50,7 +56,11 @@ function FamilyTreeNode({ data }: NodeProps<VisualizationNodeData>) {
 
 const nodeTypes = { familyNode: FamilyTreeNode };
 
-function computeLayout(tree: FamilyTree, profileBasePath: string) {
+function computeLayout(
+  tree: FamilyTree,
+  profileBasePath: string,
+  highlightedNodeId: string | null
+) {
   const nodeLookup = new Map(tree.nodes.map((node) => [node.id, node]));
   const visibleNodes = tree.nodes;
   const visibleEdges = tree.edges;
@@ -168,6 +178,7 @@ function computeLayout(tree: FamilyTree, profileBasePath: string) {
       data: {
         ...node,
         href: `${profileBasePath}/${node.rollNo}`,
+        isHighlighted: node.id === highlightedNodeId,
       },
     };
   });
@@ -205,6 +216,8 @@ function FamilyTreeViewport({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const initialViewAppliedRef = useRef(false);
 
   useEffect(() => {
@@ -240,15 +253,52 @@ function FamilyTreeViewport({
     };
   }, [apiPath]);
 
+  const searchMatches = useMemo(() => {
+    if (!tree) {
+      return [] as TreeNode[];
+    }
+
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return [] as TreeNode[];
+    }
+
+    return tree.nodes
+      .filter((node) =>
+        `${node.fName} ${node.lName} ${node.rollNo}`
+          .toLowerCase()
+          .includes(normalizedQuery)
+      )
+      .sort((left, right) => getMemberSortKey(left).localeCompare(getMemberSortKey(right)));
+  }, [searchQuery, tree]);
+
+  useEffect(() => {
+    setActiveMatchIndex(0);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (activeMatchIndex >= searchMatches.length) {
+      setActiveMatchIndex(0);
+    }
+  }, [activeMatchIndex, searchMatches.length]);
+
+  const highlightedNodeId = searchMatches[activeMatchIndex]?.id ?? null;
+
   const flow = useMemo(() => {
     if (!tree) {
       return { nodes: [], edges: [] };
     }
-    return computeLayout(tree, profileBasePath);
-  }, [tree, profileBasePath]);
+    return computeLayout(tree, profileBasePath, highlightedNodeId);
+  }, [tree, profileBasePath, highlightedNodeId]);
 
   useEffect(() => {
-    if (!flowInstance || loading || flow.nodes.length === 0 || initialViewAppliedRef.current) {
+    if (
+      !flowInstance ||
+      loading ||
+      flow.nodes.length === 0 ||
+      initialViewAppliedRef.current ||
+      searchQuery.trim()
+    ) {
       return;
     }
 
@@ -265,7 +315,37 @@ function FamilyTreeViewport({
     });
 
     initialViewAppliedRef.current = true;
-  }, [flow.nodes, flowInstance, loading]);
+  }, [flow.nodes, flowInstance, loading, searchQuery]);
+
+  const cycleSearchResult = () => {
+    if (searchMatches.length <= 1) {
+      return;
+    }
+
+    setActiveMatchIndex((currentIndex) => (currentIndex + 1) % searchMatches.length);
+  };
+
+  useEffect(() => {
+    if (!flowInstance || loading || !highlightedNodeId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      const target = flow.nodes.find((node) => node.id === highlightedNodeId);
+      if (!target) return;
+
+      flowInstance.setCenter(
+        target.position.x + NODE_WIDTH / 2,
+        target.position.y + NODE_HEIGHT / 2,
+        {
+          zoom: 1.05,
+          duration: 250,
+        }
+      );
+    }, 150);
+
+    return () => window.clearTimeout(timeout);
+  }, [flow.nodes, flowInstance, highlightedNodeId, loading]);
 
   return (
     <ReactFlowProvider>
@@ -294,6 +374,47 @@ function FamilyTreeViewport({
               </>
             </div>
           )}
+
+          <div className="border-b border-[#d9b36a]/30 px-6 py-5 sm:px-8">
+            <label className="block max-w-2xl space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.35em] text-[#7a0104]">
+                Search members
+              </span>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      cycleSearchResult();
+                    }
+                  }}
+                  placeholder="Type a name or roll number"
+                  aria-label="Search family tree members"
+                  className="w-full rounded-2xl border border-[#d9b36a]/50 bg-white px-4 py-3 text-sm text-[#140d0d] outline-none transition focus:border-[#b3202a] focus:ring-2 focus:ring-[#b3202a]/20 sm:text-base"
+                />
+                {searchQuery.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="rounded-2xl border border-[#d9b36a]/60 px-4 py-3 text-sm font-semibold text-[#7a0104] transition hover:border-[#b3202a] hover:text-[#b3202a]"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              <p className="text-sm text-[#5c4532]">
+                {searchQuery.trim()
+                  ? searchMatches.length > 0
+                    ? searchMatches.length === 1
+                      ? "1 match found."
+                      : `Match ${activeMatchIndex + 1} of ${searchMatches.length}. Press Enter to cycle.`
+                    : "No matching members found."
+                  : "Search centers the first matching member and highlights their box."}
+              </p>
+            </label>
+          </div>
 
           <div className={embedded ? "h-[78vh] min-h-[42rem] w-full bg-[radial-gradient(circle_at_top,rgba(245,215,154,0.20),transparent_32%),linear-gradient(180deg,rgba(255,251,242,0.9),rgba(248,241,222,0.98))]" : "h-[78vh] min-h-[42rem] bg-[radial-gradient(circle_at_top,rgba(245,215,154,0.20),transparent_32%),linear-gradient(180deg,rgba(255,251,242,0.9),rgba(248,241,222,0.98))]"}>
             {loading ? (
@@ -328,7 +449,13 @@ function FamilyTreeViewport({
                 zoomOnPinch
               >
                 <MiniMap
-                  nodeColor={(node) => (node.data.status === "Removed" ? "#7a0104" : "#b3202a")}
+                  nodeColor={(node) =>
+                    node.data.isHighlighted
+                      ? "#f5d79a"
+                      : node.data.status === "Removed"
+                        ? "#7a0104"
+                        : "#b3202a"
+                  }
                   maskColor="rgba(20, 13, 13, 0.05)"
                   zoomable
                   pannable

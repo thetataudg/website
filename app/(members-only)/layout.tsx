@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Navbar from "./components/Navbar.js";
 import LockdownGuard from "./components/LockdownGuard";
+import MembersOnlyAccessGate from "./components/MembersOnlyAccessGate";
 import { ClerkProvider } from "@clerk/nextjs";
 
 import { config } from "@fortawesome/fontawesome-svg-core";
@@ -9,8 +10,6 @@ config.autoAddCss = false;
 
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./members.css";
-
-import { useEffect } from "react";
 
 export const metadata: Metadata = {
   title: "Members",
@@ -27,9 +26,11 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className="members-shell" data-theme="light">
-          <Navbar />
-          <LockdownGuard />
-          {children}
+          <MembersOnlyAccessGate>
+            <Navbar />
+            <LockdownGuard />
+            {children}
+          </MembersOnlyAccessGate>
         </body>
       </html>
     </ClerkProvider>
