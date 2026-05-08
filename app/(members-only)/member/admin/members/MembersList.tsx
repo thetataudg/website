@@ -77,7 +77,7 @@ export default function MembersList({
   const [showSearch, setShowSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "All" | "Active" | "Alumni" | "Removed" | "Deceased"
-  >("All");
+  >("Active");
   const [loadingMembers, setLoadingMembers] = useState(true);
 
   useEffect(() => {
@@ -124,7 +124,12 @@ export default function MembersList({
   const sorted = [...filtered].sort((a, b) => {
     const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
     const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
-    return aNum - bNum;
+    // Active: ascending, Alumni/All/others: descending
+    if (statusFilter === "Active") {
+      return aNum - bNum;
+    } else {
+      return bNum - aNum;
+    }
   });
 
   const editing = editingRollNo
