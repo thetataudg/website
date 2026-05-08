@@ -1828,6 +1828,17 @@
   box-shadow: 0 14px 24px rgba(5, 5, 5, 0.45);
 }
 
+.wallet-btn:disabled {
+  cursor: wait;
+  opacity: 0.82;
+  transform: none;
+  box-shadow: 0 10px 18px rgba(5, 5, 5, 0.28);
+}
+
+.wallet-btn[aria-busy="true"] {
+  background: linear-gradient(135deg, #050505, #2b2b2b);
+}
+
 .wallet-btn + .wallet-btn {
   margin-top: 12px;
 }
@@ -1848,6 +1859,10 @@
   height: 32px;
   width: 32px;
   object-fit: contain;
+}
+
+.wallet-btn__spinner {
+  color: currentColor;
 }
 
 .members-shell[data-theme="dark"] .qr-modal {

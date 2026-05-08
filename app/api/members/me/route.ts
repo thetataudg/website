@@ -6,6 +6,7 @@ import Member from "@/lib/models/Member";
 import PendingMember from "@/lib/models/PendingMember";
 import logger from "@/lib/logger";
 import { maybePresignUrl } from "@/lib/garage";
+import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
 
 export const runtime = "nodejs";
 
@@ -175,13 +176,14 @@ export async function PATCH(req: Request) {
     { clerkId },
     { $set: sanitized },
     { new: true, runValidators: true, strict: false }
-  ).lean();
+  ).lean<any>();
 
-  if (!member) {
+  if (!member || Array.isArray(member)) {
     logger.error({ clerkId }, "Self‐profile update failed: not found");
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
+  await markWalletPassUpdatedForMember(member._id.toString());
   logger.info({ clerkId }, "Self‐profile update successful");
   return NextResponse.json(member, { status: 200 });
 }

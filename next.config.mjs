@@ -4,6 +4,14 @@ const require = createRequire(import.meta.url);
 
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: [
+      "react-icons",
+      "@fortawesome/react-fontawesome",
+      "@fortawesome/free-solid-svg-icons",
+      "@fortawesome/free-brands-svg-icons",
+    ],
+  },
   webpack(config, options) {
     config.module.rules.push({
       test: /\.svg$/,

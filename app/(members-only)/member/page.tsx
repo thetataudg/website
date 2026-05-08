@@ -124,15 +124,57 @@ export default function Dashboard() {
     {}
   );
   const [gemSnapshot, setGemSnapshot] = useState<GemMemberSnapshot | null>(null);
-  const walletUrls = {
-    google: "#",
-    apple: "#",
-  };
+  const [walletPassStatus, setWalletPassStatus] = useState<
+    "idle" | "loading" | "success"
+  >("idle");
+  const walletPassResetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleAddToAppleWallet = async () => {
+    if (walletPassStatus === "loading") return;
 
-  const handleAddToWallet =
-    (provider: keyof typeof walletUrls) => () => {
-      window.open(walletUrls[provider], "_blank", "noopener");
-    };
+    setWalletPassStatus("loading");
+
+    try {
+      const response = await fetch("/api/wallet/apple-pass", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        let message = "Failed to generate Apple Wallet pass";
+        try {
+          const payload = await response.json();
+          if (payload?.error) message = payload.error;
+        } catch {
+          // ignore JSON parse failures
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+      const fileName = fileNameMatch?.[1] || "member-pass.pkpass";
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+
+      setWalletPassStatus("success");
+      if (walletPassResetTimeoutRef.current) {
+        clearTimeout(walletPassResetTimeoutRef.current);
+      }
+      walletPassResetTimeoutRef.current = setTimeout(() => {
+        setWalletPassStatus("idle");
+      }, 2500);
+    } catch (error) {
+      console.error("Error generating Apple Wallet pass:", error);
+      setWalletPassStatus("idle");
+    }
+  };
 
   const needsDiscordLink =
     !loadingUserData &&
@@ -143,6 +185,14 @@ export default function Dashboard() {
   useEffect(() => {
     setShowLinkModal(needsDiscordLink);
   }, [needsDiscordLink]);
+
+  useEffect(() => {
+    return () => {
+      if (walletPassResetTimeoutRef.current) {
+        clearTimeout(walletPassResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -852,29 +902,27 @@ export default function Dashboard() {
                     <> (refreshing...)</>
                   )}
                 </p>
-                
-                {/*
-                <button
-                  type="button"
-                  className="wallet-btn wallet-btn--google"
-                  onClick={handleAddToWallet("google")}
-                >
-                  <span className="wallet-icon" aria-hidden="true">
-                    <img src="/google_wallet.svg" alt="" />
-                  </span>
-                  Add to Google Wallet
-                </button>
                 <button
                   type="button"
                   className="wallet-btn wallet-btn--apple"
-                  onClick={handleAddToWallet("apple")}
+                  onClick={handleAddToAppleWallet}
+                  disabled={walletPassStatus === "loading"}
+                  aria-busy={walletPassStatus === "loading"}
                 >
                   <span className="wallet-icon" aria-hidden="true">
                     <img src="/apple_wallet.svg" alt="" />
                   </span>
-                  Add to Apple Wallet
+                  {walletPassStatus === "loading" ? (
+                    <>
+                      <LoadingSpinner size="sm" className="wallet-btn__spinner" />
+                      Generating Pass...
+                    </>
+                  ) : walletPassStatus === "success" ? (
+                    "Pass Generated"
+                  ) : (
+                    "Add to Apple Wallet"
+                  )}
                 </button>
-                */}
               </div>
             </div>
           </div>

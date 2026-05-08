@@ -5,15 +5,9 @@ import React, { useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
-import { Bungee } from "next/font/google";
 import { SignInButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
-
-const bungee = Bungee({
-  subsets: ["latin"],
-  display: "swap",
-  weight: "400",
-});
+import { bungee } from "../../fonts";
 
 const Navbar = () => {
   const [nav, setNav] = useState(false);

@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 
 const LOCKDOWN_KEY = "global";
 const SECRET = process.env.LOCKDOWN_API_SECRET;
+const FORCE_LOCKDOWN_OFF = true;
 
 const defaultState = {
   active: false,
@@ -45,6 +46,9 @@ async function getState() {
 
 export async function GET() {
   try {
+    if (FORCE_LOCKDOWN_OFF) {
+      return NextResponse.json(defaultState);
+    }
     const result = await getState();
     return NextResponse.json(result);
   } catch (err: any) {

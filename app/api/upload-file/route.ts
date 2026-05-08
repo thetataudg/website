@@ -7,6 +7,7 @@ import logger from "@/lib/logger";
 import path from "path";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
 
 export const runtime = "nodejs";
 
@@ -134,31 +135,40 @@ const deleteOtherObjects = async (
 
   const contentTypeHeader = req.headers.get("content-type") || "";
   let body: any = null;
+  let form: FormData | null = null;
   let rollNo: string | null = null;
   let memberQuery: { clerkId?: string; rollNo?: string } = { clerkId };
 
   if (contentTypeHeader.includes("application/json")) {
     body = await req.json();
-    const targetRollNo = String(body?.targetRollNo || "").trim();
-    if (targetRollNo) {
-      try {
-        await requireRole(req as any, ["superadmin", "admin"]);
-      } catch (err: any) {
-        logger.warn({ err }, "Unauthorized admin upload attempt");
-        return NextResponse.json(
-          { error: err.message },
-          { status: err.statusCode }
-        );
-      }
-      const targetMember = await Member.findOne({ rollNo: targetRollNo })
-        .select("rollNo")
-        .lean<{ rollNo: string }>();
-      if (!targetMember) {
-        return NextResponse.json({ error: "Member not found" }, { status: 404 });
-      }
-      rollNo = targetMember.rollNo;
-      memberQuery = { rollNo };
+  } else {
+    form = await req.formData();
+  }
+
+  const targetRollNo = String(
+    contentTypeHeader.includes("application/json")
+      ? body?.targetRollNo || ""
+      : form?.get("targetRollNo") || ""
+  ).trim();
+
+  if (targetRollNo) {
+    try {
+      await requireRole(req as any, ["superadmin", "admin"]);
+    } catch (err: any) {
+      logger.warn({ err }, "Unauthorized admin upload attempt");
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.statusCode }
+      );
     }
+    const targetMember = await Member.findOne({ rollNo: targetRollNo })
+      .select("rollNo")
+      .lean<{ rollNo: string }>();
+    if (!targetMember) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+    rollNo = targetMember.rollNo;
+    memberQuery = { rollNo };
   }
 
   if (!rollNo) {
@@ -240,7 +250,12 @@ const deleteOtherObjects = async (
       } else {
         update.resumeUrl = publicUrl;
       }
-      await Member.findOneAndUpdate(memberQuery, update);
+      const updatedMember = await Member.findOneAndUpdate(memberQuery, update, {
+        new: true,
+      }).lean<{ _id: { toString: () => string } } | null>();
+      if (updatedMember?._id) {
+        await markWalletPassUpdatedForMember(updatedMember._id.toString());
+      }
       await deleteOtherObjects(s3, bucket, kind, rollNo, ext);
       return NextResponse.json({ [kind]: publicUrl }, { status: 200 });
     }
@@ -248,7 +263,9 @@ const deleteOtherObjects = async (
     return NextResponse.json({ error: "Invalid upload action" }, { status: 400 });
   }
 
-  const form = await req.formData();
+  if (!form) {
+    form = await req.formData();
+  }
   for (const key of ["photo", "resume"] as const) {
     const file = form.get(key);
     if (!(file instanceof File)) continue;
@@ -383,7 +400,12 @@ const deleteOtherObjects = async (
 
   // Apply updates to Member document
   if (Object.keys(update).length > 0) {
-    await Member.findOneAndUpdate(memberQuery, update);
+    const updatedMember = await Member.findOneAndUpdate(memberQuery, update, {
+      new: true,
+    }).lean<{ _id: { toString: () => string } } | null>();
+    if (updatedMember?._id) {
+      await markWalletPassUpdatedForMember(updatedMember._id.toString());
+    }
     logger.info({ clerkId, update }, "Member document fields updated");
   }
 

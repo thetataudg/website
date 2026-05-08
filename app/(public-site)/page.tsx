@@ -1,91 +1,13 @@
-"use client";
-
 import Image from "next/image";
-import { Bungee } from "next/font/google";
-import { useEffect, useRef, useState } from "react";
 import TypingAnimation from "./components/TypingAnimation";
-
-import { FaUsers, FaGraduationCap, FaBuilding } from "react-icons/fa"
-
-const bungee = Bungee({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-bungee",
-  weight: "400"
-});
+import HomeRevealEffects from "./components/HomeRevealEffects";
+import HomeStats from "./components/HomeStats";
+import { bungee } from "../fonts";
 
 export default function Home() {
-  const [stats, setStats] = useState({ actives: 0, alumni: 0, chapters: 0 });
-  const statsStartedRef = useRef(false);
-  const statsRafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const elements = Array.from(document.querySelectorAll(".reveal"));
-    if (!elements.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("reveal-in");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" }
-    );
-
-    elements.forEach((el) => observer.observe(el));
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const statsSection = document.querySelector(".stats-counter");
-    if (!statsSection) return;
-
-    const targets = { actives: 60, alumni: 400, chapters: 90 };
-    const durationMs = 2000;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting || statsStartedRef.current) return;
-          statsStartedRef.current = true;
-
-          const start = performance.now();
-          const step = (now: number) => {
-            const progress = Math.min((now - start) / durationMs, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setStats({
-              actives: Math.round(targets.actives * eased),
-              alumni: Math.round(targets.alumni * eased),
-              chapters: Math.round(targets.chapters * eased),
-            });
-
-            if (progress < 1) {
-              statsRafRef.current = requestAnimationFrame(step);
-            }
-          };
-
-          statsRafRef.current = requestAnimationFrame(step);
-          observer.disconnect();
-        });
-      },
-      { threshold: 0.3 }
-    );
-
-    observer.observe(statsSection);
-
-    return () => {
-      observer.disconnect();
-      if (statsRafRef.current !== null) {
-        cancelAnimationFrame(statsRafRef.current);
-      }
-    };
-  }, []);
   return (
     <main className="bg-[#120a0a] pb-16 text-white">
+      <HomeRevealEffects />
       <section className="relative min-h-[85vh] w-full">
         <Image
           src="/homepage-hero.jpg"
@@ -253,37 +175,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto mt-16 w-full max-w-5xl rounded-[28px] bg-[#120a0a] px-8 py-12 reveal stats-counter">
-        <div className="grid grid-cols-1 gap-10 text-center sm:grid-cols-3">
-          <div>
-            <FaUsers className="mx-auto" color="#e2ab16" size={72} />
-            <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-              {stats.actives}+
-            </h3>
-            <p className="text-sm uppercase tracking-[0.25em] text-white/80">
-              Actives
-            </p>
-          </div>
-          <div>
-            <FaGraduationCap className="mx-auto" color="#e2ab16" size={72} />
-            <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-              {stats.alumni}+
-            </h3>
-            <p className="text-sm uppercase tracking-[0.25em] text-white/80">
-              Alumni
-            </p>
-          </div>
-          <div>
-            <FaBuilding className="mx-auto" color="#e2ab16" size={72} />
-            <h3 className={`${bungee.className} mt-4 text-4xl text-[#b3202a]`}>
-              {stats.chapters}+
-            </h3>
-            <p className="text-sm uppercase tracking-[0.25em] text-white/80">
-              Chapters
-            </p>
-          </div>
-        </div>
-      </section>
+      <HomeStats />
 
       <section className="mx-auto mt-16 w-full max-w-6xl px-6 reveal">
         <div className="grid gap-8 lg:grid-cols-[0.6fr,1.4fr]">

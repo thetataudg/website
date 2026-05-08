@@ -7,6 +7,7 @@ import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { maybePresignUrl } from "@/lib/garage";
+import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
 
 const MEMBER_SECRET_HEADER = process.env.MEMBER_API_SECRET_HEADER || "x-api-secret";
 const MEMBER_SECRET_QUERY_PARAM = process.env.MEMBER_API_SECRET_QUERY_PARAM || "secret";
@@ -194,9 +195,9 @@ export async function PATCH(
     { rollNo: params.rollNo },
     updates,
     { new: true }
-  ).lean();
+  ).lean<any>();
 
-  if (!updatedMember) {
+  if (!updatedMember || Array.isArray(updatedMember)) {
     logger.error(
       { adminId, rollNo: params.rollNo },
       "Admin PATCH failed: member not found after update"
@@ -204,6 +205,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
+  await markWalletPassUpdatedForMember(updatedMember._id.toString());
   logger.info(
     { adminId, rollNo: params.rollNo, updates },
     "Admin PATCH successful"
