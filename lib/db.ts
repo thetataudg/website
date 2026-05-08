@@ -99,6 +99,16 @@ async function ensureMemberIndexMigration(conn: Connection): Promise<void> {
     }
   );
 
+  const discordIndexExists = indexes.some((index) => index.name === "discordId_1");
+
+  if (discordIndexExists) {
+    await memberCollection.dropIndex("discordId_1").catch((error: any) => {
+      if (error?.codeName !== "IndexNotFound") {
+        throw error;
+      }
+    });
+  }
+
   await memberCollection.createIndex(
     { discordId: 1 },
     {
