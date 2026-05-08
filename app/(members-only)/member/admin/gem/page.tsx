@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 type GemRequirementKey =
   | "generalConference"
@@ -1016,6 +1018,34 @@ export default function AdminGemDashboardPage() {
                   <p className="text-muted small mb-3">
                     General: {detailMember.gem.general.attended}/{detailMember.generalTarget || detailMember.gem.general.total} · Rush: {detailMember.gem.rush.total}/{status?.rushTarget ?? 0}
                   </p>
+                  <div className="mb-3">
+                    <h6 className="mb-2">Committee requirements</h6>
+                    {detailMember.gem.committee.details.length > 0 ? (
+                      <div className="list-group">
+                        {detailMember.gem.committee.details.map((committee) => (
+                          <div
+                            key={committee.id}
+                            className={`list-group-item d-flex justify-content-between align-items-center ${committee.satisfied ? "list-group-item-success" : "list-group-item-danger"}`}
+                          >
+                            <div className="me-3">
+                              <div className="fw-semibold">{committee.name}</div>
+                              <small className="text-muted">
+                                {committee.totalMeetings <= 2
+                                  ? `Auto-met · ${committee.totalMeetings} meetings held`
+                                  : `${committee.attended}/${committee.required} attended · ${committee.totalMeetings} meetings held`}
+                              </small>
+                            </div>
+                            <FontAwesomeIcon
+                              icon={committee.satisfied ? faCheck : faTimes}
+                              className={committee.satisfied ? "text-success" : "text-danger"}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted mb-0">No committee assignments for this member.</p>
+                    )}
+                  </div>
                   <div className="row g-3">
                     {buildRequirementCards(detailMember).map((card) => (
                       <div key={card.key} className="col-12 col-md-6">

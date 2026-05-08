@@ -66,6 +66,9 @@ export interface MemberData {
   profilePicUrl?: string;
   resumeUrl?: string;
   isHidden?: boolean;
+  previousECouncilRoles?: string[];
+  previousCommitteesChaired?: string[];
+  previousCommitteesMemberOf?: string[];
 }
 
 interface MemberShort {
@@ -248,6 +251,9 @@ const getMemberId = (value: any) => {
 
 const getMemberIds = (values: any[] | undefined) =>
   Array.isArray(values) ? values.map((value) => getMemberId(value)).filter(Boolean) : [];
+
+const formatHistoryList = (values?: string[]) =>
+  Array.isArray(values) && values.length ? values.join(", ") : "None recorded";
 
 export default function MemberEditorModal({
   member,
@@ -631,6 +637,33 @@ export default function MemberEditorModal({
                         ? "Hidden from public site"
                         : "Visible on public site"}
                     </button>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Previous E-Council Roles</label>
+                    <textarea
+                      className="form-control"
+                      value={formatHistoryList(member.previousECouncilRoles)}
+                      readOnly
+                      rows={3}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Previous Committees Chaired</label>
+                    <textarea
+                      className="form-control"
+                      value={formatHistoryList(member.previousCommitteesChaired)}
+                      readOnly
+                      rows={3}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Previous Committees Member Of</label>
+                    <textarea
+                      className="form-control"
+                      value={formatHistoryList(member.previousCommitteesMemberOf)}
+                      readOnly
+                      rows={3}
+                    />
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Status</label>
