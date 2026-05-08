@@ -74,6 +74,142 @@ interface MemberShort {
   lName: string;
 }
 
+function getMemberDisplayName(member: MemberShort) {
+  return `${member.fName} ${member.lName}`;
+}
+
+type MemberPickerProps = {
+  label: string;
+  members: MemberShort[];
+  selectedIds: string[];
+  onChange: (values: string[]) => void;
+};
+
+function MemberTokenPicker({
+  label,
+  members,
+  selectedIds,
+  onChange,
+}: MemberPickerProps) {
+  const [query, setQuery] = useState("");
+
+  const selectedMembers = useMemo(
+    () =>
+      selectedIds
+        .map((id) => members.find((member) => member._id === id))
+        .filter(Boolean) as MemberShort[],
+    [members, selectedIds]
+  );
+
+  const availableMembers = useMemo(() => {
+    const selected = new Set(selectedIds);
+    const normalizedQuery = query.trim().toLowerCase();
+    return members
+      .filter((member) => !selected.has(member._id))
+      .filter((member) => {
+        if (!normalizedQuery) return true;
+        const label = getMemberDisplayName(member).toLowerCase();
+        return label.includes(normalizedQuery);
+      })
+      .slice(0, 8);
+  }, [members, query, selectedIds]);
+
+  const addMember = (memberId: string) => {
+    if (!memberId || selectedIds.includes(memberId)) return;
+    onChange([...selectedIds, memberId]);
+    setQuery("");
+  };
+
+  const removeMember = (memberId: string) => {
+    onChange(selectedIds.filter((id) => id !== memberId));
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((event.key === "Enter" || event.key === "Tab") && availableMembers.length > 0) {
+      event.preventDefault();
+      addMember(availableMembers[0]._id);
+      return;
+    }
+
+    if (event.key === "Backspace" && !query && selectedIds.length > 0) {
+      event.preventDefault();
+      removeMember(selectedIds[selectedIds.length - 1]);
+    }
+  };
+
+  return (
+    <div className="mb-3">
+      <label className="form-label">{label}</label>
+      <div className="member-token-picker">
+        {selectedMembers.map((selectedMember) => (
+          <button
+            key={selectedMember._id}
+            type="button"
+            className="member-token-pill"
+            onClick={() => removeMember(selectedMember._id)}
+            title={`Remove ${selectedMember.fName} ${selectedMember.lName}`}
+          >
+            <span>
+              {selectedMember.fName} {selectedMember.lName}
+            </span>
+            <span aria-hidden="true" className="member-token-pill__remove">
+              ×
+            </span>
+          </button>
+        ))}
+        <input
+          className="member-token-picker__input"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={selectedIds.length ? "" : "Type a name and press Enter"}
+        />
+      </div>
+      {availableMembers.length > 0 && (
+        <div className="member-token-picker__menu">
+          {availableMembers.map((availableMember) => (
+            <button
+              key={availableMember._id}
+              type="button"
+              className="member-token-picker__option"
+              onClick={() => addMember(availableMember._id)}
+            >
+              {getMemberDisplayName(availableMember)}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="form-text">Press Enter or Tab to add the highlighted match.</div>
+    </div>
+  );
+}
+
+function SelectedMemberSummary({
+  members,
+  selectedIds,
+}: {
+  members: MemberShort[];
+  selectedIds: string[];
+}) {
+  const selectedMembers = selectedIds
+    .map((id) => members.find((member) => member._id === id))
+    .filter(Boolean) as MemberShort[];
+
+  if (!selectedMembers.length) {
+    return <div className="member-summary__empty">None selected</div>;
+  }
+
+  return (
+    <div className="member-summary-pills">
+      {selectedMembers.map((selectedMember) => (
+        <span key={selectedMember._id} className="member-summary-pill">
+          {getMemberDisplayName(selectedMember)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   member: MemberData;
   show: boolean;
@@ -110,6 +246,9 @@ const getMemberId = (value: any) => {
   return value._id || "";
 };
 
+const getMemberIds = (values: any[] | undefined) =>
+  Array.isArray(values) ? values.map((value) => getMemberId(value)).filter(Boolean) : [];
+
 export default function MemberEditorModal({
   member,
   show,
@@ -130,8 +269,8 @@ export default function MemberEditorModal({
     isCommitteeHead: member.isCommitteeHead,
     familyLine: member.familyLine,
     discordId: member.discordId || "",
-    big: getMemberId(member.bigs?.[0]),
-    little: getMemberId(member.littles?.[0]),
+    bigs: getMemberIds(member.bigs),
+    littles: getMemberIds(member.littles),
     headline: member.headline || "",
     pronouns: member.pronouns || "",
     majors: (member.majors || []).join(", "),
@@ -176,6 +315,7 @@ export default function MemberEditorModal({
   const [saved, setSaved] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
+  const [showRelationsModal, setShowRelationsModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -192,8 +332,8 @@ export default function MemberEditorModal({
       isCommitteeHead: member.isCommitteeHead,
       familyLine: member.familyLine,
       discordId: member.discordId || "",
-      big: getMemberId(member.bigs?.[0]),
-      little: getMemberId(member.littles?.[0]),
+      bigs: getMemberIds(member.bigs),
+      littles: getMemberIds(member.littles),
       headline: member.headline || "",
       pronouns: member.pronouns || "",
       majors: (member.majors || []).join(", "),
@@ -251,6 +391,9 @@ export default function MemberEditorModal({
 
   const update = <K extends keyof typeof form>(key: K, val: any) =>
     setForm((f) => ({ ...f, [key]: val }));
+
+  const updateSelectedMembers = (key: "bigs" | "littles", values: string[]) =>
+    setForm((f) => ({ ...f, [key]: values }));
 
   const updateArrayItem = <T, K extends keyof T>(
     key: "projects" | "work" | "awards" | "customSections",
@@ -319,8 +462,8 @@ export default function MemberEditorModal({
       isCommitteeHead: form.isCommitteeHead,
       familyLine: form.familyLine,
       discordId: discordIdValue || undefined,
-      bigs: form.big ? [form.big] : [],
-      littles: form.little ? [form.little] : [],
+      bigs: form.bigs,
+      littles: form.littles,
       headline: form.headline.trim(),
       pronouns: form.pronouns.trim(),
       majors: parseList(form.majors),
@@ -390,7 +533,7 @@ export default function MemberEditorModal({
       className="modal fade show"
       style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
     >
-      <div className="modal-dialog modal-xl modal-dialog-scrollable admin-modal-wide">
+      <div className="modal-dialog modal-dialog-scrollable admin-modal-wide">
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">Edit {member.fName}’s Profile</h5>
@@ -576,36 +719,34 @@ export default function MemberEditorModal({
                       onChange={(e) => update("familyLine", e.target.value)}
                     />
                   </div>
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Big</label>
-                      <select
-                        className="form-select"
-                        value={form.big}
-                        onChange={(e) => update("big", e.target.value)}
-                      >
-                        <option value="">None</option>
-                        {allMembers.map((m) => (
-                          <option key={m._id} value={m._id}>
-                            {m.fName} {m.lName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Little</label>
-                      <select
-                        className="form-select"
-                        value={form.little}
-                        onChange={(e) => update("little", e.target.value)}
-                      >
-                        <option value="">None</option>
-                        {allMembers.map((m) => (
-                          <option key={m._id} value={m._id}>
-                            {m.fName} {m.lName}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="mb-3">
+                    <label className="form-label d-block">Bigs & Littles</label>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm mb-3"
+                      onClick={() => setShowRelationsModal(true)}
+                    >
+                      Manage Bigs and Littles
+                    </button>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <div className="member-summary-card">
+                          <div className="member-summary-card__label">Bigs</div>
+                          <SelectedMemberSummary
+                            members={allMembers}
+                            selectedIds={form.bigs}
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="member-summary-card">
+                          <div className="member-summary-card__label">Littles</div>
+                          <SelectedMemberSummary
+                            members={allMembers}
+                            selectedIds={form.littles}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1122,6 +1263,55 @@ export default function MemberEditorModal({
           </div>
         </div>
       </div>
+
+      {showRelationsModal && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.35)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered admin-relations-modal">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Manage Bigs and Littles</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowRelationsModal(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <div className="row g-4">
+                  <div className="col-md-6">
+                    <MemberTokenPicker
+                      label="Bigs"
+                      members={allMembers}
+                      selectedIds={form.bigs}
+                      onChange={(values) => updateSelectedMembers("bigs", values)}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <MemberTokenPicker
+                      label="Littles"
+                      members={allMembers}
+                      selectedIds={form.littles}
+                      onChange={(values) => updateSelectedMembers("littles", values)}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowRelationsModal(false)}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPhotoModal && (
         <PhotoUploader
