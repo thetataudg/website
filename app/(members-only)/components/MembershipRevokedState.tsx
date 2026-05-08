@@ -6,7 +6,7 @@ export default function MembershipRevokedState() {
       <div className="bento-card text-center">
         <h2>Unauthorized</h2>
         <p className="text-muted mb-0">
-          Your membership has been suspended or removed and you no longer have acccess to this application.
+          Your membership has been suspended or removed and you no longer have access to this application.
         </p>
       </div>
     </div>
