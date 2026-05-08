@@ -75,7 +75,7 @@ export default function MembersList({
   const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showQuickTools, setShowQuickTools] = useState(false);
-  const [quickToolsTool, setQuickToolsTool] = useState<"election" | "graduations">("election");
+  const [quickToolsTool, setQuickToolsTool] = useState<"election" | "graduations" | "purgeCommittees">("election");
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
@@ -99,6 +99,11 @@ export default function MembersList({
       .catch(() => setMe(null));
     refreshMembers();
   }, []);
+
+  const currentUser = members.find((member) => member.rollNo === me?.rollNo) || null;
+  const isCurrentRegent = Boolean(
+    currentUser?.isECouncil && currentUser.ecouncilPosition === "Regent"
+  );
 
   const { isLoaded, isSignedIn } = useAuth();
 
@@ -187,23 +192,21 @@ export default function MembersList({
       <div className="bento-card admin-table-card mb-3">
         <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
           <div>
-            <h2 className="mb-1">Quick Tools</h2>
+            <h3 className="mb-1">Bulk Tools</h3>
             <p className="text-muted mb-0">
-              Run bulk chapter updates from one place.
+              Run large end-of-semester chapter updates rapidly.
             </p>
           </div>
           <div className="d-flex flex-wrap gap-2">
             <button
               type="button"
               className="btn btn-outline-primary"
-              disabled={me?.role !== "admin" && me?.role !== "superadmin"}
-              title={me?.role !== "admin" && me?.role !== "superadmin" ? "Admin only" : undefined}
               onClick={() => {
                 setQuickToolsTool("election");
                 setShowQuickTools(true);
               }}
             >
-              E-Council Election
+              Officer Election
             </button>
             <button
               type="button"
@@ -214,6 +217,16 @@ export default function MembersList({
               }}
             >
               Graduations
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-danger"
+              onClick={() => {
+                setQuickToolsTool("purgeCommittees");
+                setShowQuickTools(true);
+              }}
+            >
+              Purge Committees
             </button>
           </div>
         </div>
@@ -350,7 +363,13 @@ export default function MembersList({
         show={showQuickTools}
         initialTool={quickToolsTool}
         members={members}
-        canManageElection={me?.role === "admin" || me?.role === "superadmin"}
+        canSubmitQuickTools={Boolean(
+          currentUser &&
+            (currentUser.role === "superadmin" ||
+              (currentUser.isECouncil &&
+                (currentUser.ecouncilPosition === "Regent" ||
+                  currentUser.ecouncilPosition === "Vice Regent")))
+        )}
         onClose={() => setShowQuickTools(false)}
         onCompleted={refreshMembers}
       />

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/clerk";
+import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import logger from "@/lib/logger";
+import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
 
 export const runtime = "nodejs";
@@ -19,9 +20,11 @@ const ELECTION_POSITIONS = [
 type ElectionPosition = (typeof ELECTION_POSITIONS)[number];
 
 type QuickToolsAction = "election" | "graduations";
+type PurgeCommitteesAction = "purgeCommittees";
+type QuickToolsActionWithPurge = QuickToolsAction | PurgeCommitteesAction;
 
 type QuickToolsRequestBody = {
-  action?: QuickToolsAction;
+  action?: QuickToolsActionWithPurge;
   assignments?: Partial<Record<ElectionPosition, string>>;
   rollNos?: string[];
 };
@@ -35,6 +38,29 @@ const ADMIN_POSITIONS = new Set<ElectionPosition>([
 
 const normalizeRollNo = (value: unknown) => String(value || "").trim();
 
+async function requireQuickToolSubmitter(req: Request) {
+  const clerkId = await requireAuth(req as any);
+  await connectDB();
+
+  const submitter = await Member.findOne({
+    clerkId,
+    $or: [
+      { role: "superadmin" },
+      { isECouncil: true, ecouncilPosition: { $in: ["Regent", "Vice Regent"] } },
+    ],
+  }).lean<{ rollNo?: string; fName?: string; lName?: string; ecouncilPosition?: string }>();
+
+  if (!submitter) {
+    const error = new Error(
+      "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+    ) as Error & { statusCode?: number };
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return { clerkId, submitter };
+}
+
 function buildElectionAssignments(assignments: Partial<Record<ElectionPosition, string>>) {
   const normalized: Partial<Record<ElectionPosition, string>> = {};
   for (const position of ELECTION_POSITIONS) {
@@ -47,22 +73,53 @@ function buildElectionAssignments(assignments: Partial<Record<ElectionPosition, 
 }
 
 export async function POST(req: Request) {
+  let body: QuickToolsRequestBody;
+  try {
+    body = (await req.json()) as QuickToolsRequestBody;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  if (body.action === "purgeCommittees") {
+    try {
+      const { clerkId, submitter } = await requireQuickToolSubmitter(req);
+      const regentOrViceRegent = submitter.ecouncilPosition || "";
+      await connectDB();
+
+      const committeesResult = await Committee.updateMany(
+        {},
+        { $set: { committeeHeadId: null, committeeMembers: [] } }
+      );
+      await Member.updateMany({ isCommitteeHead: true }, { $set: { isCommitteeHead: false } });
+
+      logger.info(
+        { clerkId, rollNo: submitter.rollNo, position: regentOrViceRegent },
+        "Committee purge completed"
+      );
+
+      return NextResponse.json({
+        status: "ok",
+        action: "purgeCommittees",
+        updatedCount: committeesResult.modifiedCount ?? committeesResult.matchedCount ?? 0,
+      });
+    } catch (err: any) {
+      logger.warn({ err }, "Unauthorized purge committees request");
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.statusCode || 401 }
+      );
+    }
+  }
+
   let actor;
   try {
-    actor = await requireRole(req as any, ["superadmin", "admin"]);
+    actor = await requireQuickToolSubmitter(req);
   } catch (err: any) {
     logger.warn({ err }, "Unauthorized quick tools request");
     return NextResponse.json(
       { error: err.message },
       { status: err.statusCode || 401 }
     );
-  }
-
-  let body: QuickToolsRequestBody;
-  try {
-    body = (await req.json()) as QuickToolsRequestBody;
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   if (body.action === "election") {

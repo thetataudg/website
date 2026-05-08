@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LoadingSpinner } from "../../../components/LoadingState";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faKey, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 const ELECTION_POSITIONS = [
   "Regent",
@@ -28,13 +28,13 @@ type QuickToolMember = {
   isHidden?: boolean;
 };
 
-type ToolMode = "election" | "graduations";
+type ToolMode = "election" | "graduations" | "purgeCommittees";
 
 interface Props {
   show: boolean;
   initialTool: ToolMode;
   members: QuickToolMember[];
-  canManageElection: boolean;
+  canSubmitQuickTools: boolean;
   onClose: () => void;
   onCompleted: () => Promise<void>;
 }
@@ -57,7 +57,7 @@ export default function QuickToolsModal({
   show,
   initialTool,
   members,
-  canManageElection,
+  canSubmitQuickTools,
   onClose,
   onCompleted,
 }: Props) {
@@ -124,7 +124,7 @@ export default function QuickToolsModal({
     if (!show) return;
 
     setActiveTool(initialTool);
-    setShowConfirmation(false);
+    setShowConfirmation(initialTool === "purgeCommittees");
     setError(null);
     setSaving(false);
     setGraduationSelection({});
@@ -159,15 +159,36 @@ export default function QuickToolsModal({
       .filter(Boolean)
   );
 
+  // const filteredElectionMembers = (position: ElectionPosition) => {
+  //   const currentValue = normalizeRollNo(electionAssignments[position]);
+  //   return eligibleElectionMembers.filter((member) => {
+  //     const otherSelections = new Set(
+  //       Object.entries(electionAssignments)
+  //         .filter(([otherPosition, rollNo]) => otherPosition !== position && normalizeRollNo(rollNo))
+  //         .map(([, rollNo]) => normalizeRollNo(rollNo))
+  //     );
+  //     const isAllowed = !otherSelections.has(member.rollNo) || currentValue === member.rollNo;
+  //     return isAllowed;
+  //   });
+  // };
+
   const filteredElectionMembers = (position: ElectionPosition) => {
     const currentValue = normalizeRollNo(electionAssignments[position]);
+    const currentOccupantRollNo = normalizeRollNo(currentBoardByPosition.get(position)?.rollNo);
     return eligibleElectionMembers.filter((member) => {
       const otherSelections = new Set(
         Object.entries(electionAssignments)
           .filter(([otherPosition, rollNo]) => otherPosition !== position && normalizeRollNo(rollNo))
           .map(([, rollNo]) => normalizeRollNo(rollNo))
       );
-      const isAllowed = !otherSelections.has(member.rollNo) || currentValue === member.rollNo;
+      const isCurrentOccupant =
+        !!currentOccupantRollNo &&
+        member.rollNo === currentOccupantRollNo &&
+        !otherSelections.has(member.rollNo); // ← don't bypass if already assigned elsewhere
+      const isAllowed =
+        !otherSelections.has(member.rollNo) ||
+        currentValue === member.rollNo ||
+        isCurrentOccupant;
       return isAllowed;
     });
   };
@@ -180,7 +201,50 @@ export default function QuickToolsModal({
     setGraduationSelection((current) => ({ ...current, [rollNo]: checked }));
   };
 
+  const handlePurgeCommitteesSubmit = async () => {
+    if (!canSubmitQuickTools) {
+      setError(
+        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+      );
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/members/quick-tools", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "purgeCommittees" }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || "Failed to purge committees");
+      }
+      await onCompleted();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Failed to purge committees");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openConfirmation = () => {
+    if (!canSubmitQuickTools) {
+      setError(
+        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+      );
+      return;
+    }
+
+    if (activeTool === "purgeCommittees") {
+      setError(null);
+      setShowConfirmation(true);
+      return;
+    }
+
     if (activeTool === "election") {
       const missingPositions = ELECTION_POSITIONS.filter(
         (position) => !normalizeRollNo(electionAssignments[position])
@@ -214,6 +278,13 @@ export default function QuickToolsModal({
   };
 
   const handleElectionSubmit = async () => {
+    if (!canSubmitQuickTools) {
+      setError(
+        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+      );
+      return;
+    }
+
     const missingPositions = ELECTION_POSITIONS.filter(
       (position) => !normalizeRollNo(electionAssignments[position])
     );
@@ -244,18 +315,25 @@ export default function QuickToolsModal({
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.error || "Failed to run e-council election");
+        throw new Error(payload.error || "Failed to run officer election");
       }
       await onCompleted();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to run e-council election");
+      setError(err.message || "Failed to run officer election");
     } finally {
       setSaving(false);
     }
   };
 
   const handleGraduationsSubmit = async () => {
+    if (!canSubmitQuickTools) {
+      setError(
+        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+      );
+      return;
+    }
+
     const rollNos = activeMembers
       .filter((member) => graduationSelection[member.rollNo])
       .map((member) => member.rollNo);
@@ -305,6 +383,20 @@ export default function QuickToolsModal({
             memberLabel: `${member.fName} ${member.lName}`,
           }));
 
+  const modalTitle =
+    activeTool === "election"
+      ? "Officer Election"
+      : activeTool === "graduations"
+      ? "Graduations"
+      : "Purge Committees";
+
+  const modalDescription =
+    activeTool === "election"
+      ? "Assigns chapter officer privileges to newly elected officers. Use this tool only after initiation of new officers as permission and role updates take effect upon submission."
+      : activeTool === "graduations"
+      ? "Move selected active members to Alumni status."
+      : "Prepare committee assignment for next semester by purging committee membership.";
+
   return (
     <div
       className="modal d-block"
@@ -317,68 +409,75 @@ export default function QuickToolsModal({
           <div className="modal-header vote-modal__header">
             <div>
               <h5 className="modal-title mb-1">
-                {activeTool === "election" ? "E-Council Election" : "Graduations"}
+                {modalTitle}
               </h5>
               <div className="small">
-                {activeTool === "election"
-                  ? "Assign the next chapter leadership lineup."
-                  : "Move selected active members to Alumni status."}
+                {modalDescription}
               </div>
             </div>
             <button type="button" className="btn-close" onClick={onClose} />
           </div>
           <div className="modal-body">
-            {showConfirmation ? (
-              <div className="d-flex flex-column gap-3">
-                <div className="alert alert-warning mb-0">
-                  {activeTool === "election"
-                    ? "Approving these changes will update chapter roles and will remove admin access immediately for members who lose an admin-granting position, potentially including you."
-                    : "Please confirm these selections before moving the members to Alumni status."}
-                </div>
-                <div className="list-group">
-                  {reviewEntries.map((entry) => (
-                    <div
-                      key={entry.position}
-                      className="list-group-item d-flex align-items-center justify-content-between py-3 px-3"
-                    >
-                      <div className="pe-3">
-                        <div className="text-uppercase small fw-semibold ps-2">
-                          {activeTool === "election" ? entry.position : "Selected member"}
+            {!canSubmitQuickTools && (
+              <div className="alert alert-warning d-flex align-items-center gap-2">
+                <FontAwesomeIcon icon={faTimes} />
+                <span>
+                  Only the current Regent or Vice Regent has access to this tool. Please contact leadership if you believe this is an error.
+                </span>
+              </div>
+            )}
+            <div className={!canSubmitQuickTools ? "opacity-50 pe-none" : ""}>
+              {showConfirmation ? (
+                <div className="d-flex flex-column gap-3">
+                {activeTool === "purgeCommittees" ? (
+                  <>
+                    <div className="alert alert-danger mb-0">
+                      <strong>Destructive action.</strong> All committees will remain, but membership and chair assignments will be removed immediately and cannot be undone.
+                    </div>
+                    <div className="list-group">
+                      <div className="list-group-item d-flex align-items-center justify-content-between py-3 px-3">
+                        <div className="pe-3">
+                          <div className="text-uppercase small fw-semibold ps-2">
+                            Committees
+                          </div>
+                          <div className="fw-semibold ps-2">
+                            All committee heads and members will be removed
+                          </div>
                         </div>
-                        <div className="fw-semibold ps-2">{entry.memberLabel}</div>
                       </div>
                     </div>
-                  ))}
+                  </>
+                ) : (
+                  <>
+                    <div className="alert alert-warning mb-0">
+                      {activeTool === "election"
+                        ? "Approving these changes will update chapter roles and will remove admin access immediately for members who lose an admin-granting position."
+                        : "Please confirm that all members listed below will be moved to Alumni status."}
+                    </div>
+                    <div className="list-group">
+                      {reviewEntries.map((entry) => (
+                        <div
+                          key={entry.position}
+                          className="list-group-item d-flex align-items-center justify-content-between py-3 px-3"
+                        >
+                          <div className="pe-3">
+                            <div className="text-uppercase small fw-semibold ps-2">
+                              {activeTool === "election" ? entry.position : "Selected member"}
+                            </div>
+                            <div className="fw-semibold ps-2">{entry.memberLabel}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
                 </div>
-              </div>
-            ) : (
-              <>
-                <div className="mb-4 d-flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${activeTool === "election" ? "btn-primary" : "btn-outline-primary"}`}
-                    onClick={() => setActiveTool("election")}
-                  >
-                    E-Council Election
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${activeTool === "graduations" ? "btn-primary" : "btn-outline-primary"}`}
-                    onClick={() => setActiveTool("graduations")}
-                  >
-                    Graduations
-                  </button>
-                </div>
-
+              ) : (
+                <>
                 {error && <div className="alert alert-danger">{error}</div>}
 
                 {activeTool === "election" ? (
                   <div className="d-flex flex-column gap-3">
-                    {!canManageElection && (
-                      <div className="alert alert-warning mb-0">
-                        Only admins can submit election changes.
-                      </div>
-                    )}
                     {ELECTION_POSITIONS.map((position) => {
                       const currentValue = normalizeRollNo(electionAssignments[position]);
                       const options = filteredElectionMembers(position);
@@ -393,6 +492,12 @@ export default function QuickToolsModal({
                               <div className="fw-semibold ps-2">
                                 {currentOccupantLabel(position)}
                               </div>
+                              {ADMIN_POSITIONS.has(position) && (
+                                <div className="small d-flex align-items-center gap-1 ps-2 mt-1">
+                                  <FontAwesomeIcon icon={faTimes} />
+                                  Admin permission will be revoked.
+                                </div>
+                              )}
                             </div>
                             <div className="col-12 col-lg-1 text-center fs-4">
                               →
@@ -422,7 +527,8 @@ export default function QuickToolsModal({
                                 </div>
                               )}
                               {ADMIN_POSITIONS.has(position) && (
-                                <div className="form-text text-muted">
+                                <div className="form-text text-muted d-flex align-items-center gap-2">
+                                  <FontAwesomeIcon icon={faKey} className="text-warning" />
                                   This position grants admin permissions.
                                 </div>
                               )}
@@ -433,38 +539,45 @@ export default function QuickToolsModal({
                     })}
                   </div>
                 ) : (
-                  <div className="d-flex flex-column gap-2">
-                    <div className="small">
-                      {activeMembers.length} active members available for graduation.
+                  activeTool === "purgeCommittees" ? (
+                    <div className="alert alert-danger mb-0">
+                      This action is destructive and cannot be undone.
                     </div>
-                    {activeMembers.map((member) => (
-                      <label
-                        key={member.rollNo}
-                        className="list-group-item d-flex align-items-center justify-content-between py-3 px-3 my-1"
-                      >
-                        <div>
-                          <div className="fw-semibold">
-                            {member.fName} {member.lName}
+                  ) : (
+                    <div className="d-flex flex-column gap-2">
+                      <div className="small">
+                        {activeMembers.length} active members available for graduation.
+                      </div>
+                      {activeMembers.map((member) => (
+                        <label
+                          key={member.rollNo}
+                          className="list-group-item d-flex align-items-center justify-content-between py-3 px-3 my-1"
+                        >
+                          <div>
+                            <div className="fw-semibold">
+                              {member.fName} {member.lName}
+                            </div>
+                            <div className="small">Active</div>
                           </div>
-                          <div className="small">Active</div>
-                        </div>
-                        <input
-                          className="form-check-input ms-3"
-                          type="checkbox"
-                          checked={Boolean(graduationSelection[member.rollNo])}
-                          onChange={(e) =>
-                            updateGraduationSelection(member.rollNo, e.target.checked)
-                          }
-                        />
-                      </label>
-                    ))}
-                  </div>
+                          <input
+                            className="form-check-input ms-3"
+                            type="checkbox"
+                            checked={Boolean(graduationSelection[member.rollNo])}
+                            onChange={(e) =>
+                              updateGraduationSelection(member.rollNo, e.target.checked)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )
                 )}
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
           <div className="modal-footer">
-            {showConfirmation ? (
+            {showConfirmation && activeTool !== "purgeCommittees" ? (
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -481,12 +594,26 @@ export default function QuickToolsModal({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={showConfirmation ? (activeTool === "election" ? handleElectionSubmit : handleGraduationsSubmit) : openConfirmation}
-              disabled={saving}
+              onClick={
+                showConfirmation
+                  ? activeTool === "election"
+                    ? handleElectionSubmit
+                    : activeTool === "graduations"
+                    ? handleGraduationsSubmit
+                    : handlePurgeCommitteesSubmit
+                  : openConfirmation
+              }
+                disabled={saving || !canSubmitQuickTools}
             >
               {showConfirmation ? <FontAwesomeIcon icon={faCheck} className="me-2" /> : null}
               {saving && <LoadingSpinner size="sm" className="me-2" />}
-              {saving ? "Saving..." : showConfirmation ? "Approve Changes" : "Review Changes"}
+              {saving
+                ? "Saving..."
+                : showConfirmation
+                ? "Approve Changes"
+                : activeTool === "purgeCommittees"
+                ? "Review Changes"
+                : "Review Changes"}
             </button>
           </div>
         </div>

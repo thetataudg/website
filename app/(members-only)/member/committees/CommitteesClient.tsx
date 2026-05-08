@@ -212,6 +212,19 @@ export default function CommitteesClient({
         </div>
       </section>
 
+      <section className="bento-card committees-pill-list">
+        <div className="d-flex flex-wrap gap-2">
+          {sortedCommittees.map((committee) => (
+            <span
+              key={committee._id}
+              className="badge rounded-pill bg-primary px-3 py-2"
+            >
+              {committee.name}
+            </span>
+          ))}
+        </div>
+      </section>
+
       {memberQuery.trim() && (
         <section className="committee-search-results bento-card">
           <h3>Member committee matches</h3>
