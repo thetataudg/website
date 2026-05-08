@@ -97,26 +97,8 @@ export async function createAppleWalletPass(
       height: 150,
       fit: "contain",
     });
-    const thumbnail = profileSource
-      ? await normalizeToPng(profileSource, {
-          width: 90,
-          height: 90,
-          fit: "cover",
-        })
-      : null;
-    const thumbnail2x = profileSource
-      ? await normalizeToPng(profileSource, {
-          width: 180,
-          height: 180,
-          fit: "cover",
-        })
-      : null;
-    const thumbnail3x = profileSource
-      ? await normalizeToPng(profileSource, {
-          width: 270,
-          height: 270,
-          fit: "cover",
-        })
+    const thumbnails = profileSource
+      ? await createOptionalThumbnails(profileSource, member.rollNo)
       : null;
 
     const majorText = formatList(member.majors);
@@ -313,10 +295,10 @@ export async function createAppleWalletPass(
       "logo@3x.png": logo3x,
     };
 
-    if (thumbnail && thumbnail2x && thumbnail3x) {
-      files["thumbnail.png"] = thumbnail;
-      files["thumbnail@2x.png"] = thumbnail2x;
-      files["thumbnail@3x.png"] = thumbnail3x;
+    if (thumbnails) {
+      files["thumbnail.png"] = thumbnails.thumbnail;
+      files["thumbnail@2x.png"] = thumbnails.thumbnail2x;
+      files["thumbnail@3x.png"] = thumbnails.thumbnail3x;
     }
 
     const manifest = buildManifest(files);
@@ -637,6 +619,36 @@ async function loadProfilePhoto(profilePicUrl?: string) {
     return Buffer.from(arrayBuffer);
   } catch (err: any) {
     logger.warn({ err }, "Failed to load member profile photo for wallet pass");
+    return null;
+  }
+}
+
+async function createOptionalThumbnails(source: Buffer, rollNo: string) {
+  try {
+    const [thumbnail, thumbnail2x, thumbnail3x] = await Promise.all([
+      normalizeToPng(source, {
+        width: 90,
+        height: 90,
+        fit: "cover",
+      }),
+      normalizeToPng(source, {
+        width: 180,
+        height: 180,
+        fit: "cover",
+      }),
+      normalizeToPng(source, {
+        width: 270,
+        height: 270,
+        fit: "cover",
+      }),
+    ]);
+
+    return { thumbnail, thumbnail2x, thumbnail3x };
+  } catch (err: any) {
+    logger.warn(
+      { err, rollNo },
+      "Skipping wallet pass thumbnail because the member photo could not be converted"
+    );
     return null;
   }
 }
