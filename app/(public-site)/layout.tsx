@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import Script from 'next/script';
 import { ClerkProvider } from "@clerk/nextjs";
+import "reactflow/dist/style.css";
 
 import "../(public-site)/globals.css";
 

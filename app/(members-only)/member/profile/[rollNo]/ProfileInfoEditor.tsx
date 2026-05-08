@@ -68,7 +68,7 @@ export default function ProfileInfoEditor({
     pronouns: member.pronouns || "",
     majors: member.majors.join(", "),
     minors: member.minors?.join(", ") || "",
-    gradYear: member.gradYear.toString(),
+    gradYear: member.gradYear?.toString() || "",
     bio: member.bio || "",
     hometown: member.hometown,
     pledgeClass: member.pledgeClass || "",
