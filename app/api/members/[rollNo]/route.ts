@@ -37,6 +37,13 @@ function getProvidedSecret(req: Request) {
   }
 }
 
+function normalizeObjectIdList(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value
+    .map((entry) => String(entry || "").trim())
+    .filter((entry) => entry && /^[a-fA-F0-9]{24}$/.test(entry));
+}
+
 export const runtime = "nodejs";
 
 export async function GET(
@@ -103,6 +110,12 @@ export async function PATCH(
     if (!updates.rollNo) {
       delete updates.rollNo;
     }
+  }
+  if ("bigs" in updates) {
+    updates.bigs = normalizeObjectIdList(updates.bigs);
+  }
+  if ("littles" in updates) {
+    updates.littles = normalizeObjectIdList(updates.littles);
   }
   logger.info(
     { adminId, rollNo: params.rollNo, updates },

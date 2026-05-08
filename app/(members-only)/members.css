@@ -413,7 +413,135 @@
 }
 
 .admin-modal-wide {
-  max-width: 1200px;
+  --bs-modal-width: min(90vw, 1600px);
+  width: min(90vw, 1600px);
+  max-width: min(90vw, 1600px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.admin-modal-wide .modal-content {
+  width: 100%;
+}
+
+.admin-relations-modal {
+  --bs-modal-width: min(72vw, 1100px);
+  max-width: min(72vw, 1100px);
+}
+
+.member-summary-card {
+  min-height: 96px;
+  padding: 14px 16px;
+  border: 1px solid rgba(28, 22, 16, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.member-summary-card__label {
+  margin-bottom: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #6d1219;
+}
+
+.member-summary__empty {
+  color: rgba(42, 31, 27, 0.56);
+}
+
+.member-summary-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.member-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  max-width: 100%;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(139, 27, 35, 0.1);
+  color: #6d1219;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-token-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid rgba(28, 22, 16, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.member-token-picker:focus-within {
+  border-color: rgba(139, 27, 35, 0.38);
+  box-shadow: 0 0 0 3px rgba(139, 27, 35, 0.14);
+}
+
+.member-token-picker__input {
+  flex: 1 1 180px;
+  min-width: 140px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  padding: 4px 0;
+}
+
+.member-token-picker__menu {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid rgba(28, 22, 16, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.member-token-picker__option {
+  border: 0;
+  border-radius: 12px;
+  background: rgba(139, 27, 35, 0.06);
+  color: #2a1f1b;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.member-token-picker__option:hover {
+  background: rgba(139, 27, 35, 0.12);
+}
+
+.member-token-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 0 14px;
+  background: rgba(139, 27, 35, 0.12);
+  color: #6d1219;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.member-token-pill__remove {
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
 }
 
 .brothers-hero {

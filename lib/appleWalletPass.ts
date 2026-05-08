@@ -334,6 +334,77 @@ export async function createAppleWalletPass(
   }
 }
 
+export async function getAppleWalletCertDiagnostics() {
+  const configuredDir = process.env.APPLE_WALLET_CERTS_DIR?.trim() || null;
+  const p12Path = process.env.APPLE_WALLET_CERT_P12_PATH?.trim() || null;
+  const wwdrPath = process.env.APPLE_WALLET_WWDR_PATH?.trim() || null;
+  const signerCertPath = process.env.APPLE_WALLET_SIGNER_CERT_PATH?.trim() || null;
+  const signerKeyPath = process.env.APPLE_WALLET_SIGNER_KEY_PATH?.trim() || null;
+
+  const diagnostics = {
+    env: {
+      APPLE_WALLET_CERTS_DIR: Boolean(configuredDir),
+      APPLE_WALLET_CERT_PASSWORD: Boolean(process.env.APPLE_WALLET_CERT_PASSWORD?.trim()),
+      APPLE_WALLET_TEAM_IDENTIFIER: Boolean(process.env.APPLE_WALLET_TEAM_IDENTIFIER?.trim()),
+      APPLE_WALLET_PASS_TYPE_IDENTIFIER: Boolean(
+        process.env.APPLE_WALLET_PASS_TYPE_IDENTIFIER?.trim()
+      ),
+      APPLE_WALLET_CERT_P12_PATH: Boolean(p12Path),
+      APPLE_WALLET_WWDR_PATH: Boolean(wwdrPath),
+      APPLE_WALLET_SIGNER_CERT_PATH: Boolean(signerCertPath),
+      APPLE_WALLET_SIGNER_KEY_PATH: Boolean(signerKeyPath),
+      APPLE_WALLET_CERT_P12_BASE64: Boolean(
+        process.env.APPLE_WALLET_CERT_P12_BASE64?.trim()
+      ),
+      APPLE_WALLET_WWDR_BASE64: Boolean(process.env.APPLE_WALLET_WWDR_BASE64?.trim()),
+      APPLE_WALLET_WWDR_PEM: Boolean(process.env.APPLE_WALLET_WWDR_PEM?.trim()),
+      APPLE_WALLET_SIGNER_CERT_BASE64: Boolean(
+        process.env.APPLE_WALLET_SIGNER_CERT_BASE64?.trim()
+      ),
+      APPLE_WALLET_SIGNER_CERT_PEM: Boolean(
+        process.env.APPLE_WALLET_SIGNER_CERT_PEM?.trim()
+      ),
+      APPLE_WALLET_SIGNER_KEY_BASE64: Boolean(
+        process.env.APPLE_WALLET_SIGNER_KEY_BASE64?.trim()
+      ),
+      APPLE_WALLET_SIGNER_KEY_PEM: Boolean(
+        process.env.APPLE_WALLET_SIGNER_KEY_PEM?.trim()
+      ),
+    },
+    paths: {
+      configuredDir,
+      p12Path,
+      wwdrPath,
+      signerCertPath,
+      signerKeyPath,
+    },
+    cwd: process.cwd(),
+  };
+
+  const candidateDirs = [
+    configuredDir,
+    path.join(process.cwd(), "secrets", "apple-wallet"),
+    path.join(process.cwd(), "certs", "apple-wallet"),
+    path.join(process.cwd(), "app", "certs"),
+  ].filter(Boolean) as string[];
+
+  const candidateChecks = await Promise.all(
+    candidateDirs.map(async (candidate) => {
+      try {
+        const entries = await fs.readdir(candidate);
+        return { candidate, exists: true, entries };
+      } catch {
+        return { candidate, exists: false, entries: [] as string[] };
+      }
+    })
+  );
+
+  return {
+    ...diagnostics,
+    candidateChecks,
+  };
+}
+
 async function resolveCertPaths(): Promise<WalletCertPaths> {
   const fromEnv = await resolveCertPathsFromEnvironment();
   if (fromEnv) {
