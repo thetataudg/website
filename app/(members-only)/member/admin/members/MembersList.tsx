@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import MemberEditorModal from "./MemberEditorModal";
+import QuickToolsModal from "./QuickToolsModal";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -73,24 +74,36 @@ export default function MembersList({
   const [editingRollNo, setEditingRollNo] = useState<string | null>(null);
   const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showQuickTools, setShowQuickTools] = useState(false);
+  const [quickToolsTool, setQuickToolsTool] = useState<"election" | "graduations" | "purgeCommittees">("election");
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "All" | "Active" | "Alumni" | "Removed" | "Deceased"
-  >("All");
+  >("Active");
   const [loadingMembers, setLoadingMembers] = useState(true);
+
+  async function refreshMembers() {
+    setLoadingMembers(true);
+    fetch("/api/members")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: MemberData[]) => setMembers(data))
+      .catch(() => setMembers(initialMembers))
+      .finally(() => setLoadingMembers(false));
+  }
 
   useEffect(() => {
     fetch("/api/members/me")
       .then((r) => r.json())
       .then((d) => setMe({ role: d.role, rollNo: d.rollNo }))
       .catch(() => setMe(null));
-    fetch("/api/members")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data: MemberData[]) => setMembers(data))
-      .catch(() => setMembers(initialMembers))
-      .finally(() => setLoadingMembers(false));
+    refreshMembers();
   }, []);
+
+  const currentUser = members.find((member) => member.rollNo === me?.rollNo) || null;
+  const isCurrentRegent = Boolean(
+    currentUser?.isECouncil && currentUser.ecouncilPosition === "Regent"
+  );
 
   const { isLoaded, isSignedIn } = useAuth();
 
@@ -124,7 +137,12 @@ export default function MembersList({
   const sorted = [...filtered].sort((a, b) => {
     const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
     const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
-    return aNum - bNum;
+    // Active: ascending, Alumni/All/others: descending
+    if (statusFilter === "Active") {
+      return aNum - bNum;
+    } else {
+      return bNum - aNum;
+    }
   });
 
   const editing = editingRollNo
@@ -171,6 +189,49 @@ export default function MembersList({
 
   return (
     <>
+      <div className="bento-card admin-table-card mb-3">
+        <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+          <div>
+            <h3 className="mb-1">Bulk Tools</h3>
+            <p className="text-muted mb-0">
+              Run large end-of-semester chapter updates rapidly.
+            </p>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={() => {
+                setQuickToolsTool("election");
+                setShowQuickTools(true);
+              }}
+            >
+              Officer Election
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={() => {
+                setQuickToolsTool("graduations");
+                setShowQuickTools(true);
+              }}
+            >
+              Graduations
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-danger"
+              onClick={() => {
+                setQuickToolsTool("purgeCommittees");
+                setShowQuickTools(true);
+              }}
+            >
+              Purge Committees
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="bento-card admin-table-card">
         <div className="admin-members-header">
           <h2>Manage Members</h2>
@@ -297,6 +358,21 @@ export default function MembersList({
           </table>
         </div>
       </div>
+
+      <QuickToolsModal
+        show={showQuickTools}
+        initialTool={quickToolsTool}
+        members={members}
+        canSubmitQuickTools={Boolean(
+          currentUser &&
+            (currentUser.role === "superadmin" ||
+              (currentUser.isECouncil &&
+                (currentUser.ecouncilPosition === "Regent" ||
+                  currentUser.ecouncilPosition === "Vice Regent")))
+        )}
+        onClose={() => setShowQuickTools(false)}
+        onCompleted={refreshMembers}
+      />
 
       {editing && (
         <MemberEditorModal

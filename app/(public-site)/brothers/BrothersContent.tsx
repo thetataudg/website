@@ -142,18 +142,30 @@ export default function BrothersContent() {
 
   const filteredMembers = useMemo(() => {
     const normalized = members.filter(
-      (m) =>
-        ["Active", "Alumni"].includes(m.status || "") &&
-        m.role !== "superadmin" &&
-        !m.isHidden
-    );
-    const filtered = normalized.filter((member) => {
-      if (filter === "Officers") {
+      (m) => {
+        // Include Active and Alumni members
+        // Also include Regent Emeritus members regardless of status
+        const isActiveOrAlumni = ["Active", "Alumni"].includes(m.status || "");
+        const isRegentEmeritus = m.isECouncil && m.ecouncilPosition === "Regent Emeritus";
         return (
-          member.isECouncil ||
-          member.isCommitteeHead
+          (isActiveOrAlumni || isRegentEmeritus) &&
+          m.role !== "superadmin" &&
+          !m.isHidden
         );
       }
+    );
+    const filtered = normalized.filter((member) => {
+      // On Officers view, show all E-Council, Committee Heads, and Regent Emeritus
+      if (filter === "Officers") {
+        const isRegentEmeritus = member.ecouncilPosition === "Regent Emeritus";
+        return (
+          member.isECouncil ||
+          member.isCommitteeHead ||
+          isRegentEmeritus
+        );
+      }
+      
+      // On Active/Alumni views, show members matching that status
       return member.status === filter;
     });
     const searched = query.trim()
@@ -165,7 +177,12 @@ export default function BrothersContent() {
     return searched.sort((a, b) => {
       const aNum = Number(String(a.rollNo).replace(/\D/g, "")) || 0;
       const bNum = Number(String(b.rollNo).replace(/\D/g, "")) || 0;
-      return aNum - bNum;
+      // Alumni sort descending, others ascending
+      if (filter === "Alumni") {
+        return bNum - aNum;
+      } else {
+        return aNum - bNum;
+      }
     });
   }, [members, filter, query]);
 
@@ -179,7 +196,7 @@ export default function BrothersContent() {
   ];
 
   const executiveBoardMembers = useMemo(() => {
-    if (filter !== "Active") return [];
+    if (filter !== "Active" && filter !== "Alumni") return [];
     const board: Member[] = [];
     executiveBoardPositions.forEach((position) => {
       const member = filteredMembers.find(
@@ -189,8 +206,12 @@ export default function BrothersContent() {
         board.push(member);
       }
     });
-    return board;
-  }, [filteredMembers, filter]);
+    // Add ALL Regent Emeritus members to the end of the board, regardless of status
+    const regentEmeritus = members.filter(
+      (m) => m.isECouncil && m.ecouncilPosition === "Regent Emeritus" && m.role !== "superadmin" && !m.isHidden
+    );
+    return [...board, ...regentEmeritus];
+  }, [filteredMembers, members, filter]);
 
   const regularActiveMembers = useMemo(() => {
     if (filter !== "Active") return filteredMembers;
@@ -215,12 +236,17 @@ export default function BrothersContent() {
 
   const officersEcouncil = useMemo(() => {
     if (filter !== "Officers") return [];
-    const ecouncilMembers = filteredMembers.filter((m) => m.isECouncil);
+    
+    // For e-council section, show ALL e-council members regardless of status
+    // Filter only by superadmin and hidden flags
+    const allEcouncilMembers = members.filter(
+      (m) => m.isECouncil && m.role !== "superadmin" && !m.isHidden
+    );
     
     // Sort by executive board positions
     const board: Member[] = [];
     executiveBoardPositions.forEach((position) => {
-      const member = ecouncilMembers.find(
+      const member = allEcouncilMembers.find(
         (m) => m.ecouncilPosition === position
       );
       if (member) {
@@ -230,10 +256,19 @@ export default function BrothersContent() {
     
     // Add any remaining e-council members who don't match the standard positions
     const boardRollNos = new Set(board.map((m) => m.rollNo));
-    const remaining = ecouncilMembers.filter((m) => !boardRollNos.has(m.rollNo));
+    const remaining = allEcouncilMembers.filter((m) => !boardRollNos.has(m.rollNo));
     
-    return [...board, ...remaining];
-  }, [filteredMembers, filter]);
+    // Separate Regent Emeritus from other remaining positions
+    const regentEmeritusMembers = remaining.filter(
+      (m) => m.ecouncilPosition === "Regent Emeritus"
+    );
+    const otherRemaining = remaining.filter(
+      (m) => m.ecouncilPosition !== "Regent Emeritus"
+    );
+    
+    // Return board positions, other remaining, then Regent Emeritus last
+    return [...board, ...otherRemaining, ...regentEmeritusMembers];
+  }, [members, filter]);
 
   const officersCommitteeHeads = useMemo(() => {
     if (filter !== "Officers") return [];
