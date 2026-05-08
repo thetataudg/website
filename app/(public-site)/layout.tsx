@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from 'next/script';
 import { ClerkProvider } from "@clerk/nextjs";
 import { inter } from "../fonts";
+import "reactflow/dist/style.css";
 
 import "../(public-site)/globals.css";
 

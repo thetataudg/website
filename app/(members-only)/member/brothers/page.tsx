@@ -64,7 +64,7 @@ function Unauthorized() {
       <div className="bento-card text-center">
         <h2>Unauthorized</h2>
         <p className="text-muted">
-          You do not have permission to view the brothers directory.
+          Your membership has been suspended or removed, and you no longer have access to this application.
         </p>
       </div>
     </div>

@@ -7,7 +7,7 @@ export interface MemberDoc {
   lName: string;
   majors: string[];
   minors?: string[];
-  gradYear: number;
+  gradYear?: number;
   bigs: any[];
   littles: any[];
   bio: string;

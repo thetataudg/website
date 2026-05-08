@@ -18,6 +18,7 @@ import {
   faUsersCog,
 } from "@fortawesome/free-solid-svg-icons";
 import LoadingState, { LoadingSpinner } from "../components/LoadingState";
+import MembershipRevokedState from "../components/MembershipRevokedState";
 import { useRouter } from "next/navigation";
 import ConnectWithDiscordButton from "@/components/ConnectWithDiscordButton";
 
@@ -206,6 +207,7 @@ export default function Dashboard() {
         const hasProfile = Boolean(data.memberId);
         const needsProfileReview = data.needsProfileReview ?? false;
         const needsPermissionReview = data.needsPermissionReview ?? false;
+
         setUserData({
           userHasProfile: hasProfile,
           pending: isPending,
@@ -481,7 +483,6 @@ export default function Dashboard() {
     );
   }
 
-
   if (!userData || !userData.type) {
     // All accesses are false for unapproved users
     const privileges = [
@@ -581,6 +582,10 @@ export default function Dashboard() {
     needsPermissionReview,
     needsProfileReview,
   } = userData;
+
+  if (userData.type === "Removed") {
+    return <MembershipRevokedState />;
+  }
 
   const userTypeDetails = [
     isAdmin && "Admin",
