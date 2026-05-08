@@ -17,11 +17,6 @@ interface CommitResult {
 export async function POST(req: NextRequest) {
   await connectDB();
 
-  await Member.updateMany(
-    { clerkId: null },
-    { $unset: { clerkId: 1 } }
-  );
-
   let admin;
   try {
     admin = await requireRole(req, ["superadmin", "admin"]);
