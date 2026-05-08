@@ -6,7 +6,7 @@ import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
-import { verifyCheckInCode } from "@/lib/checkinCode";
+import { verifyAnyCheckInToken } from "@/lib/checkinCode";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -56,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
-    const decoded = verifyCheckInCode(code);
+    const decoded = verifyAnyCheckInToken(code);
     if (!decoded) {
       return NextResponse.json({ error: "Invalid code" }, { status: 400 });
     }
@@ -67,9 +67,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    const targetMember = await Member.findById(decoded.memberId).lean();
-    if (!targetMember) {
+    const targetMember = await Member.findById(decoded.memberId).lean<any>();
+    if (!targetMember || Array.isArray(targetMember)) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+    if (targetMember.status && targetMember.status !== "Active") {
+      return NextResponse.json(
+        { error: "Member is not eligible for check-in" },
+        { status: 403 }
+      );
     }
 
     if (event.attendees && !Array.isArray(event.attendees)) {
@@ -110,8 +116,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     logger.info(
-      { eventId, memberId: decoded.memberId, source, scannerMemberId },
-      "Checked in member via QR"
+      {
+        eventId,
+        memberId: decoded.memberId,
+        source,
+        scannerMemberId,
+        tokenType: decoded.type,
+      },
+      "Checked in member via token"
     );
     return NextResponse.json(
       {

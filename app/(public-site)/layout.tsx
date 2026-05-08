@@ -1,25 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Poppins } from "next/font/google";
 import Script from 'next/script';
 import { ClerkProvider } from "@clerk/nextjs";
+import { inter } from "../fonts";
 import "reactflow/dist/style.css";
 
 import "../(public-site)/globals.css";
 
 import Navbar from "../(public-site)/components/Navbar.js";
 import Footer from "../(public-site)/components/Footer.js";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-inter",
-});
-const poppins = Poppins({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-poppins",
-  weight: "300",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(

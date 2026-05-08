@@ -1,15 +1,7 @@
-"use client";
-
-import { Bungee } from "next/font/google";
 import Link from "next/link";
 import Image from "next/image";
 import { FaEnvelope, FaGithub, FaInstagram } from "react-icons/fa";
-
-const bungee = Bungee({
-  subsets: ["latin"],
-  display: "swap",
-  weight: "400",
-});
+import { bungee } from "../../fonts";
 
 const socialLinks = [
   {
