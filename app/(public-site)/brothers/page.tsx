@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Bungee } from "next/font/google";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
 
@@ -45,18 +45,30 @@ const getGradientClass = (rollNo: string) => {
 const getInitials = (first = "", last = "") =>
   `${first.trim().charAt(0)}${last.trim().charAt(0)}`.toUpperCase();
 
+const VALID_FILTERS = ["Active", "Alumni", "Officers"] as const;
+type BrothersFilter = (typeof VALID_FILTERS)[number];
+
+const isValidFilter = (value: string | null): value is BrothersFilter =>
+  Boolean(value && VALID_FILTERS.includes(value as BrothersFilter));
+
 export default function BrothersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [committeeHeadMap, setCommitteeHeadMap] = useState<
     Record<string, string[]>
   >({});
-  const [filter, setFilter] = useState<"Active" | "Alumni" | "Officers">(
-    "Active"
-  );
+  const [filter, setFilter] = useState<BrothersFilter>("Active");
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const queryFilter = searchParams.get("filter");
+    if (isValidFilter(queryFilter)) {
+      setFilter(queryFilter);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const elements = Array.from(document.querySelectorAll(".reveal")).filter(

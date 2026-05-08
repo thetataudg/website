@@ -43,7 +43,7 @@ export default function MembersOnlyAccessGate({
   }, []);
 
   if (isChecking) {
-    return <LoadingState message="Checking account status..." />;
+    return <LoadingState message="Checking access..." />;
   }
 
   if (isRemoved) {
