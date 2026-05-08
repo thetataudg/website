@@ -263,8 +263,8 @@ const members = await Member.find({ status: "Active" })
           const totalMeetings = committeeTotals.get(committee.id) || 0;
           const attended = stats.committeeAttendance.get(committee.id) || 0;
           const required =
-            totalMeetings > 0 ? Math.floor(totalMeetings / 2) + 1 : 1;
-          const satisfied = totalMeetings > 0 ? attended >= required : false;
+            totalMeetings <= 2 ? totalMeetings : Math.floor(totalMeetings / 2) + 1;
+          const satisfied = totalMeetings <= 2 ? true : attended >= required;
           return {
             id: committee.id,
             name: committee.name,

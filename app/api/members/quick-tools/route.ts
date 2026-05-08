@@ -86,6 +86,78 @@ export async function POST(req: Request) {
       const regentOrViceRegent = submitter.ecouncilPosition || "";
       await connectDB();
 
+      const committees = await Committee.find({})
+        .select("name committeeHeadId committeeMembers")
+        .lean<
+          {
+            name: string;
+            committeeHeadId?: { toString: () => string } | string | null;
+            committeeMembers?: Array<{ toString: () => string } | string>;
+          }[]
+        >();
+
+      const historyUpdates = new Map<
+        string,
+        {
+          previousCommitteesChaired: Set<string>;
+          previousCommitteesMemberOf: Set<string>;
+        }
+      >();
+
+      const addHistory = (
+        memberId: string,
+        field: "previousCommitteesChaired" | "previousCommitteesMemberOf",
+        committeeName: string
+      ) => {
+        const existing = historyUpdates.get(memberId) || {
+          previousCommitteesChaired: new Set<string>(),
+          previousCommitteesMemberOf: new Set<string>(),
+        };
+        existing[field].add(committeeName);
+        historyUpdates.set(memberId, existing);
+      };
+
+      for (const committee of committees) {
+        const committeeName = String(committee.name || "").trim();
+        if (!committeeName) continue;
+
+        const headId =
+          typeof committee.committeeHeadId === "string"
+            ? committee.committeeHeadId
+            : committee.committeeHeadId?.toString();
+        if (headId) {
+          addHistory(headId, "previousCommitteesChaired", committeeName);
+        }
+
+        for (const memberId of committee.committeeMembers || []) {
+          const memberIdValue =
+            typeof memberId === "string" ? memberId : memberId?.toString();
+          if (memberIdValue) {
+            addHistory(memberIdValue, "previousCommitteesMemberOf", committeeName);
+          }
+        }
+      }
+
+      if (historyUpdates.size) {
+        await Promise.all(
+          Array.from(historyUpdates.entries()).map(([memberId, patch]) =>
+            Member.updateOne(
+              { _id: memberId },
+              {
+                $addToSet: {
+                  previousCommitteesChaired: {
+                    $each: Array.from(patch.previousCommitteesChaired),
+                  },
+                  previousCommitteesMemberOf: {
+                    $each: Array.from(patch.previousCommitteesMemberOf),
+                  },
+                },
+              }
+            )
+          )
+        );
+      }
+
       const committeesResult = await Committee.updateMany(
         {},
         { $set: { committeeHeadId: null, committeeMembers: [] } }
@@ -168,6 +240,33 @@ export async function POST(req: Request) {
       isECouncil: true,
       ecouncilPosition: { $in: ELECTION_POSITIONS },
     }).lean<{ rollNo: string; role?: string; ecouncilPosition?: string }[]>();
+
+    const eCouncilHistoryUpdates = new Map<string, Set<string>>();
+    for (const member of currentBoardMembers) {
+      const previousRole = String(member.ecouncilPosition || "").trim();
+      if (!previousRole || previousRole === "Regent Emeritus") continue;
+      const existing = eCouncilHistoryUpdates.get(member.rollNo) || new Set<string>();
+      existing.add(previousRole);
+      eCouncilHistoryUpdates.set(member.rollNo, existing);
+    }
+
+    if (eCouncilHistoryUpdates.size) {
+      await Promise.all(
+        Array.from(eCouncilHistoryUpdates.entries()).map(
+          ([rollNo, previousECouncilRoles]) =>
+            Member.updateOne(
+              { rollNo },
+              {
+                $addToSet: {
+                  previousECouncilRoles: {
+                    $each: Array.from(previousECouncilRoles),
+                  },
+                },
+              }
+            )
+        )
+      );
+    }
 
     const updates = new Map<string, Record<string, unknown>>();
     const addUpdate = (rollNo: string, patch: Record<string, unknown>) => {

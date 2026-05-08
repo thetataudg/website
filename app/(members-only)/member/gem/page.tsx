@@ -502,6 +502,34 @@ export default function GemDashboardPage() {
                     />
                   </div>
                   <div className="modal-body">
+                    <div className="mb-3">
+                      <h6 className="mb-2">Committee requirements</h6>
+                      {viewerRequirementCards.length > 0 && currentMember?.gem.committee.details.length ? (
+                        <div className="list-group mb-3">
+                          {currentMember.gem.committee.details.map((committee) => (
+                            <div
+                              key={committee.id}
+                              className={`list-group-item d-flex justify-content-between align-items-center ${committee.satisfied ? "list-group-item-success" : "list-group-item-danger"}`}
+                            >
+                              <div className="me-3">
+                                <div className="fw-semibold">{committee.name}</div>
+                                <small className="text-muted">
+                                  {committee.totalMeetings <= 2
+                                    ? `Auto-met · ${committee.totalMeetings} meetings held`
+                                    : `${committee.attended}/${committee.required} attended · ${committee.totalMeetings} meetings held`}
+                                </small>
+                              </div>
+                              <FontAwesomeIcon
+                                icon={committee.satisfied ? faCheck : faTimes}
+                                className={committee.satisfied ? "text-success" : "text-danger"}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-muted mb-0">No committee assignments for your current GEM record.</p>
+                      )}
+                    </div>
                     <ul className="list-group list-group-flush rounded-0">
                       {viewerRequirementCards.map((card) => (
                         <li key={card.key} className="list-group-item">

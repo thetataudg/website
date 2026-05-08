@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf"
     )
     .lean() as any;
 
@@ -68,6 +68,9 @@ export async function GET(req: Request) {
                 isECouncil: member.isECouncil,
                 ecouncilPosition: member.ecouncilPosition,
                 isCommitteeHead: member.isCommitteeHead,
+                previousECouncilRoles: member.previousECouncilRoles || [],
+                previousCommitteesChaired: member.previousCommitteesChaired || [],
+                previousCommitteesMemberOf: member.previousCommitteesMemberOf || [],
                 needsProfileReview: member.needsProfileReview,
                 needsPermissionReview: member.needsPermissionReview,
                 discordId: member.discordId || null,

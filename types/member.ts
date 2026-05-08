@@ -39,6 +39,9 @@ export interface MemberDoc {
     body?: string;
   }>;
   committees: string[];
+  previousECouncilRoles?: string[];
+  previousCommitteesChaired?: string[];
+  previousCommitteesMemberOf?: string[];
   familyLine: string;
   pledgeClass: string;
   isECouncil: boolean;

@@ -19,6 +19,17 @@ interface BrotherDetailClientProps {
   committees: { name: string }[];
 }
 
+const isRemovedMember = (value: any) => {
+  if (!value || typeof value === "string") return false;
+  return String(value.status || "").toLowerCase() === "removed";
+};
+
+const formatMemberRelation = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return `${value.fName ?? ""} ${value.lName ?? ""}`.trim();
+};
+
 export default function BrotherDetailClient({
   member,
   committees,
@@ -335,6 +346,12 @@ export default function BrotherDetailClient({
 
                     <section className="profile-card">
                       <h4 className="profile-section-title">Fraternity Info</h4>
+                      {(() => {
+                        const activeBigs = (member.bigs || []).filter((b: any) => !isRemovedMember(b));
+                        const activeLittles = (member.littles || []).filter((l: any) => !isRemovedMember(l));
+
+                        return (
+                          <>
                       <p>
                         <strong>Committees:</strong>{" "}
                         {committees.length
@@ -344,32 +361,27 @@ export default function BrotherDetailClient({
                       <p>
                         <strong>Pledge Class:</strong> {member.pledgeClass || "—"}
                       </p>
-                      {member.bigs?.length > 0 && (
+                      {activeBigs.length > 0 && (
                         <p className="mb-1">
-                          <strong>Big{member.bigs.length > 1 ? "s" : ""}:</strong>{" "}
-                          {member.bigs
-                            .map((b: any) =>
-                              typeof b === "string"
-                                ? b
-                                : `${b.fName ?? ""} ${b.lName ?? ""}`.trim()
-                            )
+                          <strong>Big{activeBigs.length > 1 ? "s" : ""}:</strong>{" "}
+                          {activeBigs
+                            .map((b: any) => formatMemberRelation(b))
                             .join(", ")}
                         </p>
                       )}
-                      {member.littles?.length > 0 && (
+                      {activeLittles.length > 0 && (
                         <p>
                           <strong>
-                            Little{member.littles.length > 1 ? "s" : ""}:
+                            Little{activeLittles.length > 1 ? "s" : ""}:
                           </strong>{" "}
-                          {member.littles
-                            .map((l: any) =>
-                              typeof l === "string"
-                                ? l
-                                : `${l.fName ?? ""} ${l.lName ?? ""}`.trim()
-                            )
+                          {activeLittles
+                            .map((l: any) => formatMemberRelation(l))
                             .join(", ")}
                         </p>
                       )}
+                          </>
+                        );
+                      })()}
                     </section>
 
                     {skills.length > 0 && (
