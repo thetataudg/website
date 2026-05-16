@@ -6,6 +6,9 @@ import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { getRequestSource } from "@/lib/request-source";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET(req: Request) {
   await connectDB();
 

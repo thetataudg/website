@@ -185,10 +185,15 @@ export default function QuickToolsModal({
         !!currentOccupantRollNo &&
         member.rollNo === currentOccupantRollNo &&
         !otherSelections.has(member.rollNo); // ← don't bypass if already assigned elsewhere
+      const memberIsOnBoardElsewhere = Array.from(currentBoardByPosition.entries()).some(
+        ([otherPosition, occupant]) =>
+          otherPosition !== position && occupant.rollNo === member.rollNo
+      );
       const isAllowed =
         !otherSelections.has(member.rollNo) ||
         currentValue === member.rollNo ||
-        isCurrentOccupant;
+        isCurrentOccupant ||
+        (!currentValue && memberIsOnBoardElsewhere);
       return isAllowed;
     });
   };
