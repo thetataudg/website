@@ -65,6 +65,9 @@ export async function createAppleWalletPass(
     const otSource = await fs.readFile(
       path.join(process.cwd(), "public", "walletpassicon.png")
     );
+    const fallbackThumbnailSource = await fs.readFile(
+      path.join(process.cwd(), "public", "ot.png")
+    );
     const profileSource = await loadProfilePhoto(member.profilePicUrl);
 
     const icon = await normalizeToPng(crestSource, {
@@ -97,9 +100,11 @@ export async function createAppleWalletPass(
       height: 150,
       fit: "contain",
     });
-    const thumbnails = profileSource
-      ? await createOptionalThumbnails(profileSource, member.rollNo)
-      : null;
+    const thumbnails = await createWalletPassThumbnails({
+      primarySource: profileSource,
+      fallbackSource: fallbackThumbnailSource,
+      rollNo: member.rollNo,
+    });
 
     const majorText = formatList(member.majors);
     const minorText = formatList(member.minors);
@@ -614,7 +619,13 @@ async function loadProfilePhoto(profilePicUrl?: string) {
     const presignedUrl = await maybePresignUrl(profilePicUrl, 300);
     if (!presignedUrl) return null;
     const response = await fetch(presignedUrl);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logger.warn(
+        { profilePicUrl, status: response.status },
+        "Failed to fetch member profile photo for wallet pass"
+      );
+      return null;
+    }
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (err: any) {
@@ -623,31 +634,50 @@ async function loadProfilePhoto(profilePicUrl?: string) {
   }
 }
 
-async function createOptionalThumbnails(source: Buffer, rollNo: string) {
-  try {
-    const [thumbnail, thumbnail2x, thumbnail3x] = await Promise.all([
-      normalizeToPng(source, {
-        width: 90,
-        height: 90,
-        fit: "cover",
-      }),
-      normalizeToPng(source, {
-        width: 180,
-        height: 180,
-        fit: "cover",
-      }),
-      normalizeToPng(source, {
-        width: 270,
-        height: 270,
-        fit: "cover",
-      }),
-    ]);
+async function createThumbnailSet(source: Buffer) {
+  const [thumbnail, thumbnail2x, thumbnail3x] = await Promise.all([
+    normalizeToPng(source, {
+      width: 90,
+      height: 90,
+      fit: "cover",
+    }),
+    normalizeToPng(source, {
+      width: 180,
+      height: 180,
+      fit: "cover",
+    }),
+    normalizeToPng(source, {
+      width: 270,
+      height: 270,
+      fit: "cover",
+    }),
+  ]);
 
-    return { thumbnail, thumbnail2x, thumbnail3x };
+  return { thumbnail, thumbnail2x, thumbnail3x };
+}
+
+async function createWalletPassThumbnails(input: {
+  primarySource: Buffer | null;
+  fallbackSource: Buffer;
+  rollNo: string;
+}) {
+  try {
+    if (input.primarySource) {
+      return await createThumbnailSet(input.primarySource);
+    }
   } catch (err: any) {
     logger.warn(
-      { err, rollNo },
+      { err, rollNo: input.rollNo },
       "Skipping wallet pass thumbnail because the member photo could not be converted"
+    );
+  }
+
+  try {
+    return await createThumbnailSet(input.fallbackSource);
+  } catch (err: any) {
+    logger.error(
+      { err, rollNo: input.rollNo },
+      "Failed to create fallback wallet pass thumbnail"
     );
     return null;
   }

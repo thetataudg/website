@@ -179,3 +179,17 @@ export async function markWalletPassUpdatedForMember(memberId: string) {
     { $set: { lastUpdatedTag: nowTag() } }
   );
 }
+
+export async function markAllWalletPassesUpdated() {
+  const tag = nowTag();
+  const result = await WalletPass.updateMany(
+    {},
+    { $set: { lastUpdatedTag: tag } }
+  );
+
+  return {
+    matchedCount: result.matchedCount ?? 0,
+    modifiedCount: result.modifiedCount ?? 0,
+    lastUpdatedTag: tag,
+  };
+}
