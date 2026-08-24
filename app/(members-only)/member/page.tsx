@@ -45,50 +45,23 @@ type DashboardCommittee = {
   name: string;
 };
 
-type GemRequirementKey =
-  | "generalConference"
-  | "committeeMeetings"
-  | "brotherhood"
-  | "service"
-  | "professionalism"
-  | "rush"
-  | "fso"
-  | "lockIn"
-  | "gpa";
-
 type GemMemberSnapshot = {
   memberId: string;
-  totalSatisfied: number;
+  /// Both requirements met. Independent of the point count: a member can hold
+  /// nine points and still fail GEM on a missed meeting requirement, so the
+  /// card has to say which of the two is short.
+  requirementsMet: boolean;
+  pointsEarned: number;
+  pointsRequired: number;
+  pointsAvailable: number;
   hasCompletedGem: boolean;
-  satisfiedRequirements: GemRequirementKey[];
-  gem: {
-    rush: {
-      total: number;
-      required: number;
-    };
-    gpa: {
-      value: number | null;
-      threshold: number;
-      satisfied: boolean;
-    };
-  };
+  requirements: { key: string; label: string; satisfied: boolean }[];
 };
 
 type GemStatusResponse = {
   members: GemMemberSnapshot[];
 };
 
-const GEM_REQUIREMENTS: GemRequirementKey[] = [
-  "generalConference",
-  "committeeMeetings",
-  "brotherhood",
-  "service",
-  "professionalism",
-  "rush",
-  "fso",
-  "lockIn",
-  "gpa",
-];
 
 const GOOGLE_CALENDAR_EMBED_SRC =
   "https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=America%2FPhoenix&showPrint=0&title=Theta%20Tau%20Delta%20Gamma&src=Y18yMzNkMGFlNjA2NTg2YTcyNjg0MDMxMzg5MTZkYmMxYWUzZjk5MjNiZWU1MzBhY2NhNWIzOWRkYmIxZGM1MDU1QGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&src=Y180NThhYjlhNGIzOTRjOTA1MjI3NDBiZmNlOTRkNmFlZTk2NzI2MTBkMTI3NzU1YzAyN2U0OWFjMmJhZDMwOWNjQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&color=%238b1b23&color=%23e1b21e";
@@ -371,7 +344,9 @@ export default function Dashboard() {
         const [eventsRes, committeesRes, gemRes] = await Promise.all([
           fetch("/api/events?status=scheduled,ongoing"),
           fetch(committeeUrl),
-          fetch("/api/gem/status"),
+          // Scoped to this member: an officer's unscoped request comes back
+          // with the whole chapter, and the card is about them.
+          fetch(`/api/gem/status?memberId=${encodeURIComponent(userData.memberId)}`),
         ]);
 
         if (!eventsRes.ok) {
@@ -425,7 +400,6 @@ export default function Dashboard() {
           const gemPayload = (await gemRes.json()) as GemStatusResponse;
           memberGemSnapshot =
             gemPayload.members.find((member) => member.memberId === userData.memberId) ||
-            gemPayload.members[0] ||
             null;
         }
 
@@ -611,10 +585,14 @@ export default function Dashboard() {
   const formatEventTime = (value: string) =>
     eventTimeFormatter.format(new Date(value));
 
-  const gemCompletionCount = gemSnapshot?.totalSatisfied || 0;
+  const gemPointsEarned = gemSnapshot?.pointsEarned || 0;
+  const gemPointsRequired = gemSnapshot?.pointsRequired || 7;
   const gemCompletionPercent = Math.round(
-    (gemCompletionCount / 5) * 100
+    (gemPointsEarned / Math.max(1, gemPointsRequired)) * 100
   );
+  const gemShortfall = gemSnapshot
+    ? gemSnapshot.requirements.filter((row) => !row.satisfied).map((row) => row.label)
+    : [];
 
   const statusUpdates: { type: "alert" | "info" | "success"; icon: any; text: string }[] = [];
   if (!userHasProfile) {
@@ -814,21 +792,27 @@ export default function Dashboard() {
                     <FontAwesomeIcon icon={faCheck} className="home-gem-card__check-icon" />
                     GEM Satisfied
                   </strong>
-                  <span>{gemCompletionCount}/5 requirements met</span>
+                  <span>
+                    {gemPointsEarned}/{gemPointsRequired} points · requirements met
+                  </span>
                 </div>
               ) : (
                 <>
                   <div className="home-gem-card__stats">
                     <strong>
-                      {gemCompletionCount}/5
+                      {gemPointsEarned}/{gemPointsRequired}
                     </strong>
-                    <span>Needs attention</span>
+                    <span>points</span>
                   </div>
                   <div className="home-gem-card__progress" aria-hidden="true">
-                    <span style={{ width: `${Math.max(gemCompletionPercent, 8)}%` }} />
+                    <span style={{ width: `${Math.max(Math.min(gemCompletionPercent, 100), 8)}%` }} />
                   </div>
                   <div className="home-gem-card__detail">
-                    <span>Needed to meet GEM: 5</span>
+                    <span>
+                      {gemShortfall.length
+                        ? `Requirement not met: ${gemShortfall.join(", ")}`
+                        : `Needed to meet GEM: ${gemPointsRequired} of ${gemSnapshot.pointsAvailable}`}
+                    </span>
                   </div>
                 </>
               )}

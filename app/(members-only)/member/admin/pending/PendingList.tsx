@@ -118,7 +118,8 @@ export default function PendingList({ initialRequests }: Props) {
     "Deceased",
   ];
 
-  const preferredRoleOptions = ["member", "admin", "superadmin"];
+  // "superadmin" is intentionally absent: the API rejects it from a client.
+  const preferredRoleOptions = ["member", "admin"];
 
   const parseList = (text: string) =>
     text

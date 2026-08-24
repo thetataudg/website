@@ -4,6 +4,13 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import Vote from "@/lib/models/Vote";
 import logger from "@/lib/logger";
+import {
+  readBallotLocation,
+  recordBallotLocation,
+  hasApprovedProxy,
+  proxyRequestFor,
+} from "@/lib/voteGeo";
+import { markEnded } from "@/lib/voteLifecycle";
 
 // Helper to check active member
 async function requireActiveMember(req: Request) {
@@ -46,9 +53,48 @@ export async function POST(req: Request) {
       // Auto-end vote
       vote.ended = true;
       vote.endTime = null;
+      await markEnded(vote);
       await vote.save();
       return NextResponse.json({ error: "Vote has ended" }, { status: 400 });
     }
+    
+    // Where this ballot was cast from, and where the chapter said it should
+    // be cast from. Both feed `audit` below, which writes the pair to a
+    // separate, unattributable collection once the ballot itself is counted.
+    const ballotLocation = readBallotLocation(body.location);
+    const anchor =
+      vote.votingLocation && Number.isFinite(vote.votingLocation.lat)
+        ? vote.votingLocation
+        : null;
+
+    const audit = (isProxy: boolean, choices: string[]) =>
+      recordBallotLocation({
+        voteId: vote._id,
+        location: ballotLocation,
+        proxy: isProxy,
+        choices,
+        anchor,
+      });
+
+    // A proxy ballot is one the chapter agreed to in advance. Claiming the
+    // flag without an approved request is refused rather than quietly counted,
+    // because the flag is what stops the ballot being reviewed as an anomaly.
+    const proxyRefusal = (isProxy: boolean) => {
+      if (!isProxy) return null;
+      if (hasApprovedProxy(vote, clerkId)) return null;
+      const standing = proxyRequestFor(vote, clerkId);
+      return NextResponse.json(
+        {
+          error:
+            standing?.status === "pending"
+              ? "Your proxy request is still waiting on E-Council."
+              : standing?.status === "denied"
+              ? "Your proxy request was denied."
+              : "Proxy voting needs approval. Request one first.",
+        },
+        { status: 403 }
+      );
+    };
     
     if (vote.type === "Election") {
       const { choice, proxy } = body;
@@ -56,6 +102,8 @@ export async function POST(req: Request) {
       if (!vote.started && !proxy) {
         return NextResponse.json({ error: "Vote not started" }, { status: 400 });
       }
+      const refused = proxyRefusal(!!proxy);
+      if (refused) return refused;
       // Allow "Abstain" as a valid choice in addition to the defined options
       if (!vote.options.includes(choice) && choice !== "Abstain") {
         return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
@@ -79,6 +127,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Already voted or vote has ended" }, { status: 400 });
       }
       
+      await audit(!!proxy, [choice]);
       return NextResponse.json({ success: true });
     } else if (vote.type === "Pledge") {
       // Support batch ballot submission with dual choices
@@ -88,6 +137,8 @@ export async function POST(req: Request) {
         if (!vote.started && !isProxy) {
           return NextResponse.json({ error: "Vote not started" }, { status: 400 });
         }
+        const refused = proxyRefusal(isProxy);
+        if (refused) return refused;
         
         // Build array of all votes to insert
         const votesToInsert: any[] = [];
@@ -144,6 +195,10 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Already voted for one or more pledges or vote has ended" }, { status: 400 });
         }
         
+        await audit(
+          isProxy,
+          votesToInsert.map((v) => `${v.pledge}: ${v.round} ${v.choice}`)
+        );
         return NextResponse.json({ success: true });
       } else {
         // Fallback: single pledge vote (legacy)
@@ -159,6 +214,8 @@ export async function POST(req: Request) {
         if (!vote.started && !isProxySingle) {
           return NextResponse.json({ error: "Vote not started" }, { status: 400 });
         }
+        const refusedSingle = proxyRefusal(isProxySingle);
+        if (refusedSingle) return refusedSingle;
         
         // Use atomic update to prevent race condition
         const result = await Vote.updateOne(
@@ -178,6 +235,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Already voted for this pledge this round or vote has ended" }, { status: 400 });
         }
         
+        await audit(isProxySingle, [`${pledge}: ${vote.round} ${choice}`]);
         return NextResponse.json({ success: true });
       }
     } else if (vote.type === "Bidding") {
@@ -188,6 +246,8 @@ export async function POST(req: Request) {
         if (!vote.started && !isProxy) {
           return NextResponse.json({ error: "Vote not started" }, { status: 400 });
         }
+        const refused = proxyRefusal(isProxy);
+        if (refused) return refused;
         
         // Build array of all votes to insert
         const votesToInsert: any[] = [];
@@ -225,6 +285,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Already voted for one or more rushees or vote has ended" }, { status: 400 });
         }
         
+        await audit(isProxy, votesToInsert.map((v) => `${v.rushee}: ${v.choice}`));
         return NextResponse.json({ success: true });
       }
     }
@@ -261,8 +322,27 @@ export async function GET(req: Request) {
       // Auto-end vote
       vote.ended = true;
       vote.endTime = null;
+      await markEnded(vote);
       await vote.save();
     }
+    
+    // Carried on every shape of this response: the client needs the anchor to
+    // explain *why* it is asking for a location, and its own proxy standing to
+    // know whether the early ballot is unlocked.
+    const standingProxy = proxyRequestFor(vote, clerkId);
+    const common = {
+      votingLocation: vote.votingLocation?.lat != null
+        ? {
+            lat: vote.votingLocation.lat,
+            lng: vote.votingLocation.lng,
+            label: vote.votingLocation.label || null,
+            radiusMeters: vote.votingLocation.radiusMeters || 200,
+          }
+        : null,
+      proxyStatus: standingProxy?.status || null,
+      proxyReason: standingProxy?.reason || null,
+      proxyDecisionNote: standingProxy?.decisionNote || null,
+    };
     
     if (vote.type === "Election") {
       const hasVoted = vote.votes.some((v: any) => v.clerkId === clerkId);
@@ -278,6 +358,7 @@ export async function GET(req: Request) {
         hasVoted,
         totalVotes: vote.votes.length,
         voterListVerified: vote.voterListVerified || false,
+        ...common,
       });
     } else if (vote.type === "Pledge") {
       // For each pledge, check if user has voted in both rounds
@@ -307,6 +388,7 @@ export async function GET(req: Request) {
         abstainedPledges,
         totalVotes: new Set(vote.votes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
         voterListVerified: vote.voterListVerified || false,
+        ...common,
       });
     } else if (vote.type === "Bidding") {
       // For each rushee, check if user has voted
@@ -332,6 +414,7 @@ export async function GET(req: Request) {
         abstainedRushees,
         totalVotes: new Set(vote.votes.map((v: any) => v.clerkId)).size, // Count unique voters
         voterListVerified: vote.voterListVerified || false,
+        ...common,
       });
     }
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });

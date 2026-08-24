@@ -528,6 +528,12 @@ export default function EventsPage() {
         ) : null}
         <span className="event-meta">Committee: {getCommitteeLabel(evt)}</span>
         <span className="event-meta">GEM: {categoryLabel}</span>
+        {/* Who is allowed to see it. An event hidden from alumni never
+            reaches their calendar at all, so this is the only place an active
+            can tell whether it is theirs to pass on. */}
+        <span className="event-meta">
+          Alumni: {evt.visibleToAlumni ? "Welcome" : "Not invited"}
+        </span>
       </div>
       <p className="event-card__description">
         {evt.description || "No description"}
@@ -924,7 +930,10 @@ export default function EventsPage() {
                         </div>
                         <div className="text-muted">
                           {getEventTypeLabel(resolveEventType(evt))} ·{" "}
-                          {getCommitteeLabel(evt)}
+                          {getCommitteeLabel(evt)} ·{" "}
+                          {evt.visibleToAlumni
+                            ? "Alumni welcome"
+                            : "Actives only"}
                         </div>
                         {evt.location && (
                           <div className="text-muted">{evt.location}</div>

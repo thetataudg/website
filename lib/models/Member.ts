@@ -5,6 +5,13 @@ const MemberSchema = new Schema(
   {
     discordId: { type: String, default: undefined },
     clerkId: { type: String, required: false, default: undefined },
+    /// Cached from Clerk, which is the system of record for it.
+    ///
+    /// Held here so a sixty-person email send is one database read rather than
+    /// sixty API calls. Refreshed opportunistically by the notification
+    /// pipeline; `emailSyncedAt` is how it knows what has gone stale.
+    email: { type: String, default: null },
+    emailSyncedAt: { type: Date, default: null },
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },
     lName: { type: String, required: true },

@@ -7,7 +7,9 @@ import { clerkClient } from "@clerk/clerk-sdk-node";
 import logger from "@/lib/logger";
 
 const memberStatusOptions = ["Active", "Alumni", "Removed", "Deceased"];
-const memberRoleOptions = ["superadmin", "admin", "member"];
+// Roles a reviewer may assign from the pending-approval screen. "superadmin" is
+// never accepted from a client, matching the guard in app/api/members/[rollNo]/route.ts.
+const assignableRoleOptions = ["admin", "member"];
 
 export async function PATCH(
   req: NextRequest,
@@ -83,6 +85,36 @@ export async function PATCH(
     assignIf("socialLinks", updates.socialLinks);
     assignIf("discordId", updates.discordId?.trim?.());
     assignIf("inviteId", updates.inviteId?.trim?.());
+
+    if (updates.preferredStatus !== undefined) {
+      if (!memberStatusOptions.includes(updates.preferredStatus)) {
+        logger.warn(
+          {
+            adminId: admin.clerkId,
+            pendingId: params.id,
+            attemptedStatus: updates.preferredStatus,
+          },
+          "Denied: Invalid preferred status attempted"
+        );
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+      sanitized.preferredStatus = updates.preferredStatus;
+    }
+
+    if (updates.preferredRole !== undefined) {
+      if (!assignableRoleOptions.includes(updates.preferredRole)) {
+        logger.warn(
+          {
+            adminId: admin.clerkId,
+            pendingId: params.id,
+            attemptedRole: updates.preferredRole,
+          },
+          "Denied: Invalid preferred role attempted"
+        );
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
+      sanitized.preferredRole = updates.preferredRole;
+    }
 
     if (sanitized.rollNo && sanitized.rollNo !== pending.rollNo) {
       const existingMember = await Member.findOne({ rollNo: sanitized.rollNo }).lean();

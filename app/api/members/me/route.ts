@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId familyLine committees previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf"
     )
     .lean() as any;
 
@@ -68,6 +68,8 @@ export async function GET(req: Request) {
                 isECouncil: member.isECouncil,
                 ecouncilPosition: member.ecouncilPosition,
                 isCommitteeHead: member.isCommitteeHead,
+                familyLine: member.familyLine,
+                committees: member.committees || [],
                 previousECouncilRoles: member.previousECouncilRoles || [],
                 previousCommitteesChaired: member.previousCommitteesChaired || [],
                 previousCommitteesMemberOf: member.previousCommitteesMemberOf || [],
@@ -158,6 +160,9 @@ export async function PATCH(req: Request) {
   assignIf("minors", ensureArray(updates.minors));
   assignIf("gradYear", updates.gradYear);
   assignIf("pledgeClass", updates.pledgeClass);
+  // The named family line, e.g. "Ironclad". Distinct from bigs/littles, which
+  // are the edges of the tree; this is what the branch is called.
+  assignIf("familyLine", updates.familyLine);
   assignIf("bio", updates.bio);
   assignIf("hometown", updates.hometown);
   assignIf("skills", ensureArray(updates.skills));

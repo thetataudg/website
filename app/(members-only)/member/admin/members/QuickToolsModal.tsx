@@ -33,7 +33,10 @@ type ToolMode = "election" | "graduations" | "purgeCommittees";
 interface Props {
   show: boolean;
   initialTool: ToolMode;
-  members: QuickToolMember[];
+  /// Only read by the election and graduation tools. The committees page opens
+  /// this on `purgeCommittees`, which needs nobody, so it defaults to empty
+  /// rather than making that caller fetch a roster it has no use for.
+  members?: QuickToolMember[];
   canSubmitQuickTools: boolean;
   onClose: () => void;
   onCompleted: () => Promise<void>;
@@ -56,7 +59,7 @@ const byRollNoAsc = (a: QuickToolMember, b: QuickToolMember) => {
 export default function QuickToolsModal({
   show,
   initialTool,
-  members,
+  members = [],
   canSubmitQuickTools,
   onClose,
   onCompleted,
@@ -209,7 +212,7 @@ export default function QuickToolsModal({
   const handlePurgeCommitteesSubmit = async () => {
     if (!canSubmitQuickTools) {
       setError(
-        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+        "You don't have access to submit this quick tool. It must be done by an admin, the Regent, or the Vice Regent."
       );
       return;
     }
@@ -239,7 +242,7 @@ export default function QuickToolsModal({
   const openConfirmation = () => {
     if (!canSubmitQuickTools) {
       setError(
-        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+        "You don't have access to submit this quick tool. It must be done by an admin, the Regent, or the Vice Regent."
       );
       return;
     }
@@ -285,7 +288,7 @@ export default function QuickToolsModal({
   const handleElectionSubmit = async () => {
     if (!canSubmitQuickTools) {
       setError(
-        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+        "You don't have access to submit this quick tool. It must be done by an admin, the Regent, or the Vice Regent."
       );
       return;
     }
@@ -334,7 +337,7 @@ export default function QuickToolsModal({
   const handleGraduationsSubmit = async () => {
     if (!canSubmitQuickTools) {
       setError(
-        "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+        "You don't have access to submit this quick tool. It must be done by an admin, the Regent, or the Vice Regent."
       );
       return;
     }
@@ -427,7 +430,7 @@ export default function QuickToolsModal({
               <div className="alert alert-warning d-flex align-items-center gap-2">
                 <FontAwesomeIcon icon={faTimes} />
                 <span>
-                  Only the current Regent or Vice Regent has access to this tool. Please contact leadership if you believe this is an error.
+                  Only an admin, the Regent, or the Vice Regent has access to this tool. Please contact leadership if you believe this is an error.
                 </span>
               </div>
             )}

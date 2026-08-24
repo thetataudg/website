@@ -2,6 +2,7 @@ import type { Handler } from "@netlify/functions";
 import { connectDB } from "../../lib/db";
 import logger from "../../lib/logger";
 import { syncAllEvents } from "../../lib/calendar";
+import { autoCompleteStaleEvents } from "../../lib/eventLifecycle";
 
 export const config = {
   schedule: "*/10 * * * *", // every 10 minutes
@@ -23,9 +24,13 @@ const formatSummary = (results: { status: string }[]) => {
 export const handler: Handler = async () => {
   try {
     await connectDB();
+    // Rides along with the sync rather than taking a schedule of its own: this
+    // already runs every ten minutes, which is far finer than the three-hour
+    // grace period the sweep works to.
+    const closed = await autoCompleteStaleEvents();
     const results = await syncAllEvents();
     const summary = formatSummary(results);
-    logger.info(summary, "Netlify scheduled calendar sync completed");
+    logger.info({ ...summary, ...closed }, "Netlify scheduled calendar sync completed");
 
     return {
       statusCode: 200,
@@ -33,6 +38,7 @@ export const handler: Handler = async () => {
         status: "ok",
         total: results.length,
         ...summary,
+        ...closed,
       }),
     };
   } catch (err: any) {

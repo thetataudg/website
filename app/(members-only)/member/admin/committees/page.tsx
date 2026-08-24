@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import QuickToolsModal from "../members/QuickToolsModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUsers,
@@ -37,6 +38,10 @@ export default function CommitteesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  // Purge lives here rather than on Manage Members: it empties committees, so
+  // it belongs beside the committees it empties.
+  const [showPurge, setShowPurge] = useState(false);
+  const [canPurge, setCanPurge] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -70,6 +75,24 @@ export default function CommitteesPage() {
       setLoading(false);
     }
     load();
+  }, []);
+
+  // Who may run the purge, matched to `/api/members/quick-tools`: any admin, or
+  // a sitting Regent/Vice Regent. Narrower than who may edit a committee, which
+  // is all of E-Council.
+  useEffect(() => {
+    fetch("/api/members/me")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((me) =>
+        setCanPurge(
+          me?.role === "superadmin" ||
+            me?.role === "admin" ||
+            (Boolean(me?.isECouncil) &&
+              (me?.ecouncilPosition === "Regent" ||
+                me?.ecouncilPosition === "Vice Regent"))
+        )
+      )
+      .catch(() => setCanPurge(false));
   }, []);
 
   function resetForm() {
@@ -188,13 +211,35 @@ export default function CommitteesPage() {
 
   return (
     <div>
+      <QuickToolsModal
+        show={showPurge}
+        initialTool="purgeCommittees"
+        canSubmitQuickTools={canPurge}
+        onClose={() => setShowPurge(false)}
+        onCompleted={async () => {
+          // The purge clears every head and every roster, so the table behind
+          // it is stale the moment it lands.
+          const res = await fetch("/api/committees");
+          if (res.ok) setCommittees(await res.json());
+        }}
+      />
       <div className="bento-card admin-table-card">
         <div className="admin-members-header">
           <h2>Manage Committees</h2>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            <FontAwesomeIcon icon={faSquarePlus} className="me-2" />
-            Add Committee
-          </button>
+          <div className="d-flex flex-wrap gap-2">
+            {canPurge && (
+              <button
+                className="btn btn-outline-danger"
+                onClick={() => setShowPurge(true)}
+              >
+                Purge Committees
+              </button>
+            )}
+            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+              <FontAwesomeIcon icon={faSquarePlus} className="me-2" />
+              Add Committee
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">

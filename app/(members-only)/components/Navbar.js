@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import ThemeToggle from "./ThemeToggle";
+import NotificationBell from "./NotificationBell";
 
 export default function MemberNavbar() {
   const pathname = usePathname();
@@ -261,7 +262,7 @@ export default function MemberNavbar() {
                             }`}
                           href="/member/admin/gem"
                         >
-                          GEM Records
+                          Manage GEM
                         </Link>
                       </li>
                     </ul>
@@ -427,6 +428,9 @@ export default function MemberNavbar() {
               >
                 Main Site
               </button>
+            </li>
+            <li className="nav-item d-flex align-items-center me-2">
+              <NotificationBell />
             </li>
             <li className="nav-item">
               <ThemeToggle />

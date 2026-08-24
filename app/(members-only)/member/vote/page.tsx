@@ -46,6 +46,9 @@ type VoteInfo = {
   startedAt?: string | null;
   endTime?: string | null;
   voterListVerified?: boolean;
+  votingLocation?: { lat: number; lng: number; label: string | null; radiusMeters: number } | null;
+  proxyStatus?: 'pending' | 'approved' | 'denied' | null;
+  proxyDecisionNote?: string | null;
   boardResults?: Record<string, { continue: number; board: number }>;
   blackballResults?: Record<string, { continue: number; blackball: number }>;
   biddingResults?: Record<string, { bid: number; noBid: number }>;
@@ -152,6 +155,32 @@ export default function VotePage() {
   // Proxy vote mode (unlocks ballot before vote starts)
   const [proxyMode, setProxyMode] = useState(false);
   const [showProxyConfirm, setShowProxyConfirm] = useState(false);
+  const [proxyReason, setProxyReason] = useState("");
+  // Officer side of the same thing: who has asked, and what was decided.
+  const [showProxyQueue, setShowProxyQueue] = useState(false);
+  const [proxyQueue, setProxyQueue] = useState<any[]>([]);
+  const [proxyQueueLoading, setProxyQueueLoading] = useState(false);
+
+  // The browser's position, captured before the ballot is submitted.
+  //
+  // Optional by design. A member who declines the prompt still votes; their
+  // ballot simply doesn't appear on the integrity map, which is a smaller
+  // wrong than refusing to count it.
+  const captureLocation = (): Promise<{ lat: number; lng: number; accuracy?: number } | null> =>
+    new Promise((resolve) => {
+      if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+      const done = (value: any) => resolve(value);
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          done({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+        () => done(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      );
+    });
 
   // Pledge cons management state
   const [showPledgeCons, setShowPledgeCons] = useState(false);
@@ -672,7 +701,8 @@ export default function VotePage() {
     if (!selectedOption || !voteInfo) return;
     setSubmitting(true);
     try {
-      await axios.post("/api/vote", { voteId: voteInfo._id, choice: selectedOption, proxy: proxyMode });
+      const location = await captureLocation();
+      await axios.post("/api/vote", { voteId: voteInfo._id, choice: selectedOption, proxy: proxyMode, location });
       setVoted(true);
       setProxyMode(false);
       // Immediately update the voted badge in votes list
@@ -709,7 +739,8 @@ export default function VotePage() {
         };
       });
 
-      await axios.post("/api/vote", { voteId: voteInfo._id, ballot, proxy: proxyMode });
+      const location = await captureLocation();
+      await axios.post("/api/vote", { voteId: voteInfo._id, ballot, proxy: proxyMode, location });
       // Immediately update the voted badge in votes list
       setVotesList(prev => prev.map(v => 
         v._id === voteInfo._id ? { ...v, hasVoted: true } : v
@@ -739,7 +770,8 @@ export default function VotePage() {
         return { rushee, choice };
       });
 
-      await axios.post("/api/vote", { voteId: voteInfo._id, ballot });
+      const location = await captureLocation();
+      await axios.post("/api/vote", { voteId: voteInfo._id, ballot, location });
       // Immediately update the voted badge in votes list
       setVotesList(prev => prev.map(v => 
         v._id === voteInfo._id ? { ...v, hasVoted: true } : v
@@ -754,6 +786,71 @@ export default function VotePage() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Proxy voting is a request now, not a switch: ask, then wait for the
+  // Regent, Vice Regent or Scribe to grant it.
+  const handleRequestProxy = async () => {
+    if (!voteInfo?._id) return;
+    setSubmitting(true);
+    try {
+      await axios.post("/api/vote/proxy", { voteId: voteInfo._id, reason: proxyReason.trim() });
+      setShowProxyConfirm(false);
+      setProxyReason("");
+      fetchVoteInfo();
+      setAlertModal({
+        show: true,
+        title: 'Proxy Requested',
+        message: "Your request is with E-Council. The ballot unlocks once they approve it.",
+        variant: 'success'
+      });
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Request Proxy',
+        message: err?.response?.data?.error || "Failed to request a proxy vote.",
+        variant: 'danger'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleShowProxyQueue = async () => {
+    if (!voteInfo?._id) return;
+    setProxyQueueLoading(true);
+    setShowProxyQueue(true);
+    try {
+      const res = await axios.get(`/api/vote/proxy?voteId=${voteInfo._id}`);
+      setProxyQueue(res.data.requests || []);
+    } catch (err: any) {
+      setProxyQueue([]);
+      setAlertModal({
+        show: true,
+        title: 'Failed to Load Proxy Requests',
+        message: err?.response?.data?.error || "Failed to load proxy requests.",
+        variant: 'danger'
+      });
+    } finally {
+      setProxyQueueLoading(false);
+    }
+  };
+
+  const handleDecideProxy = async (subjectId: string, decision: 'approved' | 'denied') => {
+    if (!voteInfo?._id) return;
+    try {
+      await axios.patch("/api/vote/proxy", { voteId: voteInfo._id, clerkId: subjectId, decision });
+      const res = await axios.get(`/api/vote/proxy?voteId=${voteInfo._id}`);
+      setProxyQueue(res.data.requests || []);
+      fetchVotesList();
+    } catch (err: any) {
+      setAlertModal({
+        show: true,
+        title: 'Failed to Save Decision',
+        message: err?.response?.data?.error || "Failed to save the decision.",
+        variant: 'danger'
+      });
     }
   };
 
@@ -1367,6 +1464,11 @@ export default function VotePage() {
                     </h6>
                     <div className="d-flex gap-2">
                       {!voteInfo.started && !voteInfo.ended && (
+                        <Button size="sm" variant="warning" onClick={handleShowProxyQueue} disabled={proxyQueueLoading}>
+                          <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxies
+                        </Button>
+                      )}
+                      {!voteInfo.started && !voteInfo.ended && (
                         <>
                           <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
                             <FontAwesomeIcon icon={faPlay} className="me-1" /> Start Voting
@@ -1489,6 +1591,11 @@ export default function VotePage() {
                     </h6>
                     <div className="d-flex gap-2">
                       {!voteInfo.started && !voteInfo.ended && (
+                        <Button size="sm" variant="warning" onClick={handleShowProxyQueue} disabled={proxyQueueLoading}>
+                          <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxies
+                        </Button>
+                      )}
+                      {!voteInfo.started && !voteInfo.ended && (
                         <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
                           <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
                         </Button>
@@ -1603,6 +1710,11 @@ export default function VotePage() {
                       E-Council Controls
                     </h6>
                     <div className="d-flex gap-2">
+                      {!voteInfo.started && !voteInfo.ended && (
+                        <Button size="sm" variant="warning" onClick={handleShowProxyQueue} disabled={proxyQueueLoading}>
+                          <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxies
+                        </Button>
+                      )}
                       {!voteInfo.started && !voteInfo.ended && (
                         <Button size="sm" variant="primary" onClick={handleStartVote} disabled={submitting}>
                           <FontAwesomeIcon icon={faPlay} className="me-1" /> Start
@@ -2102,13 +2214,40 @@ export default function VotePage() {
         {/* Proxy unlock button when vote is suspended */}
         {voteInfo && voteInfo.type === "Election" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && selectedVoteId && (
           <div className="mt-3">
-            <Button 
-              variant="danger" 
-              onClick={() => setShowProxyConfirm(true)} 
-              disabled={voted || submitting}
-            >
-              <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
-            </Button>
+            {voteInfo.proxyStatus === 'approved' ? (
+              <Button
+                variant="danger"
+                onClick={() => setProxyMode(true)}
+                disabled={voted || submitting}
+              >
+                <FontAwesomeIcon icon={faUnlock} className="me-1" /> Cast Proxy Ballot
+              </Button>
+            ) : voteInfo.proxyStatus === 'pending' ? (
+              <div className="alert alert-warning mb-0" role="alert">
+                Your proxy request is waiting on E-Council. The ballot unlocks once they approve it.
+              </div>
+            ) : voteInfo.proxyStatus === 'denied' ? (
+              <div className="alert alert-danger mb-0" role="alert">
+                Your proxy request was denied.{voteInfo.proxyDecisionNote ? ` ${voteInfo.proxyDecisionNote}` : ''}
+                <Button
+                  size="sm"
+                  variant="outline-light"
+                  className="ms-3"
+                  onClick={() => setShowProxyConfirm(true)}
+                  disabled={submitting}
+                >
+                  Ask again
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="danger"
+                onClick={() => setShowProxyConfirm(true)}
+                disabled={voted || submitting}
+              >
+                <FontAwesomeIcon icon={faUnlock} className="me-1" /> Request Proxy Vote
+              </Button>
+            )}
           </div>
         )}
 
@@ -2173,13 +2312,40 @@ export default function VotePage() {
         {/* Proxy unlock button when pledge vote is suspended */}
         {voteInfo && voteInfo.type === "Pledge" && !voteInfo.started && !voteInfo.ended && !voted && !proxyMode && selectedVoteId && (
           <div className="mt-3">
-            <Button 
-              variant="danger" 
-              onClick={() => setShowProxyConfirm(true)} 
-              disabled={voted || submitting}
-            >
-              <FontAwesomeIcon icon={faUnlock} className="me-1" /> Proxy Vote
-            </Button>
+            {voteInfo.proxyStatus === 'approved' ? (
+              <Button
+                variant="danger"
+                onClick={() => setProxyMode(true)}
+                disabled={voted || submitting}
+              >
+                <FontAwesomeIcon icon={faUnlock} className="me-1" /> Cast Proxy Ballot
+              </Button>
+            ) : voteInfo.proxyStatus === 'pending' ? (
+              <div className="alert alert-warning mb-0" role="alert">
+                Your proxy request is waiting on E-Council. The ballot unlocks once they approve it.
+              </div>
+            ) : voteInfo.proxyStatus === 'denied' ? (
+              <div className="alert alert-danger mb-0" role="alert">
+                Your proxy request was denied.{voteInfo.proxyDecisionNote ? ` ${voteInfo.proxyDecisionNote}` : ''}
+                <Button
+                  size="sm"
+                  variant="outline-light"
+                  className="ms-3"
+                  onClick={() => setShowProxyConfirm(true)}
+                  disabled={submitting}
+                >
+                  Ask again
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="danger"
+                onClick={() => setShowProxyConfirm(true)}
+                disabled={voted || submitting}
+              >
+                <FontAwesomeIcon icon={faUnlock} className="me-1" /> Request Proxy Vote
+              </Button>
+            )}
           </div>
         )}
 
@@ -2864,6 +3030,69 @@ export default function VotePage() {
           </div>
         )}
 
+        {/* Proxy Requests Queue (E-Council) */}
+        {showProxyQueue && (
+          <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+              <div className="modal-content vote-modal">
+                <div className="modal-header vote-modal__header">
+                  <h5 className="modal-title">
+                    <FontAwesomeIcon icon={faUnlock} className="me-2" />
+                    Proxy Requests
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowProxyQueue(false)}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  {proxyQueueLoading ? (
+                    <div className="text-center py-4">
+                      <LoadingSpinner size="sm" className="me-2" />
+                      Loading requests...
+                    </div>
+                  ) : proxyQueue.length === 0 ? (
+                    <div className="text-muted text-center py-4">
+                      Nobody has asked to vote by proxy on this vote.
+                    </div>
+                  ) : (
+                    <div className="list-group">
+                      {proxyQueue.map((r) => (
+                        <div key={r.clerkId} className="list-group-item">
+                          <div className="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                              <strong>{r.name}</strong>
+                              {r.rollNo && <span className="text-muted ms-2">#{r.rollNo}</span>}
+                              {r.status === 'approved' && <span className="ms-2 badge bg-success">Approved</span>}
+                              {r.status === 'denied' && <span className="ms-2 badge bg-danger">Denied</span>}
+                              {r.status === 'pending' && <span className="ms-2 badge bg-warning text-dark">Waiting</span>}
+                              {r.reason && <div className="small mt-1">{r.reason}</div>}
+                            </div>
+                            {r.status === 'pending' && (
+                              <div className="d-flex gap-2 flex-shrink-0">
+                                <Button size="sm" variant="success" onClick={() => handleDecideProxy(r.clerkId, 'approved')}>
+                                  <FontAwesomeIcon icon={faCheck} className="me-1" /> Approve
+                                </Button>
+                                <Button size="sm" variant="outline-danger" onClick={() => handleDecideProxy(r.clerkId, 'denied')}>
+                                  <FontAwesomeIcon icon={faTimes} className="me-1" /> Deny
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <Button variant="secondary" onClick={() => setShowProxyQueue(false)}>Close</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Proxy Confirm Modal */}
         {showProxyConfirm && (
           <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
@@ -2872,7 +3101,7 @@ export default function VotePage() {
                 <div className="modal-header vote-modal__header vote-modal__header--danger">
                   <h5 className="modal-title">
                     <FontAwesomeIcon icon={faUnlock} className="me-2" />
-                    Unlock Ballot (Proxy)
+                    Request a Proxy Vote
                   </h5>
                   <button
                     type="button"
@@ -2882,15 +3111,26 @@ export default function VotePage() {
                 </div>
                 <div className="modal-body">
                   <p>
-                    Are you sure you want to unlock the ballot and submit a proxy vote? This action cannot be undone, and you must make the Scribe aware of your intention to proxy vote for your vote to be tallied.
+                    A proxy ballot is cast before the vote opens, so the chapter has to
+                    agree to it first. Tell E-Council why you cannot be in the room. The
+                    ballot unlocks once the Regent, Vice Regent or Scribe approves it.
                   </p>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Why you cannot attend"
+                    value={proxyReason}
+                    onChange={(e) => setProxyReason(e.target.value)}
+                    disabled={submitting}
+                  />
                 </div>
                 <div className="modal-footer">
                   <Button variant="secondary" onClick={() => setShowProxyConfirm(false)} disabled={submitting}>
                     Cancel
                   </Button>
-                  <Button variant="danger" onClick={() => { setProxyMode(true); setShowProxyConfirm(false); }} disabled={submitting}>
-                    <FontAwesomeIcon icon={faUnlock} className="me-1" /> Confirm Proxy Vote
+                  <Button variant="danger" onClick={handleRequestProxy} disabled={submitting || !proxyReason.trim()}>
+                    <FontAwesomeIcon icon={faUnlock} className="me-1" /> Send Request
                   </Button>
                 </div>
               </div>

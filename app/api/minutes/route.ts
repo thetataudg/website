@@ -82,7 +82,15 @@ export async function GET(req: Request) {
     return NextResponse.json(minutesWithSignedUrl, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to list minutes");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    // An exception is a server failure, not an authorisation decision.
+    //
+    // Every catch in this file used to answer 403, which meant a missing S3
+    // bucket, a Mongo timeout and a genuine "you are not the Scribe" all
+    // reached the client as Forbidden — and every client turns that into "you
+    // don't have access, try signing out". The real cause was in the server log
+    // and nowhere else. Deliberate refusals below still answer 403; this does
+    // not.
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
@@ -96,7 +104,10 @@ export async function POST(req: Request) {
     }
 
     if (!isAdminOrScribe(member)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Only the Scribe or an admin can publish or change minutes." },
+        { status: 403 }
+      );
     }
 
     if (!minutesBucketValue) {
@@ -245,6 +256,6 @@ export async function POST(req: Request) {
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to create minutes");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

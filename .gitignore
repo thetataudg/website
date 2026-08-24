@@ -30,6 +30,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.backup-before-bucket-fix
 
 # local secrets that should never be committed
 secrets/
@@ -46,3 +47,13 @@ calendar.json
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# treasury check-script bundles (esbuild output, regenerated per run)
+.dues-check.cjs
+.history-check.cjs
+.notify-check.cjs
+.plans-check.cjs
+
+# stray build-output backups (never commit)
+.next.bak*
+/.build/
