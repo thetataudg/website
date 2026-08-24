@@ -42,17 +42,25 @@ async function requireQuickToolSubmitter(req: Request) {
   const clerkId = await requireAuth(req as any);
   await connectDB();
 
+  // Admins as well as the two seats.
+  //
+  // This used to be superadmin *or* a sitting Regent/Vice Regent, which locked
+  // out every other admin — including the Treasurer and Scribe, who the officer
+  // election itself promotes to `role: "admin"`. An admin already has the run
+  // of the roster through `/api/members/{rollNo}` and could do all three of
+  // these by hand, one member at a time; refusing them the tool that does it in
+  // one pass protected nothing and just made the job longer.
   const submitter = await Member.findOne({
     clerkId,
     $or: [
-      { role: "superadmin" },
+      { role: { $in: ["superadmin", "admin"] } },
       { isECouncil: true, ecouncilPosition: { $in: ["Regent", "Vice Regent"] } },
     ],
-  }).lean<{ rollNo?: string; fName?: string; lName?: string; ecouncilPosition?: string }>();
+  }).lean<{ rollNo?: string; fName?: string; lName?: string; ecouncilPosition?: string; role?: string }>();
 
   if (!submitter) {
     const error = new Error(
-      "You don't have access to submit this quick tool. It must be done by the Regent or Vice Regent."
+      "You don't have access to submit this quick tool. It must be done by an admin, the Regent, or the Vice Regent."
     ) as Error & { statusCode?: number };
     error.statusCode = 403;
     throw error;

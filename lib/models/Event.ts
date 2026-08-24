@@ -45,6 +45,20 @@ const EventSchema = new Schema(
       default: "scheduled",
     },
     visibleToAlumni: { type: Boolean, default: true },
+    // Who *said* they're coming. Distinct from `attendees`, which is who
+    // actually checked in at the door — an RSVP is an intention, attendance is
+    // a fact, and GEM only ever counts the latter.
+    rsvps: [
+      {
+        memberId: { type: Schema.Types.ObjectId, ref: "Member", required: true },
+        status: {
+          type: String,
+          enum: ["going", "maybe", "not_going"],
+          required: true,
+        },
+        respondedAt: { type: Date, default: () => new Date() },
+      },
+    ],
     attendees: [
       {
         memberId: { type: Schema.Types.ObjectId, ref: "Member", required: true },
@@ -60,6 +74,15 @@ const EventSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Next's dev server re-evaluates this module on hot reload but `models` lives
+// on the global mongoose instance, so a schema registered before an edit
+// survives it. That's how `rsvps` came to be missing from the compiled model
+// while it was present in the file — every write to it silently no-opped and
+// then threw. `Member.ts` carries the same guard for the same reason.
+if (process.env.NODE_ENV === "development" && models.Event) {
+  delete models.Event;
+}
 
 const Event = models.Event || model("Event", EventSchema);
 export default Event;

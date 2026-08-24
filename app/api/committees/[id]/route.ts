@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAuth, requireRole } from "@/lib/clerk";
+import { requireAuth, requireOfficer } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { isCalendarColor } from "@/lib/calendarColors";
 
 async function updateHeadFlags(oldHeadId?: string | null, newHeadId?: string | null, committeeId?: string) {
   if (newHeadId) {
@@ -46,7 +47,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req as any, ["superadmin", "admin"]);
+    await requireOfficer(req as any);
     await connectDB();
 
     const updates = await req.json();
@@ -65,6 +66,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
     if ("committeeHeadId" in updates) {
       committee.committeeHeadId = updates.committeeHeadId || null;
+    }
+    if ("color" in updates && isCalendarColor(updates.color)) {
+      committee.color = updates.color;
     }
     if ("committeeMembers" in updates) {
       committee.committeeMembers = Array.isArray(updates.committeeMembers)
@@ -86,7 +90,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req as any, ["superadmin", "admin"]);
+    await requireOfficer(req as any);
     await connectDB();
 
     const committee = await Committee.findById(params.id);

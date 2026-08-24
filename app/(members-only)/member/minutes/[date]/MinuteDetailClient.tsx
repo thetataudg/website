@@ -15,7 +15,7 @@ import LoadingState from "../../../components/LoadingState";
 import MinuteFormModal, {
   EventOption,
   MinuteFormValues,
-} from "../components/MinuteFormModal.tsx";
+} from "../components/MinuteFormModal";
 
 type MemberSummary = {
   role: string;

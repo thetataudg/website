@@ -32,6 +32,28 @@ export async function requireRole(
   return member;
 }
 
+/**
+ * Elected officers as well as admins.
+ *
+ * `requireRole` only reads `member.role`, which is superadmin | admin | member.
+ * E-Council is a separate boolean, so an elected officer whose role is still
+ * "member" fails every `requireRole(["superadmin","admin"])` check — which is
+ * why committee management was closed to the people who actually run the
+ * committees.
+ */
+export async function requireOfficer(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) throw new UnauthorizedError();
+
+  const member = await Member.findOne({ clerkId: userId });
+  if (!member) throw new ForbiddenError();
+
+  const isAdmin = member.role === "admin" || member.role === "superadmin";
+  if (!isAdmin && !member.isECouncil) throw new ForbiddenError();
+
+  return member;
+}
+
 export async function getUserIdFromRequest(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();

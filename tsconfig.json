@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
     "target": "es2020",
     "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -23,15 +23,13 @@
       "@/*": ["./*"],
       "@/components/*": ["components/*"],
       "@/components": ["components"]
-    },
-    "allowImportingTsExtensions": true
+    }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "scripts/seedAdmin.cjs"
+    ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "out", "build"]
 }

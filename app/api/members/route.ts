@@ -13,7 +13,18 @@ import { requireRole } from "@/lib/clerk";
 export async function GET() {
   try {
     await connectDB();
-    const members = await Member.find().lean();
+    // Populated so bigs and littles arrive as people rather than as bare
+    // ObjectIds. Without this the roster is the one place a member is read
+    // from that cannot name their own big, and the app was printing the raw
+    // id — `#69fbca055118f6135a6cee00` — straight onto the profile.
+    //
+    // Three fields each, not the whole document: a roster of several hundred
+    // members would otherwise fan out into several hundred more full member
+    // records, most of them already in the same response.
+    const members = await Member.find()
+      .populate("bigs", "fName lName rollNo")
+      .populate("littles", "fName lName rollNo")
+      .lean();
 
     logger.info(`Fetched ${members.length} members from database`);
 

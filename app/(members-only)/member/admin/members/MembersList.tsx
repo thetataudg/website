@@ -75,7 +75,9 @@ export default function MembersList({
   const [deletingRollNo, setDeletingRollNo] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showQuickTools, setShowQuickTools] = useState(false);
-  const [quickToolsTool, setQuickToolsTool] = useState<"election" | "graduations" | "purgeCommittees">("election");
+  // Purge Committees used to be here too. It now lives on Manage Committees,
+  // next to the committees it empties, rather than on the roster screen.
+  const [quickToolsTool, setQuickToolsTool] = useState<"election" | "graduations">("election");
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
@@ -218,16 +220,6 @@ export default function MembersList({
             >
               Graduations
             </button>
-            <button
-              type="button"
-              className="btn btn-outline-danger"
-              onClick={() => {
-                setQuickToolsTool("purgeCommittees");
-                setShowQuickTools(true);
-              }}
-            >
-              Purge Committees
-            </button>
           </div>
         </div>
       </div>
@@ -366,6 +358,7 @@ export default function MembersList({
         canSubmitQuickTools={Boolean(
           currentUser &&
             (currentUser.role === "superadmin" ||
+              currentUser.role === "admin" ||
               (currentUser.isECouncil &&
                 (currentUser.ecouncilPosition === "Regent" ||
                   currentUser.ecouncilPosition === "Vice Regent")))

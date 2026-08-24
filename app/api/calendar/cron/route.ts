@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import logger from "@/lib/logger";
 import { syncAllEvents } from "@/lib/calendar";
+import { autoCompleteStaleEvents } from "@/lib/eventLifecycle";
 
 const CRON_SECRET = process.env.CALENDAR_SYNC_CRON_SECRET;
 
@@ -21,10 +22,11 @@ async function handleCron(req: Request) {
 
   try {
     await connectDB();
+    const closed = await autoCompleteStaleEvents();
     const results = await syncAllEvents();
     const synced = results.filter((item) => item.status === "synced").length;
     return NextResponse.json(
-      { status: "ok", total: results.length, synced },
+      { status: "ok", total: results.length, synced, ...closed },
       { status: 200 }
     );
   } catch (err: any) {

@@ -151,7 +151,15 @@ export async function GET(
     return NextResponse.json(enriched, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to load minutes");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    // An exception is a server failure, not an authorisation decision.
+    //
+    // Every catch in this file used to answer 403, which meant a missing S3
+    // bucket, a Mongo timeout and a genuine "you are not the Scribe" all
+    // reached the client as Forbidden — and every client turns that into "you
+    // don't have access, try signing out". The real cause was in the server log
+    // and nowhere else. Deliberate refusals below still answer 403; this does
+    // not.
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
@@ -167,7 +175,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
     if (!isAdminOrScribe(member)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Only the Scribe or an admin can publish or change minutes." },
+        { status: 403 }
+      );
     }
 
     const minute = await findMinuteForSlug(params.date);
@@ -285,7 +296,7 @@ export async function PATCH(
     return NextResponse.json(enriched, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update minutes");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
@@ -301,7 +312,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
     if (!isAdminOrScribe(member)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Only the Scribe or an admin can publish or change minutes." },
+        { status: 403 }
+      );
     }
 
     const minute = await findMinuteForSlug(params.date);
@@ -317,6 +331,6 @@ export async function DELETE(
     return NextResponse.json({ status: "deleted" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete minutes");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

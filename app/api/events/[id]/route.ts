@@ -6,8 +6,9 @@ import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
-import { addRecurrence, applyTimeOfDay, getArizonaNow, toArizonaDateTime } from "@/lib/recurrence";
+import { applyTimeOfDay } from "@/lib/recurrence";
 import { syncEventWithCalendar, deleteCalendarEvent } from "@/lib/calendar";
+import { ensureFutureOccurrences } from "@/lib/eventLifecycle";
 import { normalizeGemCategory } from "@/lib/gem";
 
 async function getMemberByClerk(req: Request) {
@@ -26,63 +27,6 @@ async function canManageEvent(member: any, event: any) {
   if (!event.committeeId) return false;
   const committee = await Committee.findById(event.committeeId);
   return committee?.committeeHeadId?.toString() === member._id?.toString();
-}
-
-async function ensureFutureOccurrences(parentId: any) {
-  const parent = (await Event.findById(parentId).lean()) as any;
-  if (!parent || !parent.recurrence?.enabled) return;
-
-  const count = Math.max(Number(parent.recurrence?.count) || 1, 1);
-  const now = getArizonaNow();
-
-  const existing = await Event.find({
-    $or: [{ _id: parentId }, { recurrenceParentId: parentId }],
-  })
-    .sort({ startTime: 1 })
-    .lean();
-
-  const future = existing.filter((evt: any) => {
-    const eventStart = toArizonaDateTime(evt.startTime);
-    return eventStart ? eventStart >= now : false;
-  });
-  if (future.length >= count) return;
-
-  let last = existing[existing.length - 1] || parent;
-  let toCreate = count - future.length;
-
-  while (toCreate > 0) {
-    const next = addRecurrence(
-      new Date(last.startTime),
-      new Date(last.endTime),
-      {
-        frequency: parent.recurrence?.frequency,
-        interval: parent.recurrence?.interval,
-        endDate: parent.recurrence?.endDate || null,
-      }
-    );
-    if (!next) break;
-
-    const created = await Event.create({
-      name: parent.name,
-      description: parent.description,
-      committeeId: parent.committeeId || null,
-      startTime: next.startTime,
-      endTime: next.endTime,
-      startedAt: null,
-      endedAt: null,
-      location: parent.location,
-      eventType: parent.eventType,
-      gemCategory: parent.gemCategory || null,
-      recurrence: { enabled: false },
-      status: "scheduled",
-      visibleToAlumni: parent.visibleToAlumni,
-      attendees: [],
-      recurrenceParentId: parentId,
-    });
-    await syncEventWithCalendar(created);
-    last = created.toObject();
-    toCreate -= 1;
-  }
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -255,7 +199,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         typeof updates.visibleToAlumni === "boolean"
           ? updates.visibleToAlumni
           : event.visibleToAlumni,
-      committeeId: updates.committeeId ?? event.committeeId,
+      // `??` here meant an admin could move an event *between* committees but
+      // never back to chapter-wide, because an explicit null fell through to
+      // the existing value. Presence of the key is the signal.
+      committeeId: "committeeId" in updates ? updates.committeeId : event.committeeId,
     };
 
     if (nextStatus === "ongoing" && !event.startedAt) {

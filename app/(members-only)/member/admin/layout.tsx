@@ -14,6 +14,7 @@ const TABS = [
   { href: "/member/admin/committees", label: "Manage Committees" },
   { href: "/member/admin/invite", label: "Invite Member" },
   { href: "/member/admin/pending", label: "Pending Requests" },
+  { href: "/member/admin/dues", label: "Dues" },
   { href: "/member/admin/lockdown", label: "Lockdown Control" },
 ];
 

@@ -96,3 +96,61 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: err.message }, { status: 403 });
   }
 }
+
+/**
+ * Takes somebody back off the attendance list.
+ *
+ * Scanning the wrong person, or the same phone twice under two accounts, is a
+ * thing that happens at a door with a queue behind it. Attendance is what GEM
+ * counts, so an entry that shouldn't be there has to be removable by whoever
+ * is running the event, not only by an admin with database access.
+ */
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  try {
+    const actor = await getMemberByClerk(req);
+    const { memberId } = await req.json();
+
+    if (!memberId || !mongoose.Types.ObjectId.isValid(memberId)) {
+      return NextResponse.json({ error: "memberId is required" }, { status: 400 });
+    }
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    const eventId = new mongoose.Types.ObjectId(params.id);
+    const event = await Event.collection.findOne({ _id: eventId });
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    const isAdmin = actor.role === "admin" || actor.role === "superadmin";
+    const isPrivileged = isAdmin || actor.isECouncil;
+    if (!isPrivileged) {
+      const committee = await Committee.findById(event.committeeId);
+      const isHead =
+        committee?.committeeHeadId?.toString() === actor._id?.toString();
+      if (!isHead) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    const targetId = new mongoose.Types.ObjectId(memberId);
+    const update = await Event.collection.updateOne(
+      { _id: eventId },
+      { $pull: { attendees: { memberId: targetId } } } as any
+    );
+
+    if (update.modifiedCount === 0) {
+      return NextResponse.json({ status: "not-checked-in" }, { status: 200 });
+    }
+
+    logger.info(
+      { eventId, memberId, removedBy: actor._id?.toString() },
+      "Check-in removed"
+    );
+    return NextResponse.json({ status: "removed" }, { status: 200 });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to remove check-in");
+    return NextResponse.json({ error: err.message }, { status: 403 });
+  }
+}

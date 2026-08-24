@@ -3,9 +3,23 @@ import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import Vote from "@/lib/models/Vote";
+import VoteLocation from "@/lib/models/VoteLocation";
 import logger from "@/lib/logger";
+import { isArchived, markEnded } from "@/lib/voteLifecycle";
 
-// Helper to check E-Council
+/**
+ * The write gate for votes: creating, starting, ending, relocating, deleting,
+ * and reading a single vote's results.
+ *
+ * Same rule as the vote page's own `canAccessECouncilControls()` and as
+ * `requireVoteOfficer` in the proxy and location routes — admins, plus the two
+ * positions that actually run a vote. Despite the name this used to admit any
+ * signed-in member, which the iOS app made trivially reachable.
+ *
+ * Note the votes LIST (GET with no voteId) deliberately does NOT use this: any
+ * member needs it to find a vote to request a proxy on, so it does its own
+ * plain membership check.
+ */
 async function requireECouncil(req: Request) {
   const clerkId = await requireAuth(req as any);
   await connectDB();
@@ -13,14 +27,42 @@ async function requireECouncil(req: Request) {
   if (!member || Array.isArray(member)) {
     throw new Error("Not authorized");
   }
+  const isAdmin = member.role === "admin" || member.role === "superadmin";
+  const position = (member.ecouncilPosition || "").toLowerCase();
+  if (!isAdmin && !(position.includes("regent") || position.includes("scribe"))) {
+    throw new Error("Not authorized - vote officers only");
+  }
   return member;
+}
+
+/**
+ * Normalises an anchor sent by a client, or undefined when it isn't one.
+ *
+ * The radius is clamped rather than trusted: a zero would flag every ballot in
+ * the room, and an unbounded one would flag none, and neither is a setting
+ * anybody means to choose.
+ */
+function readAnchor(raw: any) {
+  if (!raw || typeof raw !== "object") return undefined;
+  const lat = Number(raw.lat);
+  const lng = Number(raw.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return undefined;
+  const radius = Number(raw.radiusMeters);
+  return {
+    lat,
+    lng,
+    label: typeof raw.label === "string" ? raw.label.trim().slice(0, 120) : undefined,
+    radiusMeters: Number.isFinite(radius) ? Math.min(20_000, Math.max(25, radius)) : 200,
+    setAt: new Date(),
+  };
 }
 
 // POST: Create a new vote (suspended, not started)
 export async function POST(req: Request) {
   try {
     await requireECouncil(req);
-    const { type, options, pledges, rushees, title } = await req.json();
+    const { type, options, pledges, rushees, title, votingLocation } = await req.json();
     if (type === "Election") {
       if (!Array.isArray(options) || options.length < 1) {
         return NextResponse.json({ error: "Invalid vote type or options" }, { status: 400 });
@@ -50,6 +92,8 @@ export async function POST(req: Request) {
       endTime: null,
       votes: [],
       removedOptions: [],
+      votingLocation: readAnchor(votingLocation),
+      proxyRequests: [],
       createdAt: new Date(),
     });
     return NextResponse.json({ success: true, voteId: vote._id }, { status: 201 });
@@ -81,6 +125,8 @@ export async function DELETE(req: Request) {
     }
     
     await Vote.findByIdAndDelete(voteId);
+    // Orphaned location records are a pile of coordinates belonging to nothing.
+    await VoteLocation.deleteMany({ voteId }).catch(() => undefined);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete vote");
@@ -92,7 +138,8 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await requireECouncil(req);
-    const { action, countdown, voteId } = await req.json();
+    const body = await req.json();
+    const { action, countdown, voteId } = body;
     
     if (!voteId) {
       return NextResponse.json({ error: "voteId is required" }, { status: 400 });
@@ -101,6 +148,38 @@ export async function PATCH(req: Request) {
     const vote = await Vote.findById(voteId);
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "Vote not found" }, { status: 404 });
+    }
+    
+    if (action === "setLocation") {
+      // Allowed while the vote is open as well as before it. A meeting that
+      // moves rooms mid-vote is ordinary, and an anchor left pointing at the
+      // old building would flag the whole chapter.
+      if (vote.ended) {
+        return NextResponse.json({ error: "Vote has ended" }, { status: 400 });
+      }
+      const anchor = readAnchor(body.votingLocation);
+      if (!anchor) {
+        return NextResponse.json({ error: "A valid lat and lng are required" }, { status: 400 });
+      }
+      vote.votingLocation = anchor;
+      await vote.save();
+      return NextResponse.json({ success: true, votingLocation: anchor });
+    }
+    
+    if (action === "archive" || action === "unarchive") {
+      if (!vote.ended) {
+        return NextResponse.json(
+          { error: "Only a finished vote can be archived." },
+          { status: 400 }
+        );
+      }
+      // Archiving early is allowed; un-archiving only puts the row back inside
+      // whatever is left of its twenty minutes, which is the honest behaviour —
+      // the automatic move is a function of when the vote ended, and that is
+      // not something a button should be able to rewrite.
+      vote.archivedAt = action === "archive" ? new Date() : undefined;
+      await vote.save();
+      return NextResponse.json({ success: true, archived: isArchived(vote) });
     }
     
     if (action === "start") {
@@ -135,6 +214,7 @@ export async function PATCH(req: Request) {
             if (currentVote && !currentVote.ended && currentVote.endTime && new Date() >= currentVote.endTime) {
               currentVote.ended = true;
               currentVote.endTime = null;
+              await markEnded(currentVote);
               await currentVote.save();
               logger.info({ voteId: vote._id }, "Vote automatically ended after countdown");
             }
@@ -148,6 +228,7 @@ export async function PATCH(req: Request) {
         // End immediately
         vote.ended = true;
         vote.endTime = null;
+        await markEnded(vote);
         await vote.save();
         return NextResponse.json({ success: true });
       }
@@ -177,8 +258,12 @@ export async function GET(req: Request) {
       }
       
       const votes = await Vote.find({}).sort({ createdAt: 1 }).lean();
+      const now = Date.now();
       return NextResponse.json({ 
         votes: votes.map((v: any) => ({
+          archived: isArchived(v, now),
+          endedAt: v.endedAt || null,
+          purgeAt: v.purgeAt || null,
           _id: v._id,
           type: v.type,
           title: v.title,
@@ -187,6 +272,15 @@ export async function GET(req: Request) {
           createdAt: v.createdAt,
           voteCount: v.votes?.length || 0,
           hasVoted: v.votes?.some((vote: any) => vote.clerkId === clerkId) || false,
+          hasLocation: v.votingLocation?.lat != null,
+          locationLabel: v.votingLocation?.label || null,
+          // The caller's own standing, and how many are waiting on a decision.
+          // Enough for a list row to say "proxy approved" or "3 waiting"
+          // without a second request per vote.
+          proxyStatus:
+            (v.proxyRequests || []).find((r: any) => r.clerkId === clerkId)?.status || null,
+          pendingProxyCount:
+            (v.proxyRequests || []).filter((r: any) => r.status === "pending").length,
         }))
       });
     }
