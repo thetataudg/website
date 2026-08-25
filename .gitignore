@@ -57,3 +57,4 @@ calendar.json
 # stray build-output backups (never commit)
 .next.bak*
 /.build/
+.appstore-check.cjs

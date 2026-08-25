@@ -86,6 +86,82 @@ export interface RenderedMessage {
   emailSubject: string;
   link: string;
   category: "dues" | "reimbursement" | "plan" | "general";
+  /// What the email's button says. Optional, and usually left unset: the
+  /// wording is derived from `link` by `ctaLabelFor` so the button can never
+  /// promise somewhere it does not go. Set it only when the action deserves
+  /// its own verb, like a proxy request an officer has to decide.
+  ctaLabel?: string;
+}
+
+/// What to write on the button, worked out from where the button lands.
+///
+/// This is derived rather than stored because the alternative was a literal
+/// string sitting in the email channel, and that string said "Open your dues"
+/// on every message the chapter sent. A proxy-vote request to an officer
+/// arrived with a maroon button reading "Open your dues" that went to the
+/// voting page. Deriving from `link` makes the two impossible to disagree:
+/// change where a message points and the words follow.
+///
+/// The dues page is three things at once: what you owe, your payment plan, and
+/// your reimbursements. One destination, so `CTA_BY_PATH` marks it with this
+/// sentinel and the category picks the wording. All three labels name something
+/// that is genuinely on that page, so none of them promises a page that does
+/// not exist. There is no `/member/reimbursements` route, and a button that
+/// implied one would be the same bug in a new coat.
+const DUES_PAGE = "\u0000dues-page";
+
+const DUES_PAGE_LABELS: Record<RenderedMessage["category"], string> = {
+  dues: "Open your dues",
+  plan: "Open your payment plan",
+  reimbursement: "Open your reimbursements",
+  general: "Open your dues",
+};
+
+/// Most specific path first, since these are prefix matches and
+/// `/member/admin/dues/requests` starts with `/member/admin/dues`.
+const CTA_BY_PATH: ReadonlyArray<readonly [string, string]> = [
+  ["/member/admin/dues/requests", "Open the queue"],
+  ["/member/admin/dues", "Open the ledger"],
+  ["/member/admin/members", "Open the roster"],
+  ["/member/admin/pending", "Open the pending list"],
+  ["/member/admin/committees", "Open committees"],
+  ["/member/admin/gem", "Open the GEM report"],
+  ["/member/admin", "Open the admin tools"],
+  ["/member/dues", DUES_PAGE],
+  ["/member/vote", "Open the vote"],
+  ["/member/events", "Open the event"],
+  ["/member/committees", "Open committees"],
+  ["/member/minutes", "Open the minutes"],
+  ["/member/brothers", "Open the roster"],
+  ["/member/gem", "Open your GEM standing"],
+  ["/member/profile", "Open your profile"],
+  ["/member", "Open the portal"],
+] as const;
+
+
+/// Fallback wording when the link is something the table has not seen. Keyed on
+/// the category, which is the next-best thing we know about the message.
+const CTA_BY_CATEGORY: Record<RenderedMessage["category"], string> = {
+  dues: "Open your dues",
+  plan: "Open your payment plan",
+  reimbursement: "Open your reimbursements",
+  general: "Open the portal",
+};
+
+export function ctaLabelFor(
+  message: Pick<RenderedMessage, "link" | "category"> &
+    Partial<Pick<RenderedMessage, "ctaLabel">>
+): string {
+  if (message.ctaLabel?.trim()) return message.ctaLabel.trim();
+
+  // Compare on the path alone. A link may carry a query string or a fragment,
+  // and `/member/vote?id=7` is still the voting page.
+  const path = (message.link || "").split(/[?#]/)[0];
+  for (const [prefix, label] of CTA_BY_PATH) {
+    if (path !== prefix && !path.startsWith(`${prefix}/`)) continue;
+    return label === DUES_PAGE ? DUES_PAGE_LABELS[message.category] : label;
+  }
+  return CTA_BY_CATEGORY[message.category] ?? "Open the portal";
 }
 
 export function renderTemplate(

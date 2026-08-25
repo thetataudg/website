@@ -51,6 +51,10 @@ async function announceProxyRequest(opts: {
             emailSubject: `${title}: ${name}`,
             link: "/member/vote",
             category: "general",
+            // The generic label for this link is "Open the vote", which is
+            // true but passive. An officer reading this has a decision to
+            // make, so the button says so.
+            ctaLabel: "Review the request",
           },
           amountCents: null,
           // The one notification in this app with a hard deadline attached: a

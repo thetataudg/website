@@ -1,7 +1,7 @@
 import { serializeCharge, isPastDueInArizona, arizonaDueDeadline, normalizeDueDate } from "@/lib/dues";
 import { formatCents } from "@/lib/financeEvents";
 import { fromAddressFor, alertsDomain, replyToFor } from "@/lib/notify/from";
-import { renderTemplate } from "@/lib/notify/templates";
+import { renderTemplate, renderOfficerMessage, ctaLabelFor } from "@/lib/notify/templates";
 import { renderEmailHtml, renderEmailText } from "@/lib/notify/emailTemplate";
 import {
   maxInstallmentsFor,
@@ -275,6 +275,61 @@ for (const template of [
   });
   const from = fromAddressFor(rendered.category);
   check(`${template} has a sender`, /^[^<]+<[a-z]+@alerts\.ttdg\.org>$/.test(from), true);
+}
+
+console.log("\nthe button says where it goes");
+// This was a real bug: the email channel hardcoded "Open your dues", so a
+// proxy-vote request sent to officers arrived with a maroon button reading
+// "Open your dues" that landed on the voting page.
+check("a member's dues email", ctaLabelFor({ link: "/member/dues", category: "dues" }), "Open your dues");
+check("an officer's ledger email", ctaLabelFor({ link: "/member/admin/dues", category: "dues" }), "Open the ledger");
+check("the requests queue is not the ledger", ctaLabelFor({ link: "/member/admin/dues/requests", category: "dues" }), "Open the queue");
+check("a vote never says dues", ctaLabelFor({ link: "/member/vote", category: "general" }), "Open the vote");
+// Reimbursements and payment plans both live on the dues page, so one
+// destination carries three labels. Each names something actually on that
+// page; there is no /member/reimbursements route to send anyone to.
+check("a reimbursement says reimbursement", ctaLabelFor({ link: "/member/dues", category: "reimbursement" }), "Open your reimbursements");
+check("a plan says plan", ctaLabelFor({ link: "/member/dues", category: "plan" }), "Open your payment plan");
+check("a query string does not defeat the match", ctaLabelFor({ link: "/member/vote?id=7", category: "general" }), "Open the vote");
+check("a deeper path still matches its section", ctaLabelFor({ link: "/member/events/42", category: "general" }), "Open the event");
+check("an explicit label wins", ctaLabelFor({ link: "/member/vote", category: "general", ctaLabel: "Review the request" }), "Review the request");
+check("a blank explicit label falls back", ctaLabelFor({ link: "/member/dues", category: "dues", ctaLabel: "   " }), "Open your dues");
+check("an unknown link falls back on category", ctaLabelFor({ link: "/somewhere/new", category: "plan" }), "Open your payment plan");
+check("no link at all still says something", ctaLabelFor({ link: "", category: "general" }), "Open the portal");
+
+// Every template the treasury can send, and every officer headline, has to
+// produce a button whose words match its destination. The check that matters
+// is the negative one: nothing that is not about dues may say "dues".
+for (const template of [
+  "assigned", "upcoming", "due_soon", "due_today", "overdue", "installment_due",
+  "payment_verified", "payment_rejected", "plan_approved", "plan_denied", "credit_paid_out",
+  "reimbursement_approved", "reimbursement_denied", "reimbursement_received",
+  "charge_amended", "charge_waived", "charge_voided", "payment_recorded", "payment_removed",
+  "plan_cancelled", "plan_completed", "plan_defaulted", "installment_missed", "credit_applied",
+] as const) {
+  const rendered = renderTemplate(template, {
+    firstName: "Sam", amountCents: 25000, dueLabel: "Sept 1",
+    installmentCount: 3, installmentSeq: 1, reason: "test", method: "venmo",
+  });
+  const label = ctaLabelFor(rendered);
+  check(`${template}: the button matches its link`, rendered.link.startsWith("/member/dues"), true);
+  check(`${template}: the button matches its subject`, label, {
+    dues: "Open your dues",
+    plan: "Open your payment plan",
+    reimbursement: "Open your reimbursements",
+    general: "Open your dues",
+  }[rendered.category]);
+}
+
+for (const event of [
+  "charge_assigned", "payment_submitted", "plan_proposed", "reimbursement_submitted",
+  "payment_verified", "plan_approved", "credit_paid_out", "proxy_requested",
+]) {
+  const message = renderOfficerMessage({ event, memberName: "Sam Doe", summary: "did a thing" });
+  const label = ctaLabelFor(message);
+  // Officer links all live under /member/admin, and none of those pages are
+  // "your dues" for the officer reading them.
+  check(`officer ${event}: not told to open their own dues`, label === "Open your dues", false);
 }
 
 console.log("\nthe email layout survives what members actually type");

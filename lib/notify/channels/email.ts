@@ -13,6 +13,7 @@ import {
   renderEmailHtml,
   renderEmailText,
 } from "@/lib/notify/emailTemplate";
+import { ctaLabelFor } from "@/lib/notify/templates";
 import { formatCents } from "@/lib/financeEvents";
 import type { Channel, DeliveryRequest, DeliveryResult } from "./types";
 
@@ -55,7 +56,10 @@ function contentFor(request: DeliveryRequest): EmailContent {
     heroLabel: isBill ? (template === "installment_due" ? "Instalment due" : "Amount due") : undefined,
     paragraphs: [`Hey ${recipient.firstName},`, message.body],
     meta: meta.length ? meta : undefined,
-    ctaLabel: "Open your dues",
+    // Derived from the destination rather than written here. A literal label
+    // meant every email the chapter sent carried a button reading "Open your
+    // dues", including the ones about votes and reimbursements.
+    ctaLabel: ctaLabelFor(message),
     ctaHref: `${siteUrl()}${message.link || "/member/dues"}`,
     footnote: "Reply to this email if you need anything clarified.",
     replyTo: replyToFor(message.category),
