@@ -2,15 +2,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faList,
-  faTableCellsLarge,
-  faUsers,
-  faCrown,
-  faFilePdf,
-  faMagnifyingGlass,
-} from "@fortawesome/free-solid-svg-icons";
+  Crown,
+  FileDown,
+  LayoutGrid,
+  List,
+  Search,
+  TriangleAlert,
+  Users,
+  X,
+} from "lucide-react";
+
+import { PageContainer, PageHeader } from "../../components/shell/PageShell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MemberRef {
   _id?: string;
@@ -27,6 +48,19 @@ interface Committee {
   committeeMembers?: Array<string | MemberRef>;
 }
 
+const formatMember = (member: string | MemberRef | undefined) => {
+  if (!member) return "Unassigned";
+  if (typeof member === "string") return member;
+  const name = `${member.fName ?? ""} ${member.lName ?? ""}`.trim();
+  const roll = member.rollNo ? ` (#${member.rollNo})` : "";
+  return name ? `${name}${roll}` : "Unassigned";
+};
+
+const listMembers = (members?: Array<string | MemberRef>) =>
+  (members || [])
+    .map((member) => formatMember(member))
+    .filter((label) => label && label !== "Unassigned");
+
 export default function CommitteesClient({
   committees,
   error,
@@ -41,19 +75,6 @@ export default function CommitteesClient({
   const sortedCommittees = useMemo(() => {
     return [...committees].sort((a, b) => a.name.localeCompare(b.name));
   }, [committees]);
-
-  const formatMember = (m: string | MemberRef | undefined) => {
-    if (!m) return "Unassigned";
-    if (typeof m === "string") return m;
-    const name = `${m.fName ?? ""} ${m.lName ?? ""}`.trim();
-    const roll = m.rollNo ? ` (#${m.rollNo})` : "";
-    return name ? `${name}${roll}` : "Unassigned";
-  };
-
-  const listMembers = (members?: Array<string | MemberRef>) =>
-    (members || [])
-      .map((m) => formatMember(m))
-      .filter((label) => label && label !== "Unassigned");
 
   const exportPdf = async () => {
     const { default: jsPDF } = await import("jspdf");
@@ -157,163 +178,214 @@ export default function CommitteesClient({
   }, [memberQuery, sortedCommittees]);
 
   return (
-    <div className="member-dashboard committees-page">
-      {error && (
-        <div className="alert alert-warning" role="alert">
-          {error}
-        </div>
-      )}
-      <section className="bento-card committees-hero">
-        <div>
-          <h2 className="committees-title">Committees</h2>
-        </div>
-        <div className="committees-controls">
-          <div className="btn-group">
-            <button
-              type="button"
-              className={`btn btn-sm ${view === "cards" ? "btn-primary" : "btn-outline-primary"}`}
-              onClick={() => setView("cards")}
+    <PageContainer className="space-y-6">
+      <PageHeader
+        title="Committees"
+        description={`${sortedCommittees.length} committee${
+          sortedCommittees.length === 1 ? "" : "s"
+        } this semester.`}
+        actions={
+          <>
+            <Tabs
+              value={view}
+              onValueChange={(value) => setView(value as "cards" | "list")}
             >
-              <FontAwesomeIcon icon={faTableCellsLarge} className="me-2" />
-              Cards
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${view === "list" ? "btn-primary" : "btn-outline-primary"}`}
-              onClick={() => setView("list")}
-            >
-              <FontAwesomeIcon icon={faList} className="me-2" />
-              List
-            </button>
-          </div>
-          <div className="committee-search">
-            <label className="visually-hidden" htmlFor="committee-search">
-              Search members
-            </label>
-            <input
-              id="committee-search"
-              className="committee-search__input"
-              placeholder="Search members..."
-              value={memberQuery}
-              onChange={(event) => setMemberQuery(event.target.value)}
-            />
-            <button
-              type="button"
-              className="committee-search__button"
-              aria-label="Search members"
-            >
-              <FontAwesomeIcon icon={faMagnifyingGlass} />
-            </button>
-          </div>
-          <button className="btn btn-outline-secondary btn-sm" onClick={exportPdf}>
-            <FontAwesomeIcon icon={faFilePdf} className="me-2" />
-            Export PDF
-          </button>
-        </div>
-      </section>
+              <TabsList aria-label="Committee layout">
+                <TabsTrigger value="cards" className="gap-2">
+                  <LayoutGrid className="size-4" />
+                  Cards
+                </TabsTrigger>
+                <TabsTrigger value="list" className="gap-2">
+                  <List className="size-4" />
+                  List
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button variant="outline" onClick={exportPdf}>
+              <FileDown aria-hidden="true" />
+              Export PDF
+            </Button>
+          </>
+        }
+      />
 
-      <section className="bento-card committees-pill-list">
-        <div className="d-flex flex-wrap gap-2">
-          {sortedCommittees.map((committee) => (
-            <span
-              key={committee._id}
-              className="badge rounded-pill bg-primary px-3 py-2"
-            >
-              {committee.name}
-            </span>
-          ))}
-        </div>
-      </section>
+      {error && (
+        <Alert variant="warning" role="alert">
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Keep the icon, field, and clear control as flex siblings, matching
+        * the proven roster search. No overlay or padding calculation means
+        * the placeholder cannot collide with the icon. */}
+      <div className="flex h-10 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 sm:max-w-sm">
+        <Search
+          aria-hidden="true"
+          className="h-4 w-4 shrink-0 text-muted-foreground"
+        />
+        <input
+          id="committee-search"
+          type="search"
+          placeholder="Search members…"
+          aria-label="Search members"
+          value={memberQuery}
+          onChange={(event) => setMemberQuery(event.target.value)}
+          className="m-0 h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:appearance-none"
+        />
+        {memberQuery ? (
+          <button
+            type="button"
+            onClick={() => setMemberQuery("")}
+            aria-label="Clear member search"
+            className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
 
       {memberQuery.trim() && (
-        <section className="committee-search-results bento-card">
-          <h3>Member committee matches</h3>
-          {memberMatches.length === 0 ? (
-            <p className="text-muted">No members match that search.</p>
-          ) : (
-            <ul>
-              {memberMatches.map((match) => (
-                <li key={match.member}>
-                  <span className="committee-search-results__name">{match.member}</span>
-                  <span className="committee-search-results__committees">
-                    {match.committees.join(", ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Member committee matches</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {memberMatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No members match that search.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {memberMatches.map((match) => (
+                  <li
+                    key={match.member}
+                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 first:pt-0 last:pb-0"
+                  >
+                    <span className="font-medium text-foreground">
+                      {match.member}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {match.committees.join(", ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       )}
 
-      {view === "cards" ? (
-        <section className="committees-grid">
-          {sortedCommittees.map((committee) => {
-            const headLabel = formatMember(committee.committeeHeadId);
-            const members = listMembers(committee.committeeMembers);
-            return (
-              <button
-                key={committee._id}
-                type="button"
-                className="committee-card"
-                onClick={() => setSelected(committee)}
-              >
-                <div className="committee-card__header">
-                  <h3>{committee.name}</h3>
-                  <span className="committee-pill">
-                    <FontAwesomeIcon icon={faUsers} className="me-2" />
-                    {members.length} members
-                  </span>
-                </div>
-                {committee.description && (
-                  <p className="committee-card__desc">{committee.description}</p>
-                )}
-                <div className="committee-card__head">
-                  <FontAwesomeIcon icon={faCrown} className="me-2" />
-                  {headLabel}
-                </div>
-                <p className="committee-card__cta">Click to see the member list</p>
-              </button>
-            );
-          })}
-          {sortedCommittees.length === 0 && (
-            <div className="bento-card text-center text-muted">
-              No committees available.
+      {sortedCommittees.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-muted">
+              <Users className="size-5 text-muted-foreground" aria-hidden="true" />
             </div>
-          )}
-        </section>
-      ) : (
-        <section className="bento-card committees-list-view">
+            <p className="font-medium">No committees available</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Committees appear here once they have been created.
+            </p>
+          </CardContent>
+        </Card>
+      ) : view === "cards" ? (
+        <ul className="grid auto-rows-fr list-none items-stretch gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
           {sortedCommittees.map((committee) => {
             const headLabel = formatMember(committee.committeeHeadId);
             const members = listMembers(committee.committeeMembers);
             return (
-              <div key={committee._id} className="committee-list-item">
-                <div className="committee-list-item__header">
-                  <h3>{committee.name}</h3>
-                  <span className="committee-pill">
-                    <FontAwesomeIcon icon={faCrown} className="me-2" />
-                    {headLabel}
-                  </span>
-                </div>
-                {committee.description && (
-                  <p className="text-muted mb-3">{committee.description}</p>
-                )}
-                <div className="committee-members">
-                  <span className="committee-members__label">Members</span>
-                  {members.length === 0 ? (
-                    <span className="text-muted">No members assigned.</span>
-                  ) : (
-                    <ul className="committee-members__list">
-                      {members.map((m) => (
-                        <li key={`${committee._id}-${m}`}>{m}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
+              <li key={committee._id} className="h-full min-w-0">
+                <Card className="h-full transition-colors hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
+                  <CardContent className="h-full p-4">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setSelected(committee)}
+                      className="h-full min-h-40 w-full flex-col items-stretch justify-start whitespace-normal p-0 text-left hover:bg-transparent"
+                    >
+                      <span className="sr-only">
+                        {`See the member list for ${committee.name}`}
+                      </span>
+                      <span className="flex w-full items-start justify-between gap-3">
+                        <span className="min-w-0 text-lg font-semibold leading-snug text-foreground">
+                          {committee.name}
+                        </span>
+                        <Badge variant="muted" className="shrink-0">
+                          <Users aria-hidden="true" />
+                          {members.length} member{members.length === 1 ? "" : "s"}
+                        </Badge>
+                      </span>
+
+                      {committee.description && (
+                        <span className="mt-2 line-clamp-2 block text-sm text-muted-foreground">
+                          {committee.description}
+                        </span>
+                      )}
+
+                      <span className="mt-auto block w-full border-t border-border pt-3">
+                        <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Committee head
+                        </span>
+                        <span className="mt-1 flex items-start gap-1.5 text-sm text-foreground">
+                          <Crown
+                            aria-hidden="true"
+                            className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                          />
+                          <span className="min-w-0 break-words leading-snug">{headLabel}</span>
+                        </span>
+                      </span>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </li>
             );
           })}
-        </section>
+        </ul>
+      ) : (
+        <Card>
+          <CardContent className="divide-y divide-border p-0">
+            {sortedCommittees.map((committee) => {
+              const headLabel = formatMember(committee.committeeHeadId);
+              const members = listMembers(committee.committeeMembers);
+              return (
+                <div key={committee._id} className="space-y-2 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {committee.name}
+                    </h2>
+                    <Badge variant="muted">
+                      <Crown aria-hidden="true" />
+                      {headLabel}
+                    </Badge>
+                  </div>
+                  {committee.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {committee.description}
+                    </p>
+                  )}
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Members
+                    </p>
+                    {members.length === 0 ? (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        No members assigned.
+                      </p>
+                    ) : (
+                      <ul className="mt-1.5 flex list-none flex-wrap gap-1.5 p-0">
+                        {members.map((m) => (
+                          <li key={`${committee._id}-${m}`}>
+                            <Badge variant="outline">{m}</Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
       )}
 
       <section className="committee-print">
@@ -344,52 +416,59 @@ export default function CommitteesClient({
         })}
       </section>
 
-      {selected && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog modal-dialog-centered committee-members-modal">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  {selected.name} Members
-                  <span className="committee-members-subtitle">
-                    {listMembers(selected.committeeMembers).length || 0} members
-                  </span>
-                </h5>
-                <button className="btn-close" onClick={() => setSelected(null)} />
+      <Dialog
+        open={selected !== null}
+        onOpenChange={(next) => {
+          if (!next) setSelected(null);
+        }}
+      >
+        {selected && (
+          <DialogContent className="w-[calc(100%-2rem)] max-w-md">
+            <DialogHeader>
+              <DialogTitle>{selected.name}</DialogTitle>
+              <DialogDescription>
+                {listMembers(selected.committeeMembers).length || 0} member
+                {listMembers(selected.committeeMembers).length === 1 ? "" : "s"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="rounded-md border border-border p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Committee head
+                </p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                  <Crown
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                  />
+                  {formatMember(selected.committeeHeadId)}
+                </p>
               </div>
-              <div className="modal-body">
-                <div className="committee-members-headline">
-                  <span className="committee-members-label">Committee Head</span>
-                  <span className="committee-members-name">
-                    {formatMember(selected.committeeHeadId)}
-                  </span>
-                </div>
-                <div className="committee-members-list">
-                  {listMembers(selected.committeeMembers).length === 0 ? (
-                    <div className="committee-members-empty">
-                      No members assigned.
-                    </div>
-                  ) : (
-                    listMembers(selected.committeeMembers).map((m) => (
-                      <div key={`${selected._id}-${m}`} className="committee-member-chip">
-                        {m}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-outline-secondary" onClick={() => setSelected(null)}>
-                  Close
-                </button>
-              </div>
+
+              {listMembers(selected.committeeMembers).length === 0 ? (
+                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                  No members assigned.
+                </p>
+              ) : (
+                <ul className="flex list-none flex-wrap gap-1.5 p-0">
+                  {listMembers(selected.committeeMembers).map((m) => (
+                    <li key={`${selected._id}-${m}`}>
+                      <Badge variant="muted">{m}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelected(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
+    </PageContainer>
   );
 }

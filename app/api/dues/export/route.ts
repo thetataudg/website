@@ -72,7 +72,7 @@ export async function GET(req: Request) {
         const paid = live.reduce((sum, charge) => sum + paidCentsFor(charge), 0);
         const balance = live.reduce((sum, charge) => sum + balanceCentsFor(charge), 0);
         return {
-          rollNo: member.rollNo ?? "—",
+          rollNo: member.rollNo ?? "Unknown",
           name: `${member.fName ?? ""} ${member.lName ?? ""}`.trim(),
           assignedCents,
           paidCents: paid,

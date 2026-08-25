@@ -15,36 +15,53 @@ type RushEvent = {
   time: string;
   title: string;
   location: string;
+  details?: string;
   year: number;
 };
 
 const rushEvents: RushEvent[] = [
   {
-    date: "January 23",
+    date: "August 25",
     time: "7:00 PM",
-    title: "Berk Bash",
+    title: "Game Night",
+    location: "GWC 487",
+    details: "Featuring Board Game Club",
+    year: 2026,
+  },
+  {
+    date: "August 26",
+    time: "7:00 PM",
+    title: "Jeopardy Night",
     location: "GWC 487",
     year: 2026,
   },
   {
-    date: "January 27",
+    date: "August 28",
+    time: "7:00 PM",
+    title: "Engineering Challenge",
+    location: "GWC 487",
+    year: 2026,
+  },
+  {
+    date: "September 1",
+    time: "7:00 PM",
+    title: "Chips and Salsa Lessons",
+    location: "BDH 192",
+    details: "Featuring IEEE and Salsa Club",
+    year: 2026,
+  },
+  {
+    date: "September 3",
     time: "7:00 PM",
     title: "Engineers in Service",
     location: "GWC 487",
     year: 2026,
   },
   {
-    date: "January 28",
-    time: "7:00 PM",
-    title: "Wings & Wits: Jeopardy Night",
-    location: "MU 241A (Ventana A)",
-    year: 2026,
-  },
-  {
-    date: "January 30",
-    time: "6:00 PM",
+    date: "September 4",
+    time: "6:30 PM",
     title: "Meet the House",
-    location: "TKDR D101/102",
+    location: "MU 202",
     year: 2026,
   },
 ];
@@ -198,16 +215,17 @@ export default function Rush() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/55 to-[#120a0a]" />
         <div className="relative z-10 flex min-h-[70vh] flex-col items-start justify-end px-6 pb-12 sm:px-12">
           <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
-            Recruitment
+            Fall 2026 Recruitment
           </p>
           <h1 className={`${bungee.className} mt-3 text-4xl text-[#b3202a] sm:text-6xl`}>
             Rush Theta Tau
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-white/85">
-            Rush is now closed. Please fill out the interest form below to be notified when we start our rush process next semester.
+            Fall 2026 Rush is here. Join us for two weeks of free events, meet the
+            brotherhood, and discover what Theta Tau can add to your ASU experience.
           </p>
           <a
-            href="https://airtable.com/app1DcIvp3XB5fdQU/pagGkFkzKTCxjJNU1/form"
+            href="https://airtable.com/appgjGGPxHjbzUs5U/pagGkFkzKTCxjJNU1/form"
             target="_blank"
             className="tt-button-primary mt-8"
           >
@@ -231,7 +249,7 @@ export default function Rush() {
               Rush Week
             </p>
             <h3 className={`${bungee.className} mt-3 text-2xl text-[#b3202a]`}>
-              Remaining Spring 2026 Events
+              Remaining Fall 2026 Events
             </h3>
             <div className="mt-6 space-y-5">
               {upcomingEvents.length ? (
@@ -245,6 +263,9 @@ export default function Rush() {
                       <p className="text-lg font-semibold text-[#1b0f0f]">
                         {event.title}
                       </p>
+                      {event.details ? (
+                        <p className="text-sm text-[#7a0104]">{event.details}</p>
+                      ) : null}
                       <p className="text-sm text-[#1b0f0f]/70">{event.location}</p>
                     </div>
                   </div>
@@ -284,7 +305,7 @@ export default function Rush() {
                 chapter feel like home.
               </p>
               <a
-                href="https://airtable.com/app1DcIvp3XB5fdQU/pagGkFkzKTCxjJNU1/form"
+                href="https://airtable.com/appgjGGPxHjbzUs5U/pagGkFkzKTCxjJNU1/form"
                 className="tt-button-primary mt-6 inline-flex"
               >
                 I'm Interested
@@ -295,7 +316,7 @@ export default function Rush() {
         </div>
       </section>
 
-      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal hidden"> {/* show this section only while rush is happening */}
+      <section className="mx-4 mt-10 rounded-[36px] bg-[#120a0a] px-8 py-12 text-white lg:mx-10 reveal">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.05fr,0.95fr]">
           <div className="flex h-full flex-col items-center">
             <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
@@ -324,6 +345,9 @@ export default function Rush() {
                       <p className="mt-2 text-2xl font-semibold text-white">
                         {event.title}
                       </p>
+                      {event.details ? (
+                        <p className="text-sm text-[#f5d79a]">{event.details}</p>
+                      ) : null}
                       <p className="text-base text-white/70">{event.location}</p>
                     </div>
                   </React.Fragment>
@@ -334,10 +358,10 @@ export default function Rush() {
           <div className="h-full rounded-[28px] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
             <Image
               alt="Rush flyer"
-              src="/rush/Rush_Poster_SP26.png"
-              width={520}
-              height={650}
-              className="h-full w-full rounded-[22px] object-cover"
+              src="/rush/Fall2026_Rush.jpg"
+              width={1080}
+              height={1350}
+              className="h-full w-full rounded-[22px] object-contain"
             />
           </div>
         </div>

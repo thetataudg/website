@@ -1,8 +1,17 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faGavel, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { Check, Gavel, X } from "lucide-react";
 import type { GemCriterionKey, GemStandingValue } from "@/lib/gem";
+
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 /// One requirement or point row, as `/api/gem/status` returns it.
 ///
@@ -79,10 +88,15 @@ export const STANDING_LABELS: Record<GemStandingValue, string> = {
   cooldown: "Cooldown",
 };
 
-export const STANDING_BADGES: Record<GemStandingValue, string> = {
-  none: "bg-secondary",
-  probation: "bg-warning text-dark",
-  cooldown: "bg-info text-dark",
+/// Badge variants, not Bootstrap classes: consumers pass these straight to
+/// `<Badge variant={...}>`.
+export const STANDING_BADGES: Record<
+  GemStandingValue,
+  "muted" | "warning" | "secondary"
+> = {
+  none: "muted",
+  probation: "warning",
+  cooldown: "secondary",
 };
 
 export function capitalizeNamePart(value?: string) {
@@ -143,8 +157,8 @@ export function gemShortVerdict(member: GemMember) {
 /// The tone the verdict is written in. Gold-ish for earned, red for a
 /// requirement that points cannot fix, muted for merely short.
 export function gemVerdictTone(member: GemMember) {
-  if (member.hasCompletedGem) return "text-success";
-  return member.requirementsMet ? "text-muted" : "text-danger";
+  if (member.hasCompletedGem) return "text-emerald-700 dark:text-emerald-400";
+  return member.requirementsMet ? "text-muted-foreground" : "text-destructive";
 }
 
 export function GemStatusBadge({
@@ -155,15 +169,17 @@ export function GemStatusBadge({
   className?: string;
 }) {
   return (
-    <span
-      className={`badge ${member.hasCompletedGem ? "bg-success" : "bg-danger"} ${className}`}
+    <Badge
+      variant={member.hasCompletedGem ? "success" : "destructive"}
+      className={className}
     >
-      <FontAwesomeIcon
-        icon={member.hasCompletedGem ? faCheck : faTimes}
-        className="me-2"
-      />
-      {member.hasCompletedGem ? "GEM Satisfied" : "GEM Not Satisfied"}
-    </span>
+      {member.hasCompletedGem ? (
+        <Check aria-hidden="true" />
+      ) : (
+        <X aria-hidden="true" />
+      )}
+      {member.hasCompletedGem ? "GEM satisfied" : "GEM not satisfied"}
+    </Badge>
   );
 }
 
@@ -186,38 +202,51 @@ export function GemCriterionRow({
     ? `${criterion.detail} · ${criterion.hint}`
     : criterion.detail;
   return (
-    <li className="list-group-item px-3 py-2" title={criterion.rule}>
-      <div className="d-flex justify-content-between align-items-center gap-3">
-        <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
-          <FontAwesomeIcon
-            icon={criterion.satisfied ? faCheck : faTimes}
-            className={criterion.satisfied ? "text-success" : "text-danger"}
-            fixedWidth
+    <li
+      className="flex items-center justify-between gap-3 px-3 py-2"
+      title={criterion.rule}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {criterion.satisfied ? (
+          <Check
+            aria-hidden="true"
+            className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
           />
-          <div style={{ minWidth: 0 }}>
-            <div className="d-flex align-items-center gap-2">
-              <strong className="small">{criterion.label}</strong>
-              {criterion.overridden && (
-                <FontAwesomeIcon
-                  icon={faGavel}
-                  className="text-primary"
-                  title={criterion.overrideNote || "Granted by chapter vote"}
-                />
-              )}
-            </div>
-            <div className="text-muted small">{detail}</div>
-          </div>
-        </div>
-        {onManage && (
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-secondary flex-shrink-0"
-            onClick={() => onManage(criterion)}
-          >
-            {criterion.overridden ? "Edit" : "Substitute"}
-          </button>
+        ) : (
+          <X aria-hidden="true" className="size-4 shrink-0 text-destructive" />
         )}
+        <span className="sr-only">
+          {criterion.satisfied ? "Satisfied: " : "Not satisfied: "}
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <strong className="text-sm font-semibold text-foreground">
+              {criterion.label}
+            </strong>
+            {criterion.overridden && (
+              <Gavel
+                className="size-3.5 shrink-0 text-primary"
+                aria-label={
+                  criterion.overrideNote || "Granted by chapter vote"
+                }
+              />
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">{detail}</div>
+        </div>
       </div>
+      {onManage && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={() => onManage(criterion)}
+        >
+          {criterion.overridden ? "Edit" : "Substitute"}
+          <span className="sr-only">{` ${criterion.label}`}</span>
+        </Button>
+      )}
     </li>
   );
 }
@@ -231,55 +260,68 @@ export function GemSheet({
   onManage?: (criterion: GemCriterion) => void;
 }) {
   return (
-    <div className="row g-3">
-      <div className="col-12 col-lg-5">
-        <div
-          className={`card h-100 border ${
-            member.requirementsMet ? "border-success" : "border-danger"
-          }`}
-        >
-          <div className="card-header d-flex justify-content-between align-items-center py-2">
-            <strong className="small text-uppercase">Requirements</strong>
-            <span
-              className={`badge ${member.requirementsMet ? "bg-success" : "bg-danger"}`}
-            >
-              {member.requirementsMet ? "Met" : "Not met"}
-            </span>
-          </div>
-          <ul className="list-group list-group-flush">
-            {member.requirements.map((criterion) => (
-              <GemCriterionRow
-                key={criterion.key}
-                criterion={criterion}
-                onManage={onManage}
-              />
-            ))}
-          </ul>
-        </div>
-      </div>
-      <div className="col-12 col-lg-7">
-        <div className="card h-100 border">
-          <div className="card-header d-flex justify-content-between align-items-center py-2">
-            <strong className="small text-uppercase">Points</strong>
-            <span
-              className={`badge ${
-                member.pointsEarned >= member.pointsRequired ? "bg-success" : "bg-secondary"
-              }`}
-            >
-              {member.pointsEarned}/{member.pointsRequired}
-            </span>
-          </div>
-          <ul className="list-group list-group-flush">
-            {member.points.map((criterion) => (
-              <GemCriterionRow
-                key={criterion.key}
-                criterion={criterion}
-                onManage={onManage}
-              />
-            ))}
-          </ul>
-        </div>
-      </div>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b py-3">
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Requirements
+          </CardTitle>
+          <Badge variant={member.requirementsMet ? "success" : "destructive"}>
+            {member.requirementsMet ? "Met" : "Not met"}
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          {member.requirements.length ? (
+            <ul className="divide-y divide-border">
+              {member.requirements.map((criterion) => (
+                <GemCriterionRow
+                  key={criterion.key}
+                  criterion={criterion}
+                  onManage={onManage}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No requirements tracked this semester.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b py-3">
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Points
+          </CardTitle>
+          <Badge
+            variant={
+              member.pointsEarned >= member.pointsRequired
+                ? "success"
+                : "muted"
+            }
+          >
+            {member.pointsEarned}/{member.pointsRequired}
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          {member.points.length ? (
+            <ul className="divide-y divide-border">
+              {member.points.map((criterion) => (
+                <GemCriterionRow
+                  key={criterion.key}
+                  criterion={criterion}
+                  onManage={onManage}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No points tracked this semester.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -298,84 +340,119 @@ export function GemMemberCard({
       100
   );
   return (
-    <article
-      className={`gem-card h-100 ${member.hasCompletedGem ? "gem-card--met" : "gem-card--missed"}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(member)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen(member);
-        }
-      }}
-      style={{ cursor: "pointer" }}
+    <Card
+      className={cn(
+        "h-full cursor-pointer transition-colors hover:border-primary/50",
+        "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+        member.hasCompletedGem
+          ? "border-emerald-600/40"
+          : "border-destructive/40"
+      )}
     >
-      <div className="card-body p-3">
-        <div className="d-flex justify-content-between align-items-start gap-2">
-          <div style={{ minWidth: 0 }}>
-            <strong className="d-block text-truncate">{formatMemberName(member)}</strong>
-            <span className="text-muted small">#{member.rollNo || "N/A"}</span>
-          </div>
-          {member.standing !== "none" && (
-            <span className={`badge ${STANDING_BADGES[member.standing]} flex-shrink-0`}>
-              {STANDING_LABELS[member.standing]}
-            </span>
-          )}
-        </div>
-
-        <div className="d-flex align-items-baseline gap-2 mt-3">
-          <span className="h4 mb-0">
-            {member.pointsEarned}/{member.pointsRequired}
+      <CardContent className="p-4">
+        {/* A real button, not a role="button" div: keyboard activation,
+          * focus, and the accessible name all come for free. */}
+        <button
+          type="button"
+          onClick={() => onOpen(member)}
+          className="w-full text-left outline-none"
+        >
+          <span className="sr-only">
+            {`Open GEM sheet for ${formatMemberName(member)}`}
           </span>
-          <span className="text-muted small">points</span>
-        </div>
-        <div className="progress mt-1" style={{ height: "6px" }}>
-          <div
-            className={`progress-bar ${member.hasCompletedGem ? "bg-success" : "bg-secondary"}`}
+          <span className="flex items-start justify-between gap-2">
+            <span className="min-w-0">
+              <strong className="block truncate text-foreground">
+                {formatMemberName(member)}
+              </strong>
+              <span className="text-xs text-muted-foreground">
+                #{member.rollNo || "N/A"}
+              </span>
+            </span>
+            {member.standing !== "none" && (
+              <Badge
+                variant={STANDING_BADGES[member.standing]}
+                className="shrink-0"
+              >
+                {STANDING_LABELS[member.standing]}
+              </Badge>
+            )}
+          </span>
+
+          <span className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-semibold tabular-nums text-foreground">
+              {member.pointsEarned}/{member.pointsRequired}
+            </span>
+            <span className="text-xs text-muted-foreground">points</span>
+          </span>
+
+          <span
             role="progressbar"
-            style={{ width: `${Math.max(pct, 3)}%` }}
             aria-valuenow={pct}
             aria-valuemin={0}
             aria-valuemax={100}
-          />
-        </div>
-        <div className={`small mt-2 ${gemVerdictTone(member)}`}>
-          {gemShortVerdict(member)}
-        </div>
-      </div>
-    </article>
+            aria-label="Points earned"
+            className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-muted"
+          >
+            <span
+              className={cn(
+                "block h-full rounded-full",
+                member.hasCompletedGem
+                  ? "bg-emerald-600 dark:bg-emerald-500"
+                  : "bg-muted-foreground"
+              )}
+              style={{ width: `${Math.max(pct, 3)}%` }}
+            />
+          </span>
+
+          <span className={cn("mt-2 block text-xs", gemVerdictTone(member))}>
+            {gemShortVerdict(member)}
+          </span>
+        </button>
+      </CardContent>
+    </Card>
   );
 }
 
 /// The committee breakdown behind the committee point.
 export function GemCommitteeList({ member }: { member: GemMember }) {
   if (!member.committeeDetails.length) {
-    return <p className="text-muted mb-0">No committee assignments this semester.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        No committee assignments this semester.
+      </p>
+    );
   }
   return (
-    <div className="list-group">
+    <ul className="divide-y divide-border rounded-md border border-border">
       {member.committeeDetails.map((committee) => (
-        <div
+        <li
           key={committee.id}
-          className={`list-group-item d-flex justify-content-between align-items-center ${
-            committee.satisfied ? "list-group-item-success" : "list-group-item-danger"
-          }`}
+          className="flex items-center justify-between gap-3 px-3 py-2"
         >
-          <div className="me-3">
-            <div className="fw-semibold">{committee.name}</div>
-            <small className="text-muted">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {committee.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
               {committee.totalMeetings <= 2
                 ? `Auto-met · ${committee.totalMeetings} meetings held`
                 : `${committee.attended}/${committee.required} attended · ${committee.totalMeetings} meetings held`}
-            </small>
+            </p>
           </div>
-          <FontAwesomeIcon
-            icon={committee.satisfied ? faCheck : faTimes}
-            className={committee.satisfied ? "text-success" : "text-danger"}
-          />
-        </div>
+          {committee.satisfied ? (
+            <Check
+              aria-label="Satisfied"
+              className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+            />
+          ) : (
+            <X
+              aria-label="Not satisfied"
+              className="size-4 shrink-0 text-destructive"
+            />
+          )}
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

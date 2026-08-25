@@ -1,22 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes } from "@fortawesome/free-solid-svg-icons";
-import LoadingState from "../../components/LoadingState";
+import { ShieldAlert } from "lucide-react";
 
-const TABS = [
-  { href: "/member/admin/members", label: "Manage Members" },
-  { href: "/member/admin/profiles", label: "Create Blank Profiles" },
-  { href: "/member/admin/family-tree", label: "Family Tree Import" },
-  { href: "/member/admin/committees", label: "Manage Committees" },
-  { href: "/member/admin/invite", label: "Invite Member" },
-  { href: "/member/admin/pending", label: "Pending Requests" },
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import LoadingState from "../../components/LoadingState";
+import { PageContainer } from "../../components/shell/PageShell";
+
+const ADMIN_TABS = [
+  { href: "/member/admin/members", label: "Members" },
+  { href: "/member/admin/profiles", label: "Profiles" },
+  { href: "/member/admin/family-tree", label: "Family tree" },
+  { href: "/member/admin/committees", label: "Committees" },
+  { href: "/member/admin/invite", label: "Invite" },
+  { href: "/member/admin/pending", label: "Requests" },
   { href: "/member/admin/dues", label: "Dues" },
-  { href: "/member/admin/lockdown", label: "Lockdown Control" },
-];
+  { href: "/member/admin/gem", label: "GEM" },
+  { href: "/member/admin/lockdown", label: "Lockdown" },
+] as const;
 
 export default function AdminLayout({
   children,
@@ -24,67 +28,94 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [me, setMe] = useState<{ role: string; rollNo: string; isECouncil: boolean } | null>(null);
+  const [me, setMe] = useState<{
+    role: string;
+    rollNo: string;
+    isECouncil: boolean;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     fetch("/api/members/me")
-      .then((r) => r.json())
-      .then((d) => {
-        setMe({ role: d.role, rollNo: d.rollNo, isECouncil: d.isECouncil });
-        setLoading(false);
+      .then((response) => response.json())
+      .then((data) => {
+        if (!active) return;
+        setMe({
+          role: data.role,
+          rollNo: data.rollNo,
+          isECouncil: data.isECouncil,
+        });
       })
       .catch(() => {
-        setMe(null);
-        setLoading(false);
+        if (active) setMe(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  if (loading) {
-    return <LoadingState message="Loading admin console..." />;
-  }
+  if (loading) return <LoadingState message="Loading admin console..." />;
 
-  const isAdmin = me && (me.role === "admin" || me.role === "superadmin");
-  const isPrivileged = isAdmin || (me && me.isECouncil);
+  const isAdmin = Boolean(
+    me && (me.role === "admin" || me.role === "superadmin")
+  );
+  const isPrivileged = Boolean(isAdmin || me?.isECouncil);
 
   if (!isPrivileged) {
     return (
-      <div className="container">
-        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>Unauthorized</h3>
-        </div>
-      </div>
+      <PageContainer>
+        <Alert variant="destructive">
+          <ShieldAlert className="size-4" aria-hidden="true" />
+          <AlertTitle>Unauthorized</AlertTitle>
+          <AlertDescription>
+            You do not have access to the chapter administration console.
+          </AlertDescription>
+        </Alert>
+      </PageContainer>
     );
   }
 
-  // Only show tabs for actual admins
-  if (!isAdmin) {
-    return <div className="member-dashboard">{children}</div>;
-  }
+  if (!isAdmin) return children;
+
+  const activeTab =
+    ADMIN_TABS.find((tab) => pathname.startsWith(tab.href))?.href ??
+    ADMIN_TABS[0].href;
 
   return (
-    <div className="member-dashboard">
-      <section className="bento-card admin-tabs">
-        <div className="admin-tabs__header">
-          <h2 className="admin-tabs__title">Admin Console</h2>
-        </div>
-        <div className="admin-tabs__nav">
-          {TABS.map((tab) => {
-            const active = pathname.startsWith(tab.href);
-            return (
-              <Link
+    <Tabs value={activeTab} className="w-full">
+      <PageContainer className="max-w-7xl pb-0">
+        <div className="overflow-x-auto pb-1" aria-label="Admin console sections">
+          <TabsList className="h-auto min-w-max justify-start">
+            {/* Rendered as real links, not value-only triggers: Radix does not
+              * fire `onValueChange` when the active tab is clicked again, so on
+              * a sub-route like /dues/requests (which resolves to the Dues tab)
+              * clicking Dues did nothing and there was no way back. Links also
+              * restore cmd-click and middle-click. */}
+            {ADMIN_TABS.map((tab) => (
+              <TabsTrigger
                 key={tab.href}
-                href={tab.href}
-                className={`admin-tab${active ? " active" : ""}`}
+                value={tab.href}
+                className="shrink-0 px-4 text-muted-foreground no-underline"
+                asChild
               >
-                {tab.label}
-              </Link>
-            );
-          })}
+                <Link href={tab.href} className="no-underline">
+                  {tab.label}
+                </Link>
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </div>
-      </section>
-      <div className="admin-content">{children}</div>
-    </div>
+      </PageContainer>
+
+      <TabsContent value={activeTab} className="mt-0" forceMount>
+        {children}
+      </TabsContent>
+    </Tabs>
   );
 }

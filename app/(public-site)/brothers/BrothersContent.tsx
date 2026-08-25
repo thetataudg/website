@@ -149,7 +149,6 @@ export default function BrothersContent() {
         const isRegentEmeritus = m.isECouncil && m.ecouncilPosition === "Regent Emeritus";
         return (
           (isActiveOrAlumni || isRegentEmeritus) &&
-          m.role !== "superadmin" &&
           !m.isHidden
         );
       }
@@ -208,7 +207,7 @@ export default function BrothersContent() {
     });
     // Add ALL Regent Emeritus members to the end of the board, regardless of status
     const regentEmeritus = members.filter(
-      (m) => m.isECouncil && m.ecouncilPosition === "Regent Emeritus" && m.role !== "superadmin" && !m.isHidden
+      (m) => m.isECouncil && m.ecouncilPosition === "Regent Emeritus" && !m.isHidden
     );
     return [...board, ...regentEmeritus];
   }, [filteredMembers, members, filter]);
@@ -238,9 +237,9 @@ export default function BrothersContent() {
     if (filter !== "Officers") return [];
     
     // For e-council section, show ALL e-council members regardless of status
-    // Filter only by superadmin and hidden flags
+    // Hidden profiles stay out of the public directory regardless of role.
     const allEcouncilMembers = members.filter(
-      (m) => m.isECouncil && m.role !== "superadmin" && !m.isHidden
+      (m) => m.isECouncil && !m.isHidden
     );
     
     // Sort by executive board positions

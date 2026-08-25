@@ -1,18 +1,45 @@
 // app/(members-only)/member/brothers/[rollNo]/BrotherDetailClient.tsx
 "use client";
 
-import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { faCheck, faTimes, faTriangleExclamation, faHourglass } from "@fortawesome/free-solid-svg-icons";
-
 import { useMemo, useState, useEffect } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faUserCircle,
-  faDownload,
-  faEye,
-} from "@fortawesome/free-solid-svg-icons";
+import { Download, ExternalLink, Eye, ShieldAlert, UserCircle2 } from "lucide-react";
+
+import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 
 import type { MemberDoc } from "@/types/member";
+
+import LoadingState from "../../../components/LoadingState";
+import { PageContainer } from "../../../components/shell/PageShell";
+import {
+  DetailRow,
+  EntryItem,
+  Section,
+  Stat,
+} from "../../../components/shell/ProfileSections";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BrotherDetailClientProps {
   member: MemberDoc;
@@ -74,15 +101,6 @@ export default function BrotherDetailClient({
     }
     if (isSignedIn) loadViewer();
   }, [isSignedIn]);
-
-  useEffect(() => {
-    if (!showPreview) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowPreview(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showPreview]);
 
   useEffect(() => {
     const now = new Date();
@@ -148,488 +166,475 @@ export default function BrotherDetailClient({
   }, [attendanceEvents, isPrivileged]);
 
   if (!isLoaded) {
-    return (
-      <div className="container">
-        <div className="alert alert-info d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faHourglass} className="h2" />
-          <h2>Loading...</h2>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading profile..." />;
   }
 
   if (!isSignedIn) {
     return (
-      <div className="container">
-        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>You must be logged into use this function.</h3>
-          <RedirectToSignIn />
-        </div>
-      </div>
+      <PageContainer>
+        <Alert variant="destructive" role="alert">
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Sign-in required</AlertTitle>
+          <AlertDescription>
+            You must be logged in to use this function. Redirecting you to sign
+            in&hellip;
+          </AlertDescription>
+        </Alert>
+        <RedirectToSignIn />
+      </PageContainer>
     );
   }
 
-  return (
-    <>
-      <div className="member-dashboard">
-        <section className="bento-card profile-hero">
-          <div className="profile-identity text-center">
-            {member.profilePicUrl ? (
-              <img
-                src={member.profilePicUrl}
-                alt="Profile"
-                className="profile-photo"
+  const fullName = `${member.fName} ${member.lName}`;
+  const initials =
+    `${member.fName?.[0] ?? ""}${member.lName?.[0] ?? ""}`.toUpperCase();
+  const activeBigs = (member.bigs || []).filter((b: any) => !isRemovedMember(b));
+  const activeLittles = (member.littles || []).filter(
+    (l: any) => !isRemovedMember(l)
+  );
+  const profileLinks = [
+    { label: "GitHub", href: member.socialLinks?.github },
+    { label: "LinkedIn", href: member.socialLinks?.linkedin },
+    { label: "Instagram", href: member.socialLinks?.instagram },
+    { label: "Website", href: member.socialLinks?.website },
+  ].filter((link): link is { label: string; href: string } => Boolean(link.href));
+
+  /** Date-range picker + total, shown to every viewer. */
+  const attendanceControls = (
+    <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
+      <div className="space-y-1.5">
+        <Label htmlFor="attendance-start">Start date</Label>
+        <DatePicker
+          id="attendance-start"
+          value={attendanceStart}
+          onChange={setAttendanceStart}
+          placeholder="Any time"
+          clearable
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="attendance-end">End date</Label>
+        <DatePicker
+          id="attendance-end"
+          value={attendanceEnd}
+          onChange={setAttendanceEnd}
+          placeholder="Today"
+          clearable
+        />
+      </div>
+      <dl aria-live="polite">
+        <Stat label="Events attended" value={attendanceTotal} />
+      </dl>
+    </div>
+  );
+
+  /* One flowing grid rather than two fixed columns — mirrors `/member/profile`.
+   * With two fixed stacks, a brother who has filled in little leaves a tall
+   * empty void beside the sidebar. Wide sections span both tracks; compact
+   * ones pair up and reflow. */
+  const profilePanel = (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Section title="About" className="md:col-span-2">
+        <p className="text-sm leading-relaxed text-foreground/90">
+          {member.bio || "This brother is still building their profile."}
+        </p>
+      </Section>
+
+      {profileLinks.length > 0 && (
+        <Section title="Links">
+          <div className="flex flex-wrap gap-2">
+            {profileLinks.map((link) => (
+              <Button key={link.label} variant="outline" size="sm" asChild>
+                <a
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="no-underline"
+                >
+                  {link.label}
+                  <ExternalLink aria-hidden="true" />
+                  <span className="sr-only">
+                    {` for ${fullName}, opens in a new tab`}
+                  </span>
+                </a>
+              </Button>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section title="Education">
+        <dl className="space-y-2 text-sm">
+          <DetailRow label="Majors" value={member.majors.join(", ")} />
+          {member.minors?.length ? (
+            <DetailRow label="Minors" value={member.minors.join(", ")} />
+          ) : null}
+          <DetailRow label="Graduation Year" value={member.gradYear} />
+        </dl>
+      </Section>
+
+      <Section title="Fraternity Info">
+        <dl className="space-y-2 text-sm">
+          <DetailRow
+            label="Committees"
+            value={
+              committees.length
+                ? committees.map((c) => c.name).join(", ")
+                : "None"
+            }
+          />
+          <DetailRow label="Pledge Class" value={member.pledgeClass} />
+          {activeBigs.length > 0 && (
+            <DetailRow
+              label={`Big${activeBigs.length > 1 ? "s" : ""}`}
+              value={activeBigs
+                .map((b: any) => formatMemberRelation(b))
+                .join(", ")}
+            />
+          )}
+          {activeLittles.length > 0 && (
+            <DetailRow
+              label={`Little${activeLittles.length > 1 ? "s" : ""}`}
+              value={activeLittles
+                .map((l: any) => formatMemberRelation(l))
+                .join(", ")}
+            />
+          )}
+        </dl>
+      </Section>
+
+      {skills.length > 0 && (
+        <Section title="Skills">
+          <ul className="flex list-none flex-wrap gap-2 p-0">
+            {skills.map((skill, idx) => (
+              <li key={`${skill}-${idx}`}>
+                <Badge variant="muted">{skill}</Badge>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {funFacts.length > 0 && (
+        <Section title="Fun Facts">
+          <ul className="list-inside list-disc space-y-1 text-sm text-foreground/90">
+            {funFacts.map((fact, idx) => (
+              <li key={`fact-${idx}`}>{fact}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <Section title="Résumé">
+        {member.resumeUrl ? (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <a href={member.resumeUrl} download className="no-underline">
+                <Download aria-hidden="true" />
+                Download
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPreview(true)}
+            >
+              <Eye aria-hidden="true" />
+              Preview
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {member.fName} hasn&apos;t uploaded a résumé yet.
+          </p>
+        )}
+      </Section>
+
+      {/* Wide narrative sections, rendered only when the brother has filled
+       * them in. Their entries pair up so a single entry doesn't stretch. */}
+      {projects.length > 0 && (
+        <Section title="Projects" className="md:col-span-2">
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {projects.map((project, idx) => (
+              <EntryItem
+                key={`project-${idx}`}
+                title={project.title || "Project"}
+                description={project.description}
+                link={project.link}
               />
-            ) : (
-              <div className="profile-photo-placeholder">
-                <FontAwesomeIcon
-                  icon={faUserCircle}
-                  size="4x"
-                  className="text-muted"
-                />
-              </div>
-            )}
-          </div>
+            ))}
+          </ul>
+        </Section>
+      )}
 
-          <div>
-            <h2 className="profile-title">
-              {member.fName} {member.lName}
-            </h2>
-            <p className="profile-subtitle">{member.hometown}</p>
-            {member.headline && (
-              <p className="text-muted mb-1">{member.headline}</p>
-            )}
-            {member.pronouns && (
-              <span className="profile-pill">{member.pronouns}</span>
-            )}
-          </div>
+      {work.length > 0 && (
+        <Section title="Work & Internships" className="md:col-span-2">
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {work.map((item, idx) => (
+              <EntryItem
+                key={`work-${idx}`}
+                title={`${item.title || "Role"}${
+                  item.organization ? ` • ${item.organization}` : ""
+                }`}
+                meta={[item.start, item.end].filter(Boolean).join(" – ")}
+                description={item.description}
+                link={item.link}
+              />
+            ))}
+          </ul>
+        </Section>
+      )}
 
-          <div className="profile-stats">
-            <div className="profile-stat">
-              <div className="fw-semibold">#{member.rollNo}</div>
-              <small className="text-muted">Roll No</small>
-            </div>
-            <div className="profile-stat">
-              <div className="fw-semibold">{member.status}</div>
-              <small className="text-muted">Status</small>
-            </div>
-            <div className="profile-stat">
-              <div className="fw-semibold">{member.familyLine}</div>
-              <small className="text-muted">Family Line</small>
-            </div>
-          </div>
-        </section>
+      {awards.length > 0 && (
+        <Section title="Awards & Certifications" className="md:col-span-2">
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {awards.map((award, idx) => (
+              <EntryItem
+                key={`award-${idx}`}
+                title={`${award.title || "Award"}${
+                  award.issuer ? ` • ${award.issuer}` : ""
+                }`}
+                meta={award.date}
+                description={award.description}
+              />
+            ))}
+          </ul>
+        </Section>
+      )}
 
-        <section className="bento-card mt-4">
-          <div className="card-body">
-            {isPrivileged && (
-              <div className="profile-tabs">
-                <button
-                  type="button"
-                  className={`profile-tab ${activeTab === "profile" ? "is-active" : ""}`}
-                  onClick={() => setActiveTab("profile")}
-                >
-                  Profile
-                </button>
-                <button
-                  type="button"
-                  className={`profile-tab ${activeTab === "events" ? "is-active" : ""}`}
-                  onClick={() => setActiveTab("events")}
-                >
-                  Events
-                </button>
-              </div>
-            )}
+      {customSections.length > 0 && (
+        <Section title="More" className="md:col-span-2">
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {customSections.map((section, idx) => (
+              <EntryItem
+                key={`section-${idx}`}
+                title={section.title || "Section"}
+                description={section.body}
+              />
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  );
 
-            {(!isPrivileged || activeTab === "profile") && (
-              <>
-                <div className="profile-content-grid">
-                  <div className="profile-content-stack">
-                    <section className="profile-card">
-                      <h4 className="profile-section-title">About</h4>
-                      <p>{member.bio || "This brother is still building their profile."}</p>
-                    </section>
+  const eventsPanel = (
+    <div className="space-y-6">
+      <Section title="Event Attendance">{attendanceControls}</Section>
 
-                    {projects.length > 0 && (
-                      <section className="profile-card">
-                        <h4 className="profile-section-title">Projects</h4>
-                        <div className="d-flex flex-column gap-3">
-                          {projects.map((project, idx) => (
-                            <div key={`project-${idx}`} className="border rounded p-3">
-                              <div className="fw-semibold">{project.title || "Project"}</div>
-                              {project.description && <p className="mb-2">{project.description}</p>}
-                              {project.link && (
-                                <a href={project.link} target="_blank" rel="noreferrer">
-                                  {project.link}
-                                </a>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Section title="Committee totals">
+          {attendanceByCommittee.length ? (
+            <ul className="flex list-none flex-wrap gap-2 p-0">
+              {attendanceByCommittee.map((item) => (
+                <li key={item.name}>
+                  <Badge variant="secondary">
+                    {item.name} ({item.count})
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No attendance yet.</p>
+          )}
+        </Section>
 
-                    {work.length > 0 && (
-                      <section className="profile-card">
-                        <h4 className="profile-section-title">Work & Internships</h4>
-                        <div className="d-flex flex-column gap-3">
-                          {work.map((item, idx) => (
-                            <div key={`work-${idx}`} className="border rounded p-3">
-                              <div className="fw-semibold">
-                                {item.title || "Role"} {item.organization ? `• ${item.organization}` : ""}
-                              </div>
-                              {(item.start || item.end) && (
-                                <div className="text-muted">
-                                  {[item.start, item.end].filter(Boolean).join(" - ")}
-                                </div>
-                              )}
-                              {item.description && <p className="mb-2">{item.description}</p>}
-                              {item.link && (
-                                <a href={item.link} target="_blank" rel="noreferrer">
-                                  {item.link}
-                                </a>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                    {awards.length > 0 && (
-                      <section className="profile-card">
-                        <h4 className="profile-section-title">Awards & Certifications</h4>
-                        <div className="d-flex flex-column gap-3">
-                          {awards.map((award, idx) => (
-                            <div key={`award-${idx}`} className="border rounded p-3">
-                              <div className="fw-semibold">
-                                {award.title || "Award"} {award.issuer ? `• ${award.issuer}` : ""}
-                              </div>
-                              {award.date && <div className="text-muted">{award.date}</div>}
-                              {award.description && <p className="mb-0">{award.description}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                    {customSections.length > 0 && (
-                      <section className="profile-card">
-                        <h4 className="profile-section-title">More</h4>
-                        <div className="d-flex flex-column gap-3">
-                          {customSections.map((section, idx) => (
-                            <div key={`section-${idx}`} className="border rounded p-3">
-                              <div className="fw-semibold">{section.title || "Section"}</div>
-                              {section.body && <p className="mb-0">{section.body}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                  </div>
-
-                  <div className="profile-content-stack">
-                    <section className="profile-card">
-                      <h4 className="profile-section-title">Education</h4>
-                      <p>
-                        <strong>Majors:</strong> {member.majors.join(", ")}
-                      </p>
-                      {member.minors?.length ? (
-                        <p>
-                          <strong>Minors:</strong> {member.minors.join(", ")}
-                        </p>
-                      ) : null}
-                      <p>
-                        <strong>Graduation Year:</strong> {member.gradYear}
-                      </p>
-                    </section>
-
-                    <section className="profile-card">
-                      <h4 className="profile-section-title">Fraternity Info</h4>
-                      {(() => {
-                        const activeBigs = (member.bigs || []).filter((b: any) => !isRemovedMember(b));
-                        const activeLittles = (member.littles || []).filter((l: any) => !isRemovedMember(l));
-
-                        return (
-                          <>
-                      <p>
-                        <strong>Committees:</strong>{" "}
-                        {committees.length
-                          ? committees.map((c) => c.name).join(", ")
-                          : "None"}
-                      </p>
-                      <p>
-                        <strong>Pledge Class:</strong> {member.pledgeClass || "—"}
-                      </p>
-                      {activeBigs.length > 0 && (
-                        <p className="mb-1">
-                          <strong>Big{activeBigs.length > 1 ? "s" : ""}:</strong>{" "}
-                          {activeBigs
-                            .map((b: any) => formatMemberRelation(b))
-                            .join(", ")}
-                        </p>
-                      )}
-                      {activeLittles.length > 0 && (
-                        <p>
-                          <strong>
-                            Little{activeLittles.length > 1 ? "s" : ""}:
-                          </strong>{" "}
-                          {activeLittles
-                            .map((l: any) => formatMemberRelation(l))
-                            .join(", ")}
-                        </p>
-                      )}
-                          </>
-                        );
-                      })()}
-                    </section>
-
-                    {skills.length > 0 && (
-                      <section className="profile-card">
-                        <h4 className="profile-section-title">Skills</h4>
-                        <div className="d-flex flex-wrap gap-2">
-                          {skills.map((skill, idx) => (
-                            <span key={`${skill}-${idx}`} className="profile-pill">
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                    {funFacts.length > 0 && (
-                      <section className="profile-card">
-                        <h4 className="profile-section-title">Fun Facts</h4>
-                        <ul className="mb-0">
-                          {funFacts.map((fact, idx) => (
-                            <li key={`fact-${idx}`}>{fact}</li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
-
-                    <section className="profile-card">
-                      <h4 className="profile-section-title">Resume</h4>
-                      {member.resumeUrl ? (
-                        <div className="d-flex flex-wrap gap-2">
-                          <a
-                            href={member.resumeUrl}
-                            download
-                            className="btn btn-outline-secondary"
-                          >
-                            <FontAwesomeIcon icon={faDownload} className="me-1" />
-                            Download Résumé
-                          </a>
-                          <button
-                            className="btn btn-outline-secondary"
-                            onClick={() => setShowPreview(true)}
-                          >
-                            <FontAwesomeIcon icon={faEye} className="me-1" />
-                            Preview Résumé
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="alert alert-warning mt-2" role="alert">
-                          {member.fName} hasn&apos;t uploaded a resume yet.
-                        </div>
-                      )}
-                    </section>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {(isPrivileged && activeTab === "events") && (
-              <section className="mt-3">
-                <h4 className="profile-section-title">Event Attendance</h4>
-                <div className="row g-3 align-items-end">
-                  <div className="col-md-4">
-                    <label className="form-label">Start date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={attendanceStart}
-                      onChange={(e) => setAttendanceStart(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label">End date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={attendanceEnd}
-                      onChange={(e) => setAttendanceEnd(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <div className="profile-stat">
-                      <div className="fw-semibold">{attendanceTotal}</div>
-                      <small className="text-muted">Events attended</small>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="profile-section-title">Committee totals</div>
-                  <div className="d-flex flex-wrap gap-2 mt-2">
-                    {attendanceByCommittee.length ? (
-                      attendanceByCommittee.map((item) => (
-                        <span key={item.name} className="event-pill">
-                          {item.name} ({item.count})
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted">No attendance yet.</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="profile-section-title">Event types</div>
-                  <div className="d-flex flex-wrap gap-2 mt-2">
-                    {attendanceByType.length ? (
-                      attendanceByType.map((item) => (
-                        <span key={item.type} className="event-pill event-pill--type">
-                          {item.type} ({item.count})
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted">No attendance yet.</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="profile-section-title">Events</div>
-                  {attendanceLoading ? (
-                    <p className="text-muted">Loading attendance…</p>
-                  ) : attendanceEvents.length ? (
-                    <div className="table-responsive">
-                      <table className="table admin-table">
-                        <thead>
-                          <tr>
-                            <th>Event</th>
-                            <th>Committee</th>
-                            <th>Type</th>
-                            <th className="text-end">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {attendanceEvents.map((evt) => (
-                            <tr key={evt._id}>
-                              <td>{evt.name}</td>
-                              <td>{evt.committeeName || "Chapter"}</td>
-                              <td>{evt.eventType || "event"}</td>
-                              <td className="text-end">
-                                {evt.startTime
-                                  ? new Date(evt.startTime).toLocaleDateString()
-                                  : ""}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-muted">No attendance in this range.</p>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {!isPrivileged && (
-              <section className="mt-4">
-                <h4 className="profile-section-title">Event Attendance</h4>
-                <div className="row g-3 align-items-end">
-                  <div className="col-md-4">
-                    <label className="form-label">Start date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={attendanceStart}
-                      onChange={(e) => setAttendanceStart(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label">End date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={attendanceEnd}
-                      onChange={(e) => setAttendanceEnd(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <div className="profile-stat">
-                      <div className="fw-semibold">{attendanceTotal}</div>
-                      <small className="text-muted">Total events attended</small>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-          </div>
-        </section>
+        <Section title="Event types">
+          {attendanceByType.length ? (
+            <ul className="flex list-none flex-wrap gap-2 p-0">
+              {attendanceByType.map((item) => (
+                <li key={item.type}>
+                  <Badge variant="outline">
+                    {item.type} ({item.count})
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No attendance yet.</p>
+          )}
+        </Section>
       </div>
 
-      {/* ── PREVIEW MODAL ── */}
-      {showPreview && (
-        <div
-          className="modal fade show"
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setShowPreview(false);
-          }}
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
-            <div className="modal-content">
-              <div className="modal-header bg-light">
-                <h5 className="modal-title">Résumé Preview</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowPreview(false)}
-                />
-              </div>
-              <div className="modal-body p-0" style={{ height: "clamp(320px, 70vh, 900px)" }}>
-                <object
-                  data={member.resumeUrl + "#toolbar=0&navpanes=0&scrollbar=0"}
-                  type="application/pdf"
-                  width="100%"
-                  height="100%"
+      <Section title="Events">
+        {attendanceLoading ? (
+          <div className="space-y-2" role="status" aria-busy="true" aria-live="polite">
+            <span className="sr-only">Loading attendance…</span>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : attendanceEvents.length ? (
+          <>
+            {/* Desktop: full table. */}
+            <div className="hidden overflow-x-auto sm:block">
+              <Table>
+                <caption className="sr-only">
+                  {`Events ${fullName} attended between ${attendanceStart} and ${attendanceEnd}`}
+                </caption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">Event</TableHead>
+                    <TableHead scope="col">Committee</TableHead>
+                    <TableHead scope="col">Type</TableHead>
+                    <TableHead scope="col" className="text-right">
+                      Date
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attendanceEvents.map((evt) => (
+                    <TableRow key={evt._id}>
+                      <TableCell className="font-medium text-foreground">
+                        {evt.name}
+                      </TableCell>
+                      <TableCell>{evt.committeeName || "Chapter"}</TableCell>
+                      <TableCell>{evt.eventType || "event"}</TableCell>
+                      <TableCell className="text-right">
+                        {evt.startTime
+                          ? new Date(evt.startTime).toLocaleDateString()
+                          : ""}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile: the same rows as a stacked list, so nothing scrolls sideways. */}
+            <ul className="space-y-2 sm:hidden">
+              {attendanceEvents.map((evt) => (
+                <li
+                  key={evt._id}
+                  className="rounded-md border border-border p-3"
                 >
-                  <p className="text-center mt-5">
-                    Unable to display PDF inline.{" "}
-                    <a href={member.resumeUrl} target="_blank" rel="noopener">
-                      Download Résumé
-                    </a>
+                  <p className="text-sm font-semibold text-foreground">
+                    {evt.name}
                   </p>
-                </object>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {evt.startTime
+                      ? new Date(evt.startTime).toLocaleDateString()
+                      : ""}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Badge variant="secondary">
+                      {evt.committeeName || "Chapter"}
+                    </Badge>
+                    <Badge variant="outline">{evt.eventType || "event"}</Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No attendance in this range.
+          </p>
+        )}
+      </Section>
+    </div>
+  );
+
+  return (
+    <>
+      <PageContainer className="space-y-6">
+        {/* ── Identity header ── */}
+        <section className="flex flex-col gap-6 border-b border-border pb-6 sm:flex-row sm:items-start">
+          <Avatar className="size-28 self-center ring-2 ring-primary/20 ring-offset-2 ring-offset-background sm:self-start">
+            {member.profilePicUrl ? (
+              <AvatarImage src={member.profilePicUrl} alt="" />
+            ) : null}
+            <AvatarFallback className="text-2xl font-semibold">
+              {initials || <UserCircle2 className="size-10" aria-hidden="true" />}
+            </AvatarFallback>
+          </Avatar>
+
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                {fullName}
+              </h1>
+              {member.headline && (
+                <p className="text-base text-foreground/80">{member.headline}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {member.hometown && <span>{member.hometown}</span>}
+                {member.pronouns && (
+                  <Badge variant="muted">{member.pronouns}</Badge>
+                )}
               </div>
-              <div className="modal-footer">
+            </div>
+
+            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Roll No" value={`#${member.rollNo}`} />
+              <Stat label="Status" value={member.status} />
+              <Stat label="Family Line" value={member.familyLine} />
+              <Stat label="Pledge Class" value={member.pledgeClass} />
+            </dl>
+          </div>
+        </section>
+
+        {isPrivileged ? (
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as "profile" | "events")}
+          >
+            <TabsList>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
+            </TabsList>
+            <TabsContent value="profile">{profilePanel}</TabsContent>
+            <TabsContent value="events">{eventsPanel}</TabsContent>
+          </Tabs>
+        ) : (
+          <>
+            {profilePanel}
+            <Section title="Event Attendance">{attendanceControls}</Section>
+          </>
+        )}
+      </PageContainer>
+
+      {/* ── Résumé preview ── */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Résumé Preview</DialogTitle>
+          </DialogHeader>
+          <div className="h-[clamp(320px,70vh,900px)] overflow-hidden rounded-md border border-border">
+            <object
+              data={member.resumeUrl + "#toolbar=0&navpanes=0&scrollbar=0"}
+              type="application/pdf"
+              width="100%"
+              height="100%"
+            >
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                Unable to display PDF inline.{" "}
                 <a
                   href={member.resumeUrl}
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-secondary"
+                  rel="noopener"
+                  className="text-primary"
                 >
-                  Open in New Tab
+                  Download Résumé
                 </a>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowPreview(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+              </p>
+            </object>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" asChild>
+              <a
+                href={member.resumeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="no-underline"
+              >
+                <ExternalLink aria-hidden="true" />
+                Open in New Tab
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -110,8 +110,8 @@ export async function createAppleWalletPass(
     const minorText = formatList(member.minors);
     const committeeText = formatList(member.committees);
     const positionText = member.ecouncilPosition?.trim() || "Brother";
-    const hometownText = member.hometown?.trim() || "—";
-    const academicText = [majorText || "—", minorText ? `Minor: ${minorText}` : ""]
+    const hometownText = member.hometown?.trim() || "Not set";
+    const academicText = [majorText || "Not set", minorText ? `Minor: ${minorText}` : ""]
       .filter(Boolean)
       .join(" | ");
     const secondaryFields = [
@@ -123,12 +123,12 @@ export async function createAppleWalletPass(
       {
         key: "major",
         label: "Major",
-        value: majorText || "—",
+        value: majorText || "Not set",
       },
       {
         key: "minor",
         label: "Minor",
-        value: minorText || "—",
+        value: minorText || "Not set",
         textAlignment: "PKTextAlignmentRight",
       },
     ];
@@ -136,12 +136,12 @@ export async function createAppleWalletPass(
       {
         key: "familyLine",
         label: "Family Line",
-        value: member.familyLine || "—",
+        value: member.familyLine || "Not set",
       },
       {
         key: "pledgeClass",
         label: "Pledge Class",
-        value: member.pledgeClass || "—",
+        value: member.pledgeClass || "Not set",
         textAlignment: "PKTextAlignmentRight",
       },
     ];
@@ -154,7 +154,7 @@ export async function createAppleWalletPass(
       {
         key: "gradYear",
         label: "Grad",
-        value: member.gradYear ? String(member.gradYear) : "—",
+        value: member.gradYear ? String(member.gradYear) : "Not set",
       },
     ];
 
@@ -215,7 +215,7 @@ export async function createAppleWalletPass(
         {
           key: "gradYearBack",
           label: "Graduation Year",
-          value: member.gradYear ? String(member.gradYear) : "—",
+          value: member.gradYear ? String(member.gradYear) : "Not set",
         },
         {
           key: "chapterBack",
@@ -230,32 +230,32 @@ export async function createAppleWalletPass(
         {
           key: "academicsBack",
           label: "Academics",
-          value: academicText || "—",
+          value: academicText || "Not set",
         },
         {
           key: "familyLineBack",
           label: "Family Line",
-          value: member.familyLine || "—",
+          value: member.familyLine || "Not set",
         },
         {
           key: "pledgeClassBack",
           label: "Pledge Class",
-          value: member.pledgeClass || "—",
+          value: member.pledgeClass || "Not set",
         },
         {
           key: "majorsBack",
           label: "Major(s)",
-          value: majorText || "—",
+          value: majorText || "Not set",
         },
         {
           key: "minorsBack",
           label: "Minor(s)",
-          value: minorText || "—",
+          value: minorText || "Not set",
         },
         {
           key: "committeesBack",
           label: "Committee(s)",
-          value: committeeText || "—",
+          value: committeeText || "Not set",
         },
         {
           key: "hometownBack",

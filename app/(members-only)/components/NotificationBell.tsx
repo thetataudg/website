@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBell } from "@fortawesome/free-solid-svg-icons";
+import { Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 type Notification = {
   _id: string;
@@ -41,7 +47,6 @@ export default function NotificationBell() {
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -61,17 +66,8 @@ export default function NotificationBell() {
     return () => clearInterval(timer);
   }, [load]);
 
-  useEffect(() => {
-    if (!open) return;
-    function onClickAway(event: MouseEvent) {
-      if (!panelRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickAway);
-    return () => document.removeEventListener("mousedown", onClickAway);
-  }, [open]);
-
-  async function toggle() {
-    const next = !open;
+  // Outside-click / Escape / focus handling comes from Radix Popover.
+  async function handleOpenChange(next: boolean) {
     setOpen(next);
     if (next && unread > 0) {
       setUnread(0);
@@ -89,60 +85,71 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="position-relative" ref={panelRef}>
-      <button
-        type="button"
-        className="btn btn-outline-light btn-sm position-relative"
-        onClick={toggle}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
-        aria-expanded={open}
-      >
-        <FontAwesomeIcon icon={faBell} />
-        {unread > 0 && (
-          <span
-            className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-            style={{ fontSize: 10 }}
-          >
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          className="position-absolute end-0 mt-2 shadow rounded border bg-body"
-          style={{ width: 340, maxHeight: 420, overflowY: "auto", zIndex: 1050 }}
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="relative h-9 w-9 min-h-9 min-w-9 shrink-0 p-0"
+          aria-label={
+            unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+          }
         >
-          <div className="px-3 py-2 border-bottom small text-uppercase text-muted fw-semibold">
-            Notifications
-          </div>
-          {items.length === 0 ? (
-            <div className="px-3 py-4 text-center text-muted small">
-              Nothing yet.
-            </div>
-          ) : (
-            <ul className="list-unstyled mb-0">
-              {items.map((item) => (
-                <li key={item._id} className="border-bottom">
-                  <Link
-                    href={item.link || "/member/dues"}
-                    className="d-block px-3 py-2 text-decoration-none text-body"
-                    onClick={() => setOpen(false)}
-                  >
-                    <div className="d-flex justify-content-between gap-2">
-                      <span className="fw-semibold small">{item.title}</span>
-                      <span className="text-muted" style={{ fontSize: 11 }}>
-                        {timeAgo(item.createdAt)}
-                      </span>
-                    </div>
-                    <div className="small text-muted">{item.body}</div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          <Bell className="size-5" />
+          {unread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+              {unread > 9 ? "9+" : unread}
+            </span>
           )}
+        </Button>
+      </PopoverTrigger>
+
+      {/* Portalled out of the navbar, so it uses the page's popover tokens
+       * rather than the dark-bar token overrides. */}
+      <PopoverContent
+        align="end"
+        className="max-h-[420px] w-[340px] overflow-y-auto p-0"
+      >
+        <div className="sticky top-0 border-b border-border bg-popover px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Notifications
         </div>
-      )}
-    </div>
+        {items.length === 0 ? (
+          <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+            Nothing yet.
+          </div>
+        ) : (
+          <ul className="m-0 list-none p-0">
+            {items.map((item) => (
+              <li
+                key={item._id}
+                className="border-b border-border last:border-b-0"
+              >
+                <Link
+                  href={item.link || "/member/dues"}
+                  className={cn(
+                    "block px-3 py-2.5 no-underline transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none",
+                    !item.readAt && "bg-primary/5"
+                  )}
+                  onClick={() => setOpen(false)}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold text-popover-foreground">
+                      {item.title}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {timeAgo(item.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {item.body}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

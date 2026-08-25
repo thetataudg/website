@@ -143,31 +143,28 @@ export async function PATCH(
     }
   }
 
-  // Only superadmin can change role, and not for superadmin users
+  // Admin and legacy superadmin accounts share the same permissions. New role
+  // assignments intentionally normalize to "admin" or "member".
   if (
     "role" in updates &&
-    adminRole === "superadmin" &&
-    member.role !== "superadmin"
+    (adminRole === "admin" || adminRole === "superadmin")
   ) {
-    // Only allow "admin" or "member"
     if (updates.role !== "admin" && updates.role !== "member") {
       logger.warn(
         { adminId, rollNo: params.rollNo, attemptedRole: updates.role },
-        "Denied: Invalid role attempted by superadmin"
+        "Denied: Invalid role attempted by admin"
       );
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
     logger.info(
       { adminId, rollNo: params.rollNo, newRole: updates.role },
-      "Superadmin changed member role"
+      "Admin changed member role"
     );
-    // Allow role update
   } else if ("role" in updates) {
     logger.warn(
       { adminId, rollNo: params.rollNo, attemptedRole: updates.role, adminRole },
-      "Denied: Non-superadmin attempted to change role or tried to change superadmin"
+      "Denied: Non-admin attempted to change role"
     );
-    // Remove role update if not allowed
     delete updates.role;
   }
 

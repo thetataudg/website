@@ -44,7 +44,7 @@ function money(cents: number) {
 }
 
 function day(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "Not set";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -61,7 +61,7 @@ export async function exportAuditPdf(payload: AuditPayload) {
   const generated = new Date(payload.generatedAt);
 
   doc.setFontSize(18);
-  doc.text(`Chapter Treasury — ${payload.term}`, 40, 52);
+  doc.text(`Chapter Treasury: ${payload.term}`, 40, 52);
   doc.setFontSize(10);
   doc.setTextColor(110);
   doc.text(
@@ -91,8 +91,8 @@ export async function exportAuditPdf(payload: AuditPayload) {
       row.name,
       money(row.assignedCents),
       money(row.paidCents),
-      row.balanceCents > 0 ? money(row.balanceCents) : "—",
-      row.creditCents > 0 ? money(row.creditCents) : "—",
+      row.balanceCents > 0 ? money(row.balanceCents) : money(0),
+      row.creditCents > 0 ? money(row.creditCents) : money(0),
       row.status,
     ]),
     styles: { fontSize: 8, cellPadding: 4 },
@@ -119,7 +119,7 @@ export async function exportAuditPdf(payload: AuditPayload) {
     doc.addPage();
     doc.setFontSize(14);
     doc.setTextColor(30);
-    doc.text("Ledger — every recorded action", 40, 52);
+    doc.text("Ledger: every recorded action", 40, 52);
     doc.setFontSize(9);
     doc.setTextColor(110);
     doc.text(

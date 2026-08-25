@@ -1,18 +1,80 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  ChevronsUpDown,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
 import QuickToolsModal from "../members/QuickToolsModal";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
+import { cn } from "@/lib/utils";
 import {
-  faUsers,
-  faUserTie,
-  faSquarePlus,
-  faPenToSquare,
-  faTrash,
-  faCircleInfo,
-  faUserGroup,
-} from "@fortawesome/free-solid-svg-icons";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 
 type Member = {
   _id: string;
@@ -209,8 +271,41 @@ export default function CommitteesPage() {
     return <LoadingState message="Loading committees..." />;
   }
 
+  const closeEdit = () => {
+    setShowEdit(false);
+    setEditingId(null);
+    setEditForm({
+      name: "",
+      description: "",
+      committeeHeadId: "",
+      committeeMembers: [],
+    });
+  };
+
   return (
-    <div>
+    <PageContainer className="max-w-7xl space-y-6">
+      <PageHeader
+        title="Manage committees"
+        description="Create committees, assign heads, and manage rosters."
+        actions={
+          <>
+            {canPurge && (
+              <Button
+                variant="outline"
+                onClick={() => setShowPurge(true)}
+                className="text-destructive hover:text-destructive"
+              >
+                Purge committees
+              </Button>
+            )}
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus aria-hidden="true" />
+              Add committee
+            </Button>
+          </>
+        }
+      />
+
       <QuickToolsModal
         show={showPurge}
         initialTool="purgeCommittees"
@@ -223,572 +318,511 @@ export default function CommitteesPage() {
           if (res.ok) setCommittees(await res.json());
         }}
       />
-      <div className="bento-card admin-table-card">
-        <div className="admin-members-header">
-          <h2>Manage Committees</h2>
-          <div className="d-flex flex-wrap gap-2">
-            {canPurge && (
-              <button
-                className="btn btn-outline-danger"
-                onClick={() => setShowPurge(true)}
-              >
-                Purge Committees
-              </button>
-            )}
-            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-              <FontAwesomeIcon icon={faSquarePlus} className="me-2" />
-              Add Committee
-            </button>
-          </div>
-        </div>
 
-        <div className="table-responsive">
-          <table className="table admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Head</th>
-                <th>Members</th>
-                <th className="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {committees.map((c) => {
-                const headName =
-                  typeof c.committeeHeadId === "string"
-                    ? activeMembers.find((m) => m._id === c.committeeHeadId)
-                    : c.committeeHeadId;
-                const headLabel =
-                  headName && typeof headName !== "string"
-                    ? `${headName.fName || ""} ${headName.lName || ""}`.trim()
-                    : "Unassigned";
-                return (
-                  <tr key={c._id}>
-                    <td>{c.name}</td>
-                    <td>{headLabel || "Unassigned"}</td>
-                    <td>{c.committeeMembers?.length || 0}</td>
-                    <td className="text-end">
-                      <button
-                        className="btn btn-sm btn-outline-primary me-2"
-                        onClick={() => startEdit(c)}
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b">
+          <CardTitle>Chapter committees</CardTitle>
+          <CardDescription>
+            {committees.length} committee{committees.length === 1 ? "" : "s"}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Name</TableHead>
+                <TableHead>Head</TableHead>
+                <TableHead className="w-28">Members</TableHead>
+                <TableHead className="w-14 pr-6">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {committees.length ? (
+                committees.map((c) => {
+                  const headName =
+                    typeof c.committeeHeadId === "string"
+                      ? activeMembers.find((m) => m._id === c.committeeHeadId)
+                      : c.committeeHeadId;
+                  const headLabel =
+                    headName && typeof headName !== "string"
+                      ? `${headName.fName || ""} ${headName.lName || ""}`.trim()
+                      : "";
+
+                  return (
+                    <TableRow key={c._id}>
+                      <TableCell className="pl-6">
+                        <p className="font-medium">{c.name}</p>
+                        {c.description ? (
+                          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                            {c.description}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        {headLabel ? (
+                          headLabel
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Unassigned
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="muted">
+                          {c.committeeMembers?.length || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="pr-6 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Actions for ${c.name}`}
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>
+                              Committee actions
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => startEdit(c)}>
+                              <Pencil className="size-4" />
+                              Edit committee
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={() => setDeleteId(c._id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="size-4" />
+                              Delete committee
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-56 text-center">
+                    <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
+                      <div className="rounded-full bg-muted p-3">
+                        <Users className="size-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">No committees yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Add a committee to start assigning heads and members.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCreate(true)}
                       >
-                        <FontAwesomeIcon icon={faPenToSquare} className="me-1" />
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => setDeleteId(c._id)}
-                      >
-                        <FontAwesomeIcon icon={faTrash} className="me-1" />
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {committees.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="text-center text-muted">
-                    No committees yet.
-                  </td>
-                </tr>
+                        <Plus aria-hidden="true" />
+                        Add committee
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      {deleteId && (
-        <div
-          className="modal show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setDeleteId(null)}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to delete this committee?</p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setDeleteId(null)}
-                >
-                  Cancel
-                </button>
-                <button className="btn btn-danger" onClick={confirmDelete}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Create and edit share one form: the payloads differ, the fields do not. */}
+      <CommitteeFormDialog
+        open={showCreate}
+        onOpenChange={(next) => {
+          if (!next) {
+            resetForm();
+            setShowCreate(false);
+          }
+        }}
+        title="Create committee"
+        description="Name the committee, pick a head, and add members."
+        submitLabel="Create committee"
+        saving={loading}
+        members={activeMembers}
+        form={form}
+        setForm={setForm}
+        onSubmit={saveCommittee}
+      />
 
-      {showCreate && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog modal-lg modal-dialog-centered committee-modal">
-            <div className="modal-content">
-              <div className="modal-header committee-modal__header">
-                <h5 className="modal-title d-flex align-items-center gap-2">
-                  <FontAwesomeIcon icon={faUsers} />
-                  Create Committee
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowCreate(false)}
-                />
-              </div>
-              <div className="modal-body">
-                <form onSubmit={saveCommittee} className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faCircleInfo} />
-                      Committee Name
-                    </label>
-                    <input
-                      className="form-control"
-                      value={form.name}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, name: e.target.value }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faUserTie} />
-                      Committee Head
-                    </label>
-                    <SingleMemberPicker
-                      members={activeMembers}
-                      value={form.committeeHeadId}
-                      onChange={(id) =>
-                        setForm((f) => ({
-                          ...f,
-                          committeeHeadId: id,
-                          committeeMembers: f.committeeMembers.filter(
-                            (memberId) => memberId !== id
-                          ),
-                        }))
-                      }
-                      placeholder="Search and select a head"
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faCircleInfo} />
-                      Description
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={2}
-                      value={form.description}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, description: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faUserGroup} />
-                      Committee Members
-                    </label>
-                    <MemberPicker
-                      members={activeMembers}
-                      value={form.committeeMembers}
-                      onChange={(ids) =>
-                        setForm((f) => ({
-                          ...f,
-                          committeeMembers: ids.filter(
-                            (id) => id !== f.committeeHeadId
-                          ),
-                        }))
-                      }
-                      disabledIds={form.committeeHeadId ? [form.committeeHeadId] : []}
-                    />
-                  </div>
-                  <div className="col-12 d-flex gap-2">
-                    <button className="btn btn-primary" disabled={loading}>
-                      {loading && <LoadingSpinner size="sm" className="me-2" />}
-                      Create Committee
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
-                      onClick={() => {
-                        resetForm();
-                        setShowCreate(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CommitteeFormDialog
+        open={showEdit}
+        onOpenChange={(next) => {
+          if (!next) closeEdit();
+        }}
+        title="Edit committee"
+        description="Update the committee name, head, and roster."
+        submitLabel="Save changes"
+        saving={loading}
+        members={activeMembers}
+        form={editForm}
+        setForm={setEditForm}
+        onSubmit={saveEdit}
+      />
 
-      {showEdit && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog modal-lg modal-dialog-centered committee-modal">
-            <div className="modal-content">
-              <div className="modal-header committee-modal__header">
-                <h5 className="modal-title d-flex align-items-center gap-2">
-                  <FontAwesomeIcon icon={faPenToSquare} />
-                  Edit Committee
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => {
-                    setShowEdit(false);
-                    setEditingId(null);
-                    setEditForm({
-                      name: "",
-                      description: "",
-                      committeeHeadId: "",
-                      committeeMembers: [],
-                    });
-                  }}
-                />
-              </div>
-              <div className="modal-body">
-                <form onSubmit={saveEdit} className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faCircleInfo} />
-                      Committee Name
-                    </label>
-                    <input
-                      className="form-control"
-                      value={editForm.name}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, name: e.target.value }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faUserTie} />
-                      Committee Head
-                    </label>
-                    <SingleMemberPicker
-                      members={activeMembers}
-                      value={editForm.committeeHeadId}
-                      onChange={(id) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          committeeHeadId: id,
-                          committeeMembers: f.committeeMembers.filter(
-                            (memberId) => memberId !== id
-                          ),
-                        }))
-                      }
-                      placeholder="Search and select a head"
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faCircleInfo} />
-                      Description
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={2}
-                      value={editForm.description}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, description: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label d-flex align-items-center gap-2">
-                      <FontAwesomeIcon icon={faUserGroup} />
-                      Committee Members
-                    </label>
-                    <MemberPicker
-                      members={activeMembers}
-                      value={editForm.committeeMembers}
-                      onChange={(ids) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          committeeMembers: ids.filter(
-                            (id) => id !== f.committeeHeadId
-                          ),
-                        }))
-                      }
-                      disabledIds={
-                        editForm.committeeHeadId
-                          ? [editForm.committeeHeadId]
-                          : []
-                      }
-                    />
-                  </div>
-                  <div className="col-12 d-flex gap-2">
-                    <button className="btn btn-primary" disabled={loading}>
-                      {loading && <LoadingSpinner size="sm" className="me-2" />}
-                      Save Changes
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
-                      onClick={() => {
-                        setShowEdit(false);
-                        setEditingId(null);
-                        setEditForm({
-                          name: "",
-                          description: "",
-                          committeeHeadId: "",
-                          committeeMembers: [],
-                        });
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this committee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The committee and its roster assignments will be removed. This
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete committee
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
   );
 }
 
+type CommitteeForm = {
+  name: string;
+  description: string;
+  committeeHeadId: string;
+  committeeMembers: string[];
+};
+
+/** Shared create/edit form. */
+function CommitteeFormDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  submitLabel,
+  saving,
+  members,
+  form,
+  setForm,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  submitLabel: string;
+  saving: boolean;
+  members: Member[];
+  form: CommitteeForm;
+  setForm: React.Dispatch<React.SetStateAction<CommitteeForm>>;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="w-[calc(100%-2rem)] max-w-2xl"
+        /* No backdrop dismissal: a stray click would discard the form. */
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="committee-name">Committee name</Label>
+              <Input
+                id="committee-name"
+                value={form.name}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="committee-head">Committee head</Label>
+              <SingleMemberPicker
+                id="committee-head"
+                members={members}
+                value={form.committeeHeadId}
+                onChange={(id) =>
+                  setForm((f) => ({
+                    ...f,
+                    committeeHeadId: id,
+                    committeeMembers: f.committeeMembers.filter(
+                      (memberId) => memberId !== id
+                    ),
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="committee-description">Description</Label>
+            <Textarea
+              id="committee-description"
+              rows={2}
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="committee-members">Committee members</Label>
+            <MemberPicker
+              id="committee-members"
+              members={members}
+              value={form.committeeMembers}
+              onChange={(ids) =>
+                setForm((f) => ({
+                  ...f,
+                  committeeMembers: ids.filter(
+                    (id) => id !== f.committeeHeadId
+                  ),
+                }))
+              }
+              disabledIds={form.committeeHeadId ? [form.committeeHeadId] : []}
+            />
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <LoadingSpinner size="sm" />}
+              {submitLabel}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const memberLabel = (m: Member) => `${m.fName} ${m.lName}`;
+/** Roll number in the search value so "#412" matches, and so members who share
+ *  a name stay distinguishable. */
+const memberSearchValue = (m: Member) =>
+  `${m.fName} ${m.lName} ${m.rollNo}`;
+
+/** Single-select member combobox (committee head). */
 function SingleMemberPicker({
+  id,
   members,
   value,
   onChange,
-  placeholder = "Search for a member",
 }: {
+  id: string;
   members: Member[];
   value: string;
   onChange: (id: string) => void;
-  placeholder?: string;
 }) {
-  const [query, setQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-
-  const selectedMember = members.find((m) => m._id === value) || null;
-  const matches = members.filter((m) => {
-    const label = `${m.fName} ${m.lName} ${m.rollNo}`.toLowerCase();
-    return query && label.includes(query.toLowerCase());
-  });
-
-  const selectedLabel = selectedMember
-    ? `${selectedMember.fName} ${selectedMember.lName} (#${selectedMember.rollNo})`
-    : "";
-
-  function chooseMember(id: string) {
-    onChange(id);
-    setQuery("");
-    setShowSuggestions(false);
-    setHighlightedIndex(0);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightedIndex((idx) =>
-        Math.min(idx + 1, Math.max(matches.length - 1, 0))
-      );
-      return;
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightedIndex((idx) => Math.max(idx - 1, 0));
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (matches.length > 0) {
-        const target = matches[highlightedIndex] || matches[0];
-        chooseMember(target._id);
-      }
-    }
-  }
+  const [open, setOpen] = useState(false);
+  const selected = members.find((m) => m._id === value) || null;
 
   return (
-    <div>
-      <div className="single-member-input">
-        <input
-          className="form-control"
-          placeholder={placeholder}
-          value={query || selectedLabel}
-          onChange={(e) => {
-            const nextValue = e.target.value;
-            if (selectedMember) {
-              onChange("");
-            }
-            setQuery(nextValue);
-            setShowSuggestions(true);
-            setHighlightedIndex(0);
-          }}
-          onKeyDown={handleKeyDown}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          onFocus={() => {
-            if (selectedMember) {
-              setQuery("");
-            }
-            if (query) setShowSuggestions(true);
-          }}
-        />
-        {selectedMember && !query && (
-          <button
-            type="button"
-            className="single-member-input__clear"
-            onClick={() => onChange("")}
-            aria-label="Clear committee head"
-          >
-            ×
-          </button>
-        )}
-      </div>
-      {showSuggestions && matches.length > 0 && (
-        <div className="list-group mt-2">
-          {matches.slice(0, 6).map((m, index) => (
-            <button
-              type="button"
-              key={m._id}
-              className={`list-group-item list-group-item-action ${
-                index === highlightedIndex ? "active" : ""
-              }`}
-              onClick={() => chooseMember(m._id)}
-            >
-              {m.fName} {m.lName} (#{m.rollNo})
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Popover open={open} onOpenChange={setOpen} modal>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+            {selected ? memberLabel(selected) : "Unassigned"}
+          </span>
+          <ChevronsUpDown aria-hidden="true" className="shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+      >
+        <Command>
+          <CommandInput placeholder="Search by name or roll number…" />
+          <CommandList>
+            <CommandEmpty>No members found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="Unassigned"
+                onSelect={() => {
+                  onChange("");
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  aria-hidden="true"
+                  className={cn(!selected ? "opacity-100" : "opacity-0")}
+                />
+                Unassigned
+              </CommandItem>
+              {members.map((m) => (
+                <CommandItem
+                  key={m._id}
+                  value={memberSearchValue(m)}
+                  onSelect={() => {
+                    onChange(m._id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    aria-hidden="true"
+                    className={cn(
+                      value === m._id ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="truncate">{memberLabel(m)}</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                    #{m.rollNo}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
+/** Multi-select member combobox (committee roster). */
 function MemberPicker({
+  id,
   members,
   value,
   onChange,
   disabledIds = [],
 }: {
+  id: string;
   members: Member[];
   value: string[];
   onChange: (ids: string[]) => void;
   disabledIds?: string[];
 }) {
-  const [query, setQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [open, setOpen] = useState(false);
+  const selected = value
+    .map((memberId) => members.find((m) => m._id === memberId))
+    .filter((m): m is Member => Boolean(m));
 
-  const matches = members
-    .filter((m) => !disabledIds.includes(m._id))
-    .filter((m) => {
-      const label = `${m.fName} ${m.lName} ${m.rollNo}`.toLowerCase();
-      return query && label.includes(query.toLowerCase());
-    });
-
-  const selectedMembers = value
-    .map((id) => members.find((m) => m._id === id))
-    .filter(Boolean) as Member[];
-
-  function addMember(id: string) {
-    if (value.includes(id)) return;
-    onChange([...value, id]);
-    setQuery("");
-    setShowSuggestions(false);
-    setHighlightedIndex(0);
-  }
-
-  function removeMember(id: string) {
-    onChange(value.filter((v) => v !== id));
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightedIndex((idx) =>
-        Math.min(idx + 1, Math.max(matches.length - 1, 0))
-      );
-      return;
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightedIndex((idx) => Math.max(idx - 1, 0));
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (matches.length > 0) {
-        const target = matches[highlightedIndex] || matches[0];
-        addMember(target._id);
-      }
-    }
-  }
+  const toggle = (memberId: string) => {
+    if (disabledIds.includes(memberId)) return;
+    onChange(
+      value.includes(memberId)
+        ? value.filter((existing) => existing !== memberId)
+        : [...value, memberId]
+    );
+  };
 
   return (
-    <div>
-      <input
-        className="form-control"
-        placeholder="Type a name or roll number and press Enter"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setShowSuggestions(true);
-          setHighlightedIndex(0);
-        }}
-        onKeyDown={handleKeyDown}
-        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-        onFocus={() => query && setShowSuggestions(true)}
-      />
-      {showSuggestions && matches.length > 0 && (
-        <div className="list-group mt-2">
-          {matches.slice(0, 6).map((m, index) => (
-            <button
-              type="button"
-              key={m._id}
-              className={`list-group-item list-group-item-action ${
-                index === highlightedIndex ? "active" : ""
-              }`}
-              onClick={() => addMember(m._id)}
+    <div className="space-y-2">
+      <Popover open={open} onOpenChange={setOpen} modal>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+          >
+            <span
+              className={cn(
+                "truncate",
+                selected.length === 0 && "text-muted-foreground"
+              )}
             >
-              {m.fName} {m.lName} (#{m.rollNo})
-            </button>
+              {selected.length
+                ? `${selected.length} member${
+                    selected.length === 1 ? "" : "s"
+                  } selected`
+                : "Select members"}
+            </span>
+            <ChevronsUpDown aria-hidden="true" className="shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="w-[var(--radix-popover-trigger-width)] p-0"
+        >
+          <Command>
+            <CommandInput placeholder="Search by name or roll number…" />
+            <CommandList>
+              <CommandEmpty>No members found.</CommandEmpty>
+              <CommandGroup>
+                {members.map((m) => {
+                  const isDisabled = disabledIds.includes(m._id);
+                  return (
+                    <CommandItem
+                      key={m._id}
+                      value={memberSearchValue(m)}
+                      disabled={isDisabled}
+                      onSelect={() => toggle(m._id)}
+                    >
+                      <Check
+                        aria-hidden="true"
+                        className={cn(
+                          value.includes(m._id) ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <span className="truncate">{memberLabel(m)}</span>
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                        {isDisabled ? "Head" : `#${m.rollNo}`}
+                      </span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {selected.length > 0 && (
+        <ul className="flex list-none flex-wrap gap-1.5 p-0">
+          {selected.map((m) => (
+            <li key={m._id}>
+              <Badge variant="muted" className="gap-1 pr-1">
+                {memberLabel(m)}
+                <button
+                  type="button"
+                  onClick={() => toggle(m._id)}
+                  aria-label={`Remove ${memberLabel(m)}`}
+                  className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </Badge>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-      <div className="d-flex flex-wrap gap-2 mt-2">
-        {selectedMembers.map((m) => (
-          <span key={m._id} className="badge bg-secondary">
-            {m.fName} {m.lName}
-            <button
-              type="button"
-              className="btn btn-sm btn-link text-white ms-2 p-0"
-              onClick={() => removeMember(m._id)}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }

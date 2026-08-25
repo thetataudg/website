@@ -1,18 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBell,
-  faCircleCheck,
-  faCircleXmark,
-  faCoins,
-  faFileInvoiceDollar,
-  faCalendarDays,
-  faReceipt,
-  faRotate,
-} from "@fortawesome/free-solid-svg-icons";
+  Bell,
+  CalendarDays,
+  CircleCheck,
+  CircleX,
+  Coins,
+  FileText,
+  Receipt,
+  RotateCw,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
+
 import { LoadingSpinner } from "../../components/LoadingState";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SectionHeader } from "../../components/shell/PageShell";
 
 export type TimelineEntry = {
   _id: string;
@@ -63,45 +68,49 @@ function dayLabel(iso: string | null) {
   });
 }
 
-const ICONS: Record<string, any> = {
-  charge_assigned: faFileInvoiceDollar,
-  charge_amended: faFileInvoiceDollar,
-  charge_waived: faCircleCheck,
-  charge_voided: faCircleXmark,
-  payment_submitted: faCoins,
-  payment_verified: faCircleCheck,
-  payment_rejected: faCircleXmark,
-  payment_recorded: faCoins,
-  payment_removed: faCircleXmark,
-  plan_proposed: faCalendarDays,
-  plan_approved: faCalendarDays,
-  plan_denied: faCircleXmark,
-  plan_completed: faCircleCheck,
-  plan_defaulted: faCircleXmark,
-  plan_cancelled: faCircleXmark,
-  installment_missed: faCircleXmark,
-  installment_paid: faCircleCheck,
-  reimbursement_submitted: faReceipt,
-  reimbursement_approved: faCircleCheck,
-  reimbursement_denied: faCircleXmark,
-  credit_applied: faRotate,
-  credit_paid_out: faCoins,
-  reminder_sent: faBell,
+const ICONS: Record<string, LucideIcon> = {
+  charge_assigned: FileText,
+  charge_amended: FileText,
+  charge_waived: CircleCheck,
+  charge_voided: CircleX,
+  payment_submitted: Coins,
+  payment_verified: CircleCheck,
+  payment_rejected: CircleX,
+  payment_recorded: Coins,
+  payment_removed: CircleX,
+  plan_proposed: CalendarDays,
+  plan_approved: CalendarDays,
+  plan_denied: CircleX,
+  plan_completed: CircleCheck,
+  plan_defaulted: CircleX,
+  plan_cancelled: CircleX,
+  installment_missed: CircleX,
+  installment_paid: CircleCheck,
+  reimbursement_submitted: Receipt,
+  reimbursement_approved: CircleCheck,
+  reimbursement_denied: CircleX,
+  credit_applied: RotateCw,
+  credit_paid_out: Coins,
+  reminder_sent: Bell,
 };
 
+/// Positive outcomes read green, refusals read as the destructive token. Colour
+/// is never the only signal — each row carries its own icon and wording.
+const POSITIVE = "text-emerald-700 dark:text-emerald-400";
+
 const TONE: Record<string, string> = {
-  payment_verified: "text-success",
-  charge_waived: "text-success",
-  plan_approved: "text-success",
-  plan_completed: "text-success",
-  reimbursement_approved: "text-success",
-  payment_rejected: "text-danger",
-  plan_denied: "text-danger",
-  plan_defaulted: "text-danger",
-  installment_missed: "text-danger",
-  reimbursement_denied: "text-danger",
-  charge_voided: "text-danger",
-  reminder_sent: "text-muted",
+  payment_verified: POSITIVE,
+  charge_waived: POSITIVE,
+  plan_approved: POSITIVE,
+  plan_completed: POSITIVE,
+  reimbursement_approved: POSITIVE,
+  payment_rejected: "text-destructive",
+  plan_denied: "text-destructive",
+  plan_defaulted: "text-destructive",
+  installment_missed: "text-destructive",
+  reimbursement_denied: "text-destructive",
+  charge_voided: "text-destructive",
+  reminder_sent: "text-muted-foreground",
 };
 
 /// The paper trail, on both surfaces.
@@ -112,9 +121,12 @@ const TONE: Record<string, string> = {
 export default function FinanceTimeline({
   endpoint,
   title = "History",
+  bare = false,
 }: {
   endpoint: string;
   title?: string;
+  /** Drops the heading and outer margin for a sheet that carries its own. */
+  bare?: boolean;
 }) {
   const [data, setData] = useState<FinanceHistory | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,32 +151,43 @@ export default function FinanceTimeline({
 
   if (loading) {
     return (
-      <div className="text-center py-4">
+      <div
+        className="flex justify-center py-6"
+        role="status"
+        aria-busy="true"
+        aria-live="polite"
+      >
         <LoadingSpinner />
+        <span className="sr-only">Loading history…</span>
       </div>
     );
   }
   if (error || !data) {
-    return <div className="alert alert-warning py-2 small">{error}</div>;
+    return (
+      <Alert variant="warning" role="alert">
+        <TriangleAlert aria-hidden="true" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
   }
 
   const { stats } = data;
 
   return (
-    <section className="mt-4">
-      <h2 className="h6 text-uppercase text-muted mb-3">{title}</h2>
+    <section className={bare ? undefined : "mt-6"}>
+      {bare ? null : <SectionHeader className="mb-3" title={title} as="h2" />}
 
-      <div className="row g-2 mb-3">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         <Stat label="Paid to date" value={money(stats.lifetimePaidCents)} />
         <Stat
           label="Avg days to pay"
-          value={stats.averageDaysToPayCharge === null ? "—" : `${stats.averageDaysToPayCharge}d`}
+          value={stats.averageDaysToPayCharge === null ? "None yet" : `${stats.averageDaysToPayCharge}d`}
         />
         <Stat label="Reminders this term" value={`${stats.timesRemindedThisTerm}`} />
         <Stat
           label="Instalments missed"
           value={`${stats.installmentsMissed}`}
-          tone={stats.installmentsMissed > 0 ? "text-danger" : undefined}
+          tone={stats.installmentsMissed > 0 ? "text-destructive" : undefined}
         />
         {/* The paidOn/recordedAt split makes this free, and a queue running
             eight days behind is something the chapter should be able to see. */}
@@ -172,11 +195,13 @@ export default function FinanceTimeline({
           label="Typical review wait"
           value={
             stats.medianVerificationDays === null
-              ? "—"
+              ? "None yet"
               : `${stats.medianVerificationDays}d`
           }
           tone={
-            (stats.medianVerificationDays ?? 0) >= 7 ? "text-danger" : undefined
+            (stats.medianVerificationDays ?? 0) >= 7
+              ? "text-destructive"
+              : undefined
           }
         />
         <Stat label="Credit held" value={money(stats.creditHeldCents)} />
@@ -189,7 +214,7 @@ export default function FinanceTimeline({
               ? `${stats.submissionsFiled} · ${stats.submissionsRejected} rejected`
               : `${stats.submissionsFiled}`
           }
-          tone={stats.submissionsRejected > 0 ? "text-danger" : undefined}
+          tone={stats.submissionsRejected > 0 ? "text-destructive" : undefined}
         />
         {/* Plans are per-charge, so a member can have run several. */}
         {(stats.plansCompleted ?? 0) +
@@ -205,36 +230,41 @@ export default function FinanceTimeline({
             ]
               .filter(Boolean)
               .join(" · ")}
-            tone={(stats.plansDefaulted ?? 0) > 0 ? "text-danger" : undefined}
+            tone={(stats.plansDefaulted ?? 0) > 0 ? "text-destructive" : undefined}
           />
         )}
       </div>
 
       {data.timeline.length === 0 ? (
-        <p className="text-muted small">Nothing recorded yet.</p>
+        <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
       ) : (
-        <ul className="list-unstyled mb-0">
-          {data.timeline.map((entry) => (
-            <li key={entry._id} className="d-flex gap-3 pb-3">
-              <div
-                className={`pt-1 ${TONE[entry.type] ?? "text-secondary"}`}
-                style={{ width: 20, flex: "none" }}
-              >
-                <FontAwesomeIcon icon={ICONS[entry.type] ?? faCoins} />
-              </div>
-              <div className="flex-grow-1 border-bottom pb-2">
-                <div className="small">{entry.summary}</div>
-                <div className="text-muted" style={{ fontSize: 12 }}>
-                  {dayLabel(entry.occurredAt)}
-                  {" · "}
-                  {/* "System" isn't a person hedging — it's the cron, and a
-                      treasurer needs to tell that from a human decision. */}
-                  {entry.actor ? entry.actor.name : "System"}
-                  {entry.channel && ` · ${entry.channel}`}
+        <ul className="mb-0 list-none space-y-0 p-0">
+          {data.timeline.map((entry) => {
+            const Icon = ICONS[entry.type] ?? Coins;
+            return (
+              <li key={entry._id} className="flex gap-3">
+                <div
+                  className={cn(
+                    "shrink-0 pt-2.5",
+                    TONE[entry.type] ?? "text-muted-foreground"
+                  )}
+                >
+                  <Icon aria-hidden="true" className="size-4" />
                 </div>
-              </div>
-            </li>
-          ))}
+                <div className="min-w-0 flex-1 border-b border-border py-2">
+                  <div className="text-sm text-foreground">{entry.summary}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {dayLabel(entry.occurredAt)}
+                    {" · "}
+                    {/* "System" isn't a person hedging — it's the cron, and a
+                        treasurer needs to tell that from a human decision. */}
+                    {entry.actor ? entry.actor.name : "System"}
+                    {entry.channel && ` · ${entry.channel}`}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
@@ -251,13 +281,11 @@ function Stat({
   tone?: string;
 }) {
   return (
-    <div className="col-6 col-md-4 col-lg-2">
-      <div className="border rounded p-2 h-100">
-        <div className="text-muted text-uppercase" style={{ fontSize: 10 }}>
-          {label}
-        </div>
-        <div className={`fw-semibold ${tone ?? ""}`}>{value}</div>
+    <div className="h-full rounded-lg border border-border bg-card p-2.5">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
       </div>
+      <div className={cn("font-semibold text-foreground", tone)}>{value}</div>
     </div>
   );
 }

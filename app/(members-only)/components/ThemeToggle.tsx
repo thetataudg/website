@@ -1,132 +1,153 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMoon, faSun } from "@fortawesome/free-solid-svg-icons";
+import { Moon, Sun } from "lucide-react";
 import { flushSync } from "react-dom";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "./ThemeProvider";
 
-const STORAGE_KEY = "member-theme";
+type ThemeViewTransition = {
+  ready: Promise<void>;
+  finished: Promise<void>;
+};
 
-type ThemeMode = "light" | "dark";
-
-function resolveInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-  if (stored === "light" || stored === "dark") {
-    return stored;
-  }
-  if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) {
-    return "dark";
-  }
-  return "light";
-}
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (update: () => void) => ThemeViewTransition;
+};
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const isTransitioningRef = useRef(false);
+  const activeAnimationRef = useRef<Animation | null>(null);
   const duration = 400;
 
-  useEffect(() => {
-    const initial = resolveInitialTheme();
-    setTheme(initial);
-    document.body.dataset.theme = initial;
+  // Avoid hydration mismatch: theme is only known on the client.
+  useEffect(() => setMounted(true), []);
+
+  const isDark = resolvedTheme === "dark";
+
+  const prefersReducedMotion = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const cleanUpTransition = useCallback(() => {
+    isTransitioningRef.current = false;
+    activeAnimationRef.current?.cancel();
+    activeAnimationRef.current = null;
+
+    const root = document.documentElement;
+    delete root.dataset.themeTransition;
+    root.style.removeProperty("--theme-toggle-transition-duration");
+    root.style.removeProperty("--theme-toggle-clip-from");
   }, []);
 
-  const applyTheme = useCallback((next: ThemeMode) => {
-    setTheme(next);
-    document.body.dataset.theme = next;
-    window.localStorage.setItem(STORAGE_KEY, next);
-  }, []);
+  useEffect(() => cleanUpTransition, [cleanUpTransition]);
 
-  const runCircularReveal = useCallback(
-    (x: number, y: number, useViewTransitionLayer: boolean) => {
-      const maxRadius = Math.hypot(
-        Math.max(x, window.innerWidth - x),
-        Math.max(y, window.innerHeight - y)
-      );
-      const keyframes = {
-        clipPath: [
-          `circle(0px at ${x}px ${y}px)`,
-          `circle(${maxRadius}px at ${x}px ${y}px)`,
-        ],
-      };
-
-      try {
-        if (useViewTransitionLayer) {
-          document.documentElement.animate(keyframes, {
-            duration,
-            easing: "ease-in-out",
-            pseudoElement: "::view-transition-new(root)",
-          });
-          return;
-        }
-        document.documentElement.animate(keyframes, {
-          duration,
-          easing: "ease-in-out",
-        });
-      } catch {
-        document.body.animate(keyframes, {
-          duration,
-          easing: "ease-in-out",
-        });
-      }
-    },
-    [duration]
-  );
-
-  const toggleTheme = useCallback(async () => {
-    const next = theme === "dark" ? "light" : "dark";
+  const toggleTheme = useCallback(() => {
+    const next = isDark ? "light" : "dark";
     const button = buttonRef.current;
-    const startViewTransition = (document as any).startViewTransition as
-      | ((callback: () => void) => { ready: Promise<void> })
-      | undefined;
+    const viewTransitionDocument = document as DocumentWithViewTransition;
 
-    if (!button) {
-      applyTheme(next);
+    // Respect reduced motion / no button / unsupported API → plain switch.
+    if (
+      !button ||
+      prefersReducedMotion() ||
+      typeof viewTransitionDocument.startViewTransition !== "function"
+    ) {
+      setTheme(next);
+      return;
+    }
+
+    if (
+      isTransitioningRef.current ||
+      document.documentElement.dataset.themeTransition === "active"
+    ) {
       return;
     }
 
     const { left, top, width, height } = button.getBoundingClientRect();
     const x = left + width / 2;
     const y = top + height / 2;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const maxRadius = Math.hypot(
+      Math.max(x, viewportWidth - x),
+      Math.max(y, viewportHeight - y)
+    );
 
-    if (typeof startViewTransition !== "function") {
-      applyTheme(next);
-      runCircularReveal(x, y, false);
-      return;
-    }
+    // Percentages resolve against the View Transition snapshot and stay
+    // aligned at fractional browser/display scales where px coordinates can
+    // be offset on the first transition.
+    const center = `${(x / viewportWidth) * 100}% ${(y / viewportHeight) * 100}%`;
+    const radius = `${
+      (maxRadius /
+        (Math.hypot(viewportWidth, viewportHeight) / Math.SQRT2)) *
+      100
+    }%`;
+    const clipPath = [
+      `circle(0% at ${center})`,
+      `circle(${radius} at ${center})`,
+    ];
+
+    const root = document.documentElement;
+    root.dataset.themeTransition = "active";
+    root.style.setProperty("--theme-toggle-transition-duration", `${duration}ms`);
+    root.style.setProperty("--theme-toggle-clip-from", clipPath[0]);
+    isTransitioningRef.current = true;
 
     try {
-      const transition = startViewTransition(() => {
-        flushSync(() => {
-          applyTheme(next);
-        });
+      // Keep this as a method call on `document`: detaching the function can
+      // throw an "Illegal invocation" in browsers that implement the API.
+      const transition = viewTransitionDocument.startViewTransition(() => {
+        flushSync(() => setTheme(next));
       });
 
-      await transition.ready;
-
-      runCircularReveal(x, y, true);
-    } catch (error) {
-      applyTheme(next);
-      runCircularReveal(x, y, false);
+      transition.finished.finally(cleanUpTransition).catch(() => {});
+      transition.ready
+        .then(() => {
+          activeAnimationRef.current = root.animate(
+            { clipPath },
+            {
+              duration,
+              easing: "ease-in-out",
+              fill: "forwards",
+              pseudoElement: "::view-transition-new(root)",
+            }
+          );
+        })
+        .catch(() => {});
+    } catch {
+      cleanUpTransition();
+      setTheme(next);
     }
-  }, [theme, applyTheme, runCircularReveal]);
+  }, [cleanUpTransition, duration, isDark, setTheme]);
 
   return (
-    <button
+    <Button
       ref={buttonRef}
-      className="theme-toggle"
+      variant="outline"
+      size="icon"
       type="button"
       onClick={toggleTheme}
-      aria-label="Toggle dark mode"
-      data-theme={theme}
+      className="h-9 w-9 shrink-0 p-0"
+      title={
+        mounted
+          ? `Switch to ${isDark ? "light" : "dark"} mode`
+          : "Toggle theme"
+      }
+      aria-label={
+        mounted
+          ? `Switch to ${isDark ? "light" : "dark"} mode`
+          : "Toggle theme"
+      }
     >
-      <span className="theme-toggle__icon" aria-hidden="true">
-        <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />
-      </span>
-      <span className="theme-toggle__label">
-        {theme === "dark" ? "Light" : "Dark"}
-      </span>
-    </button>
+      {mounted && isDark ? (
+        <Sun aria-hidden="true" className="size-5" />
+      ) : (
+        <Moon aria-hidden="true" className="size-5" />
+      )}
+    </Button>
   );
 }

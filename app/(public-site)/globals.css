@@ -1,6 +1,24 @@
+@import "./typeset.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.typeset-article {
+  --font-geist: var(--font-geist-sans);
+  --typeset-font-body: var(--font-geist);
+  --typeset-font-heading: var(--font-geist);
+  --typeset-font-mono: var(--font-geist-mono);
+  --typeset-size: 15px;
+  --typeset-leading: 1.75;
+  --typeset-flow: 1.25em;
+  --color-foreground: hsl(var(--foreground));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-border: hsl(var(--border));
+  --color-primary: hsl(var(--primary));
+  --color-ring: hsl(var(--ring));
+}
 
 * {
   box-sizing: border-box;

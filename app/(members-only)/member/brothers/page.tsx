@@ -3,12 +3,13 @@ export const dynamic = "force-dynamic";
 
 import { headers } from "next/headers";
 import MembersList, { MemberData } from "./MembersList";
+import MembershipRevokedState from "../../components/MembershipRevokedState";
 
 export default async function BrothersPage() {
   const headerList = headers();
   const host = headerList.get("x-forwarded-host") || headerList.get("host");
   if (!host) {
-    return <Unauthorized />;
+    return <MembershipRevokedState />;
   }
   const forwardedProto = headerList.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const proto =
@@ -22,14 +23,14 @@ export default async function BrothersPage() {
     cache: "no-store",
   });
   if (!meRes.ok) {
-    return <Unauthorized />;
+    return <MembershipRevokedState />;
   }
   const me = await meRes.json();
   const status = String(me.status || "").toLowerCase();
   const allowedStatus = status === "active" || status === "alumni";
   const isRestricted = !me.memberId || Boolean(me.pending) || !allowedStatus;
   if (isRestricted) {
-    return <Unauthorized />;
+    return <MembershipRevokedState />;
   }
 
   const res = await fetch(`${base}/api/members`, {
@@ -58,15 +59,3 @@ export default async function BrothersPage() {
   return <MembersList initialMembers={members} />;
 }
 
-function Unauthorized() {
-  return (
-    <div className="member-dashboard">
-      <div className="bento-card text-center">
-        <h2>Unauthorized</h2>
-        <p className="text-muted">
-          Your membership has been suspended or removed, and you no longer have access to this application.
-        </p>
-      </div>
-    </div>
-  );
-}

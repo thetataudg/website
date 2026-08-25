@@ -1,7 +1,90 @@
 // app/(members-only)/member/admin/pending/PendingList.tsx
 "use client";
 
- import { useState } from "react";
+import { useState } from "react";
+import {
+  BriefcaseBusiness,
+  Check,
+  CircleAlert,
+  ClipboardList,
+  Link2,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react";
+
+import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
+import { LoadingSpinner } from "../../../components/LoadingState";
+import { cn } from "@/lib/utils";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+
+/** Radix `SelectItem` rejects `value=""`; state still stores "" for unselected. */
+const NONE = "__none__";
+
+type ReviewSection = "profile" | "access" | "highlights" | "experience";
+
+/** Same sidebar as the create/edit profile modals. */
+const REVIEW_SECTIONS: Array<{
+  value: ReviewSection;
+  label: string;
+  icon: typeof UserRound;
+}> = [
+  { value: "profile", label: "Profile", icon: UserRound },
+  { value: "access", label: "Access & chapter", icon: ShieldCheck },
+  { value: "highlights", label: "Links & highlights", icon: Link2 },
+  { value: "experience", label: "Experience", icon: BriefcaseBusiness },
+];
 
 interface PendingRequest {
   _id: string;
@@ -53,6 +136,8 @@ export default function PendingList({ initialRequests }: Props) {
   const [requests, setRequests] = useState<PendingRequest[]>(initialRequests);
   const [selected, setSelected] = useState<PendingRequest | null>(null);
   const [saving, setSaving] = useState(false);
+  const [activeSection, setActiveSection] = useState<ReviewSection>("profile");
+  const [confirmReject, setConfirmReject] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,6 +260,7 @@ export default function PendingList({ initialRequests }: Props) {
     });
 
   const openModal = (request: PendingRequest) => {
+    setActiveSection("profile");
     setSelected(request);
     setError(null);
     const socials = request.socialLinks || {};
@@ -320,647 +406,938 @@ export default function PendingList({ initialRequests }: Props) {
     setProcessing(false);
   };
 
+
   return (
-    <div className="bento-card admin-table-card">
-      <div className="admin-members-header">
-        <h2>Pending Requests</h2>
-      </div>
-      <ul className="list-group admin-list">
-        {requests.map((r) => (
-          <li className="list-group-item" key={r._id}>
-            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <div>
-                <strong>#{r.rollNo}</strong> — {r.fName} {r.lName}
-              </div>
-              <div className="d-flex gap-2">
-                <button
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={() => openModal(r)}
-                >
-                  View
-                </button>
-              </div>
-            </div>
-          </li>
-        ))}
-        {requests.length === 0 && (
-          <li className="list-group-item text-center text-muted">
-            No pending requests.
-          </li>
-        )}
-      </ul>
+    <PageContainer className="max-w-7xl space-y-6">
+      <PageHeader
+        title="Profile requests"
+        description="Review member-submitted profiles before they join the roster."
+      />
+
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b">
+          <CardTitle>Pending requests</CardTitle>
+          <CardDescription>
+            {requests.length} request{requests.length === 1 ? "" : "s"} awaiting
+            review.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-28 pl-6">Roll</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead className="hidden sm:table-cell">Submitted</TableHead>
+                <TableHead className="w-28 pr-6">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {requests.length ? (
+                requests.map((r) => (
+                  <TableRow key={r._id}>
+                    <TableCell className="pl-6 font-mono text-sm">
+                      #{r.rollNo}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {r.fName} {r.lName}
+                    </TableCell>
+                    <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
+                      {r.submittedAt
+                        ? new Date(r.submittedAt).toLocaleDateString()
+                        : "Unknown"}
+                    </TableCell>
+                    <TableCell className="pr-6 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openModal(r)}
+                      >
+                        Review
+                        <span className="sr-only">{` #${r.rollNo} ${r.fName} ${r.lName}`}</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-56 text-center">
+                    <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
+                      <div className="rounded-full bg-muted p-3">
+                        <ClipboardList className="size-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">No pending requests</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Profiles submitted by members show up here for review.
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {selected && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+        <Dialog
+          open
+          onOpenChange={(next) => {
+            if (!next && !processing && !saving) setSelected(null);
+          }}
         >
-          <div className="modal-dialog modal-xl modal-dialog-scrollable admin-modal-wide">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  Review #{selected.rollNo} — {selected.fName} {selected.lName}
-                </h5>
-                <button className="btn-close" onClick={() => setSelected(null)} />
-              </div>
-              <div className="modal-body">
-                {error && <div className="alert alert-danger">{error}</div>}
+          {/* Same shell as the create/edit profile modals. */}
+          <DialogContent
+            className="flex h-[min(92vh,900px)] w-[calc(100%-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0"
+            onInteractOutside={(event) => event.preventDefault()}
+          >
+            <DialogHeader className="shrink-0 border-b px-5 py-5 pr-14 text-left sm:px-6">
+              <DialogTitle>
+                Review #{selected.rollNo} {selected.fName} {selected.lName}
+              </DialogTitle>
+              <DialogDescription>
+                Edit anything that needs correcting, then approve or reject the
+                request.
+              </DialogDescription>
+            </DialogHeader>
 
-                <div className="profile-editor__section">
-                  <h4 className="mb-3">Basics</h4>
-                  <div className="row mb-3">
-                    <div className="col-md-4">
-                      <label className="form-label">Roll No</label>
-                      <input
-                        className="form-control"
-                        value={form.rollNo}
-                        onChange={(e) => updateField("rollNo", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">First Name</label>
-                      <input
-                        className="form-control"
-                        value={form.fName}
-                        onChange={(e) => updateField("fName", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Last Name</label>
-                      <input
-                        className="form-control"
-                        value={form.lName}
-                        onChange={(e) => updateField("lName", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="profile-editor__section">
-                  <h4 className="mb-3">Membership</h4>
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">Status</label>
-                      <select
-                        className="form-select"
-                        value={form.preferredStatus}
-                        onChange={(e) =>
-                          updateField("preferredStatus", e.target.value)
-                        }
+            {error ? (
+              <Alert variant="destructive" role="alert" className="m-4 mb-0 sm:mx-6">
+                <CircleAlert className="size-4" />
+                <AlertTitle>Unable to save</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <Tabs
+              value={activeSection}
+              onValueChange={(value) =>
+                setActiveSection(value as ReviewSection)
+              }
+              className="flex min-h-0 flex-1 flex-col md:flex-row"
+            >
+              <aside className="shrink-0 border-b bg-muted/30 p-3 md:w-60 md:border-b-0 md:border-r md:p-4">
+                <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 md:flex-col md:items-stretch">
+                  {REVIEW_SECTIONS.map((section) => {
+                    const Icon = section.icon;
+                    return (
+                      <TabsTrigger
+                        key={section.value}
+                        value={section.value}
+                        className="shrink-0 justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-background md:w-full"
                       >
-                        {preferredStatusOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">Role</label>
-                      <select
-                        className="form-select"
-                        value={form.preferredRole}
-                        onChange={(e) =>
-                          updateField("preferredRole", e.target.value)
-                        }
-                      >
-                        {preferredRoleOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option.charAt(0).toUpperCase() + option.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                        <Icon className="size-4" />
+                        {section.label}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </aside>
 
-                <div className="profile-editor__section">
-                  <h4 className="mb-4">Profile Builder</h4>
-
-                  <div className="row mb-3">
-                    <div className="col-md-8">
-                      <label className="form-label">Headline / Tagline</label>
-                      <input
-                        className="form-control"
-                        value={form.headline}
-                        onChange={(e) => updateField("headline", e.target.value)}
-                        placeholder="Aspiring robotics engineer • Project lead"
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Pronouns</label>
-                      <input
-                        className="form-control"
-                        value={form.pronouns}
-                        onChange={(e) => updateField("pronouns", e.target.value)}
-                        placeholder="he/him, she/her, they/them"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">Majors (comma-separated)</label>
-                      <input
-                        className="form-control"
-                        value={form.majors}
-                        onChange={(e) => updateField("majors", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">Minors (comma-separated)</label>
-                      <input
-                        className="form-control"
-                        value={form.minors}
-                        onChange={(e) => updateField("minors", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row mb-3">
-                    <div className="col-sm-4">
-                      <label className="form-label">Graduation Year</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        value={form.gradYear}
-                        onChange={(e) => updateField("gradYear", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-sm-4">
-                      <label className="form-label">Pledge Class</label>
-                      <select
-                        className="form-select"
-                        value={form.pledgeClass}
-                        onChange={(e) => updateField("pledgeClass", e.target.value)}
-                      >
-                        <option value="">Select pledge class</option>
-                        {pledgeClassOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-sm-4">
-                      <label className="form-label">Hometown</label>
-                      <input
-                        className="form-control"
-                        value={form.hometown}
-                        onChange={(e) => updateField("hometown", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-0">
-                    <label className="form-label">Bio</label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={form.bio}
-                      onChange={(e) => updateField("bio", e.target.value)}
-                      placeholder="Share your story, interests, or what you're working on."
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                  {/* ── Profile ── */}
+                  <TabsContent value="profile" className="mt-0 space-y-5">
+                    <SectionHeading
+                      title="Profile"
+                      description="The details members see first on this profile."
                     />
-                  </div>
-                </div>
-
-                <div className="profile-editor__section">
-                  <h5 className="mb-3">Links & Highlights</h5>
-
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">GitHub URL</label>
-                      <input
-                        className="form-control"
-                        value={form.github}
-                        onChange={(e) => updateField("github", e.target.value)}
-                        placeholder="https://github.com/username"
-                      />
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">LinkedIn URL</label>
-                      <input
-                        className="form-control"
-                        value={form.linkedin}
-                        onChange={(e) => updateField("linkedin", e.target.value)}
-                        placeholder="https://linkedin.com/in/username"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">Instagram URL</label>
-                      <input
-                        className="form-control"
-                        value={form.instagram}
-                        onChange={(e) => updateField("instagram", e.target.value)}
-                        placeholder="https://instagram.com/username"
-                      />
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">Personal Website</label>
-                      <input
-                        className="form-control"
-                        value={form.website}
-                        onChange={(e) => updateField("website", e.target.value)}
-                        placeholder="https://your-site.com"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row mb-0">
-                    <div className="col-md-6">
-                      <label className="form-label">Skills (one per line)</label>
-                      <textarea
-                        className="form-control"
-                        rows={4}
-                        value={form.skills}
-                        onChange={(e) => updateField("skills", e.target.value)}
-                        placeholder="CAD\nPython\nProject Management"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Fun Facts (one per line)</label>
-                      <textarea
-                        className="form-control"
-                        rows={4}
-                        value={form.funFacts}
-                        onChange={(e) => updateField("funFacts", e.target.value)}
-                        placeholder="Loves sunrise hikes\nCollects vintage cameras"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="profile-editor__section">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Projects</h5>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("projects")}
-                    >
-                      Add Project
-                    </button>
-                  </div>
-                  {form.projects.map((project, index) => (
-                    <div className="border rounded p-3 mb-3" key={`project-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Project {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("projects", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="row">
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
-                            placeholder="Project title"
-                            value={project.title}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">
+                          Profile basics
+                        </CardTitle>
+                        <CardDescription>
+                          Personal details submitted with the request.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <Field label="Headline or tagline" htmlFor="pr-headline">
+                          <Input
+                            id="pr-headline"
+                            value={form.headline}
                             onChange={(e) =>
-                              updateArrayItem<typeof project, "title">(
+                              updateField("headline", e.target.value)
+                            }
+                          />
+                        </Field>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Pronouns" htmlFor="pr-pronouns">
+                            <Input
+                              id="pr-pronouns"
+                              value={form.pronouns}
+                              onChange={(e) =>
+                                updateField("pronouns", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Hometown" htmlFor="pr-hometown">
+                            <Input
+                              id="pr-hometown"
+                              value={form.hometown}
+                              onChange={(e) =>
+                                updateField("hometown", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field
+                            label="Majors"
+                            htmlFor="pr-majors"
+                            description="Comma-separated"
+                          >
+                            <Input
+                              id="pr-majors"
+                              value={form.majors}
+                              onChange={(e) =>
+                                updateField("majors", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field
+                            label="Minors"
+                            htmlFor="pr-minors"
+                            description="Comma-separated"
+                          >
+                            <Input
+                              id="pr-minors"
+                              value={form.minors}
+                              onChange={(e) =>
+                                updateField("minors", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Graduation year" htmlFor="pr-gradYear">
+                            <Input
+                              id="pr-gradYear"
+                              type="number"
+                              value={form.gradYear}
+                              onChange={(e) =>
+                                updateField("gradYear", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Pledge class" htmlFor="pr-pledgeClass">
+                            <Select
+                              value={form.pledgeClass || NONE}
+                              onValueChange={(value) =>
+                                updateField(
+                                  "pledgeClass",
+                                  value === NONE ? "" : value
+                                )
+                              }
+                            >
+                              <SelectTrigger id="pr-pledgeClass">
+                                <SelectValue placeholder="Select pledge class" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={NONE}>
+                                  Select pledge class
+                                </SelectItem>
+                                {pledgeClassOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                        </div>
+                        <Field label="Bio" htmlFor="pr-bio">
+                          <Textarea
+                            id="pr-bio"
+                            rows={4}
+                            value={form.bio}
+                            onChange={(e) => updateField("bio", e.target.value)}
+                          />
+                        </Field>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* ── Access & chapter ── */}
+                  <TabsContent value="access" className="mt-0 space-y-5">
+                    <SectionHeading
+                      title="Access & chapter"
+                      description="Identity and the access this member will be granted on approval."
+                    />
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Identity</CardTitle>
+                        <CardDescription>
+                          Roll number and name for the chapter roster.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <Field label="Roll No" htmlFor="pr-rollNo">
+                            <Input
+                              id="pr-rollNo"
+                              value={form.rollNo}
+                              onChange={(e) =>
+                                updateField("rollNo", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="First name" htmlFor="pr-fName">
+                            <Input
+                              id="pr-fName"
+                              value={form.fName}
+                              onChange={(e) =>
+                                updateField("fName", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Last name" htmlFor="pr-lName">
+                            <Input
+                              id="pr-lName"
+                              value={form.lName}
+                              onChange={(e) =>
+                                updateField("lName", e.target.value)
+                              }
+                            />
+                          </Field>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Membership</CardTitle>
+                        <CardDescription>
+                          Applied when the request is approved.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Status" htmlFor="pr-status">
+                            <Select
+                              value={form.preferredStatus}
+                              onValueChange={(value) =>
+                                updateField("preferredStatus", value)
+                              }
+                            >
+                              <SelectTrigger id="pr-status">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {preferredStatusOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                          <Field label="Role" htmlFor="pr-role">
+                            <Select
+                              value={form.preferredRole}
+                              onValueChange={(value) =>
+                                updateField("preferredRole", value)
+                              }
+                            >
+                              <SelectTrigger id="pr-role">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {preferredRoleOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option.charAt(0).toUpperCase() +
+                                      option.slice(1)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* ── Links & highlights ── */}
+                  <TabsContent value="highlights" className="mt-0 space-y-5">
+                    <SectionHeading
+                      title="Links & highlights"
+                      description="External profiles and personal details shown on the profile."
+                    />
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Links</CardTitle>
+                        <CardDescription>
+                          Public profiles linked from the member profile.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="GitHub URL" htmlFor="pr-github">
+                            <Input
+                              id="pr-github"
+                              value={form.github}
+                              onChange={(e) =>
+                                updateField("github", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="LinkedIn URL" htmlFor="pr-linkedin">
+                            <Input
+                              id="pr-linkedin"
+                              value={form.linkedin}
+                              onChange={(e) =>
+                                updateField("linkedin", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Instagram URL" htmlFor="pr-instagram">
+                            <Input
+                              id="pr-instagram"
+                              value={form.instagram}
+                              onChange={(e) =>
+                                updateField("instagram", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Personal website" htmlFor="pr-website">
+                            <Input
+                              id="pr-website"
+                              value={form.website}
+                              onChange={(e) =>
+                                updateField("website", e.target.value)
+                              }
+                            />
+                          </Field>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Highlights</CardTitle>
+                        <CardDescription>
+                          Skills and fun facts, one per line.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field
+                            label="Skills"
+                            htmlFor="pr-skills"
+                            description="One per line"
+                          >
+                            <Textarea
+                              id="pr-skills"
+                              rows={4}
+                              value={form.skills}
+                              onChange={(e) =>
+                                updateField("skills", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field
+                            label="Fun facts"
+                            htmlFor="pr-funFacts"
+                            description="One per line"
+                          >
+                            <Textarea
+                              id="pr-funFacts"
+                              rows={4}
+                              value={form.funFacts}
+                              onChange={(e) =>
+                                updateField("funFacts", e.target.value)
+                              }
+                            />
+                          </Field>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* ── Experience ── */}
+                  <TabsContent value="experience" className="mt-0 space-y-5">
+                    <SectionHeading
+                      title="Experience"
+                      description="Projects, work, awards, and custom profile sections."
+                    />
+
+                    <RepeatableCard
+                      title="Projects"
+                      description="Work this brother wants to show off."
+                      addLabel="Add project"
+                      onAdd={() => addArrayItem("projects")}
+                      emptyLabel="No projects submitted."
+                      count={form.projects.length}
+                    >
+                      {form.projects.map((project, index) => (
+                        <EntryCard
+                          key={`project-${index}`}
+                          label={`Project ${index + 1}`}
+                          onRemove={() => removeArrayItem("projects", index)}
+                        >
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Input
+                              placeholder="Project title"
+                              aria-label={`Project ${index + 1} title`}
+                              value={project.title}
+                              onChange={(e) =>
+                                updateArrayItem<typeof project, "title">(
+                                  "projects",
+                                  index,
+                                  "title",
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <Input
+                              placeholder="Project link"
+                              aria-label={`Project ${index + 1} link`}
+                              value={project.link}
+                              onChange={(e) =>
+                                updateArrayItem<typeof project, "link">(
+                                  "projects",
+                                  index,
+                                  "link",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                          <Textarea
+                            rows={3}
+                            placeholder="Short description"
+                            aria-label={`Project ${index + 1} description`}
+                            value={project.description}
+                            onChange={(e) =>
+                              updateArrayItem<typeof project, "description">(
                                 "projects",
                                 index,
+                                "description",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </EntryCard>
+                      ))}
+                    </RepeatableCard>
+
+                    <RepeatableCard
+                      title="Work & internships"
+                      description="Roles held outside the chapter."
+                      addLabel="Add experience"
+                      onAdd={() => addArrayItem("work")}
+                      emptyLabel="No experience submitted."
+                      count={form.work.length}
+                    >
+                      {form.work.map((item, index) => (
+                        <EntryCard
+                          key={`work-${index}`}
+                          label={`Experience ${index + 1}`}
+                          onRemove={() => removeArrayItem("work", index)}
+                        >
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Input
+                              placeholder="Role title"
+                              aria-label={`Experience ${index + 1} role title`}
+                              value={item.title}
+                              onChange={(e) =>
+                                updateArrayItem<typeof item, "title">(
+                                  "work",
+                                  index,
+                                  "title",
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <Input
+                              placeholder="Organization"
+                              aria-label={`Experience ${index + 1} organization`}
+                              value={item.organization}
+                              onChange={(e) =>
+                                updateArrayItem<typeof item, "organization">(
+                                  "work",
+                                  index,
+                                  "organization",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <Input
+                              placeholder="Start (e.g. Aug 2023)"
+                              aria-label={`Experience ${index + 1} start`}
+                              value={item.start}
+                              onChange={(e) =>
+                                updateArrayItem<typeof item, "start">(
+                                  "work",
+                                  index,
+                                  "start",
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <Input
+                              placeholder="End (e.g. May 2024)"
+                              aria-label={`Experience ${index + 1} end`}
+                              value={item.end}
+                              onChange={(e) =>
+                                updateArrayItem<typeof item, "end">(
+                                  "work",
+                                  index,
+                                  "end",
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <Input
+                              placeholder="Link"
+                              aria-label={`Experience ${index + 1} link`}
+                              value={item.link}
+                              onChange={(e) =>
+                                updateArrayItem<typeof item, "link">(
+                                  "work",
+                                  index,
+                                  "link",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                          <Textarea
+                            rows={3}
+                            placeholder="Description"
+                            aria-label={`Experience ${index + 1} description`}
+                            value={item.description}
+                            onChange={(e) =>
+                              updateArrayItem<typeof item, "description">(
+                                "work",
+                                index,
+                                "description",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </EntryCard>
+                      ))}
+                    </RepeatableCard>
+
+                    <RepeatableCard
+                      title="Awards & certifications"
+                      description="Recognition worth surfacing on the profile."
+                      addLabel="Add award"
+                      onAdd={() => addArrayItem("awards")}
+                      emptyLabel="No awards submitted."
+                      count={form.awards.length}
+                    >
+                      {form.awards.map((award, index) => (
+                        <EntryCard
+                          key={`award-${index}`}
+                          label={`Award ${index + 1}`}
+                          onRemove={() => removeArrayItem("awards", index)}
+                        >
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Input
+                              placeholder="Title"
+                              aria-label={`Award ${index + 1} title`}
+                              value={award.title}
+                              onChange={(e) =>
+                                updateArrayItem<typeof award, "title">(
+                                  "awards",
+                                  index,
+                                  "title",
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <Input
+                                placeholder="Issuer"
+                                aria-label={`Award ${index + 1} issuer`}
+                                value={award.issuer}
+                                onChange={(e) =>
+                                  updateArrayItem<typeof award, "issuer">(
+                                    "awards",
+                                    index,
+                                    "issuer",
+                                    e.target.value
+                                  )
+                                }
+                              />
+                              <Input
+                                placeholder="Date"
+                                aria-label={`Award ${index + 1} date`}
+                                value={award.date}
+                                onChange={(e) =>
+                                  updateArrayItem<typeof award, "date">(
+                                    "awards",
+                                    index,
+                                    "date",
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
+                          <Textarea
+                            rows={2}
+                            placeholder="Description"
+                            aria-label={`Award ${index + 1} description`}
+                            value={award.description}
+                            onChange={(e) =>
+                              updateArrayItem<typeof award, "description">(
+                                "awards",
+                                index,
+                                "description",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </EntryCard>
+                      ))}
+                    </RepeatableCard>
+
+                    <RepeatableCard
+                      title="Custom sections"
+                      description="Anything else worth adding to the profile."
+                      addLabel="Add section"
+                      onAdd={() => addArrayItem("customSections")}
+                      emptyLabel="No custom sections submitted."
+                      count={form.customSections.length}
+                    >
+                      {form.customSections.map((section, index) => (
+                        <EntryCard
+                          key={`section-${index}`}
+                          label={`Section ${index + 1}`}
+                          onRemove={() =>
+                            removeArrayItem("customSections", index)
+                          }
+                        >
+                          <Input
+                            placeholder="Section title"
+                            aria-label={`Section ${index + 1} title`}
+                            value={section.title}
+                            onChange={(e) =>
+                              updateArrayItem<typeof section, "title">(
+                                "customSections",
+                                index,
                                 "title",
                                 e.target.value
                               )
                             }
                           />
-                        </div>
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
-                            placeholder="Project link"
-                            value={project.link}
+                          <Textarea
+                            rows={3}
+                            placeholder="Section body"
+                            aria-label={`Section ${index + 1} body`}
+                            value={section.body}
                             onChange={(e) =>
-                              updateArrayItem<typeof project, "link">(
-                                "projects",
+                              updateArrayItem<typeof section, "body">(
+                                "customSections",
                                 index,
-                                "link",
+                                "body",
                                 e.target.value
                               )
                             }
                           />
-                        </div>
-                      </div>
-                      <textarea
-                        className="form-control"
-                        rows={3}
-                        placeholder="Short description"
-                        value={project.description}
-                        onChange={(e) =>
-                          updateArrayItem<typeof project, "description">(
-                            "projects",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
+                        </EntryCard>
+                      ))}
+                    </RepeatableCard>
+                  </TabsContent>
                 </div>
 
-                <div className="profile-editor__section">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Work / Internships</h5>
-                    <button
+                <DialogFooter className="shrink-0 gap-2 border-t bg-background p-4 sm:flex-row sm:justify-between sm:px-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSelected(null)}
+                    disabled={processing || saving}
+                  >
+                    Close
+                  </Button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
                       type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("work")}
+                      variant="outline"
+                      onClick={saveUpdates}
+                      disabled={saving || processing}
                     >
-                      Add Experience
-                    </button>
-                  </div>
-                  {form.work.map((item, index) => (
-                    <div className="border rounded p-3 mb-3" key={`work-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Experience {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("work", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="row">
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
-                            placeholder="Role title"
-                            value={item.title}
-                            onChange={(e) =>
-                              updateArrayItem<typeof item, "title">(
-                                "work",
-                                index,
-                                "title",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
-                            placeholder="Organization"
-                            value={item.organization}
-                            onChange={(e) =>
-                              updateArrayItem<typeof item, "organization">(
-                                "work",
-                                index,
-                                "organization",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="row mb-2">
-                        <div className="col-md-4">
-                          <input
-                            className="form-control"
-                            placeholder="Start (e.g. Aug 2023)"
-                            value={item.start}
-                            onChange={(e) =>
-                              updateArrayItem<typeof item, "start">(
-                                "work",
-                                index,
-                                "start",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <input
-                            className="form-control"
-                            placeholder="End (e.g. May 2024)"
-                            value={item.end}
-                            onChange={(e) =>
-                              updateArrayItem<typeof item, "end">(
-                                "work",
-                                index,
-                                "end",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <input
-                            className="form-control"
-                            placeholder="Link"
-                            value={item.link}
-                            onChange={(e) =>
-                              updateArrayItem<typeof item, "link">(
-                                "work",
-                                index,
-                                "link",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                      <textarea
-                        className="form-control"
-                        rows={3}
-                        placeholder="Description"
-                        value={item.description}
-                        onChange={(e) =>
-                          updateArrayItem<typeof item, "description">(
-                            "work",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="profile-editor__section">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Awards / Certifications</h5>
-                    <button
+                      {saving && <LoadingSpinner size="sm" />}
+                      {saving ? "Saving…" : "Save changes"}
+                    </Button>
+                    <Button
                       type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("awards")}
+                      variant="outline"
+                      onClick={() => setConfirmReject(true)}
+                      disabled={processing || saving}
+                      className="text-destructive hover:text-destructive"
                     >
-                      Add Award
-                    </button>
-                  </div>
-                  {form.awards.map((award, index) => (
-                    <div className="border rounded p-3 mb-3" key={`award-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Award {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("awards", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="row mb-2">
-                        <div className="col-md-6">
-                          <input
-                            className="form-control"
-                            placeholder="Title"
-                            value={award.title}
-                            onChange={(e) =>
-                              updateArrayItem<typeof award, "title">(
-                                "awards",
-                                index,
-                                "title",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-3">
-                          <input
-                            className="form-control"
-                            placeholder="Issuer"
-                            value={award.issuer}
-                            onChange={(e) =>
-                              updateArrayItem<typeof award, "issuer">(
-                                "awards",
-                                index,
-                                "issuer",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-3">
-                          <input
-                            className="form-control"
-                            placeholder="Date"
-                            value={award.date}
-                            onChange={(e) =>
-                              updateArrayItem<typeof award, "date">(
-                                "awards",
-                                index,
-                                "date",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                      <textarea
-                        className="form-control"
-                        rows={2}
-                        placeholder="Description"
-                        value={award.description}
-                        onChange={(e) =>
-                          updateArrayItem<typeof award, "description">(
-                            "awards",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="profile-editor__section">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Custom Sections</h5>
-                    <button
+                      <X className="size-4" />
+                      Reject
+                    </Button>
+                    <Button
                       type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("customSections")}
+                      onClick={approveWithUpdates}
+                      disabled={processing || saving}
                     >
-                      Add Section
-                    </button>
+                      {processing ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        <Check className="size-4" />
+                      )}
+                      {processing ? "Approving…" : "Approve"}
+                    </Button>
                   </div>
-                  {form.customSections.map((section, index) => (
-                    <div className="border rounded p-3 mb-3" key={`section-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Section {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("customSections", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <input
-                        className="form-control mb-2"
-                        placeholder="Section title"
-                        value={section.title}
-                        onChange={(e) =>
-                          updateArrayItem<typeof section, "title">(
-                            "customSections",
-                            index,
-                            "title",
-                            e.target.value
-                          )
-                        }
-                      />
-                      <textarea
-                        className="form-control"
-                        rows={3}
-                        placeholder="Section body"
-                        value={section.body}
-                        onChange={(e) =>
-                          updateArrayItem<typeof section, "body">(
-                            "customSections",
-                            index,
-                            "body",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                </DialogFooter>
               </div>
-              <div className="modal-footer">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setSelected(null)}
-                  disabled={processing}
-                >
-                  Close
-                </button>
-                <button
-                  className="btn btn-outline-primary"
-                  onClick={saveUpdates}
-                  disabled={saving || processing}
-                >
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
-                <button
-                  className="btn btn-outline-danger"
-                  onClick={rejectRequest}
-                  disabled={processing}
-                >
-                  Reject
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={approveWithUpdates}
-                  disabled={processing}
-                >
-                  {processing ? "Approving..." : "Approve"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
       )}
+
+      {/* Rejecting used to fire on a single click. */}
+      <AlertDialog open={confirmReject} onOpenChange={setConfirmReject}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject this request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selected
+                ? `#${selected.rollNo} ${selected.fName} ${selected.lName} will not be added to the roster.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmReject(false);
+                void rejectRequest();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Reject request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
+  );
+}
+
+/** Matches the profile editor's section heading. */
+function SectionHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  htmlFor,
+  description,
+  className,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  description?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+      {description ? (
+        <p className="text-xs text-muted-foreground">{description}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function RepeatableCard({
+  title,
+  description,
+  addLabel,
+  onAdd,
+  emptyLabel,
+  count,
+  children,
+}: {
+  title: string;
+  description: string;
+  addLabel: string;
+  onAdd: () => void;
+  emptyLabel: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+        <div className="space-y-1.5">
+          <CardTitle className="text-base">{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onAdd}
+          className="shrink-0"
+        >
+          <Plus className="size-4" />
+          {addLabel}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {count ? (
+          <div className="space-y-3">{children}</div>
+        ) : (
+          <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+            {emptyLabel}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EntryCard({
+  label,
+  onRemove,
+  children,
+}: {
+  label: string;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3 rounded-md border border-border p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onRemove}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="size-4" />
+          <span className="sr-only">{`Remove ${label}`}</span>
+          Remove
+        </Button>
+      </div>
+      {children}
     </div>
   );
 }

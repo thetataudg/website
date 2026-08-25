@@ -386,14 +386,14 @@ export default function BrotherProfile({
                 {member.isCommitteeHead && (
                   <p className="text-lg text-white/85">
                     Committee Chair
-                    {headCommittees.length ? `: ${headCommittees.join(", ")}` : ": —"}
+                    {headCommittees.length ? `: ${headCommittees.join(", ")}` : ""}
                   </p>
                 )}
                 <p className="text-lg text-white/80">
-                  Family Line: {member.familyLine || "—"}
+                  Family Line: {member.familyLine || "Not set"}
                 </p>
                 <p className="text-lg text-white/80">
-                  Little{littles.length !== 1 ? "s" : ""}: {littles.length > 0 ? renderMemberLinks(littles) : "—"}
+                  Little{littles.length !== 1 ? "s" : ""}: {littles.length > 0 ? renderMemberLinks(littles) : "None"}
                 </p>
                 {committees.length > 0 && (
                   <div className="pt-2">

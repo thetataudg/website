@@ -3,6 +3,8 @@ import { SignUp } from "@clerk/nextjs";
 import { clerkClient as getClerk, auth } from "@clerk/nextjs/server";
 import OnboardForm from "./OnboardForm";
 import { emailToSlug } from "@/utils/email-to-slug";
+import { PageContainer } from "../../../(members-only)/components/shell/PageShell";
+import { ErrorState } from "../../../(members-only)/components/shell/States";
 
 interface Params {
   slug?: string[];
@@ -14,9 +16,9 @@ export default async function OnboardPage({ params }: { params: Params }) {
 
   if (!userId) {
     return (
-      <div className="member-dashboard">
+      <PageContainer className="flex max-w-md justify-center">
         <SignUp routing="path" path="/member/onboard" signInUrl="/sign-in" />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -33,12 +35,12 @@ export default async function OnboardPage({ params }: { params: Params }) {
 
   if (slug && !emailBySlug) {
     return (
-      <div className="member-dashboard">
-        <div className="bento-card">
-          <h1>401 Unauthorized</h1>
-          <p>This invitation does not match the logged-in email.</p>
-        </div>
-      </div>
+      <PageContainer className="max-w-lg">
+        <ErrorState
+          title="401 Unauthorized"
+          description="This invitation does not match the logged-in email."
+        />
+      </PageContainer>
     );
   }
 
@@ -46,12 +48,12 @@ export default async function OnboardPage({ params }: { params: Params }) {
 
   if (!invitedEmail) {
     return (
-      <div className="member-dashboard">
-        <div className="bento-card">
-          <h1>Missing email</h1>
-          <p>We could not determine an email address for this account.</p>
-        </div>
-      </div>
+      <PageContainer className="max-w-lg">
+        <ErrorState
+          title="Missing email"
+          description="We could not determine an email address for this account."
+        />
+      </PageContainer>
     );
   }
 

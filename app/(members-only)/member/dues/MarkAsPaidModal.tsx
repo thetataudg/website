@@ -1,9 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { CircleAlert } from "lucide-react";
+
 import { LoadingSpinner } from "../../components/LoadingState";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type PayableCharge = {
   _id: string;
@@ -83,133 +104,122 @@ export default function MarkAsPaidModal({
   }
 
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !saving) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-dialog-centered"
-        onClick={(event) => event.stopPropagation()}
+      <DialogContent
+        className="w-[calc(100%-2rem)] max-w-md"
+        /* No backdrop dismissal while reporting money. */
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <form className="modal-content" onSubmit={submit}>
-          <div className="modal-header">
-            <h5 className="modal-title">Report a payment</h5>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
+        <DialogHeader>
+          <DialogTitle>Report a payment</DialogTitle>
+          <DialogDescription>
+            {charge.description} &middot; {charge.term}
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="modal-body">
-            <p className="text-muted small mb-3">
-              {charge.description} &middot; {charge.term}
-            </p>
-
-            <div className="mb-3">
-              <label className="form-label" htmlFor="paid-amount">
-                How much did you pay?
-              </label>
-              <div className="input-group">
-                <span className="input-group-text">$</span>
-                <input
-                  id="paid-amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className="form-control"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  required
-                />
-              </div>
-              {overpaying && (
-                <div className="form-text text-danger">
-                  That&apos;s more than the ${centsToInput(charge.balanceCents)}{" "}
-                  still owed on this charge.
-                </div>
-              )}
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label" htmlFor="paid-on">
-                When did you pay?
-              </label>
-              <input
-                id="paid-on"
-                type="date"
-                className="form-control"
-                value={paidOn}
-                max={todayLocal()}
-                onChange={(event) => setPaidOn(event.target.value)}
-                required
-              />
-              <div className="form-text">
-                The date the money actually left your account &mdash; not today,
-                if you paid earlier. This is the date used to decide whether you
-                paid on time, so it stands even if the treasurer takes a while
-                to check it off.
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label" htmlFor="paid-method">
-                How?
-              </label>
-              <select
-                id="paid-method"
-                className="form-select"
-                value={method}
-                onChange={(event) => setMethod(event.target.value)}
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="paid-amount">How much did you pay?</Label>
+            <CurrencyInput
+              id="paid-amount"
+              step="0.01"
+              min="0.01"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              required
+              aria-invalid={overpaying || undefined}
+              aria-describedby={overpaying ? "paid-amount-error" : undefined}
+            />
+            {overpaying && (
+              <p
+                id="paid-amount-error"
+                className="text-xs font-medium text-destructive"
               >
-                {METHODS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-1">
-              <label className="form-label" htmlFor="paid-reference">
-                Anything that helps them find it{" "}
-                <span className="text-muted">(optional)</span>
-              </label>
-              <input
-                id="paid-reference"
-                type="text"
-                className="form-control"
-                placeholder="@your-venmo, check #204, gave it to Marcus"
-                value={reference}
-                onChange={(event) => setReference(event.target.value)}
-                maxLength={200}
-              />
-            </div>
-
-            {error && (
-              <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>
+                That&apos;s more than the ${centsToInput(charge.balanceCents)}{" "}
+                still owed on this charge.
+              </p>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={invalid || saving}
-            >
-              {saving ? <LoadingSpinner size="sm" /> : "Send to the treasurer"}
-            </button>
+          <div className="space-y-1.5">
+            <Label htmlFor="paid-on">When did you pay?</Label>
+            <DatePicker
+              id="paid-on"
+              value={paidOn}
+              maxDate={new Date()}
+              onChange={setPaidOn}
+              placeholder="Choose the day you paid"
+              aria-describedby="paid-on-help"
+            />
+            <p id="paid-on-help" className="text-xs text-muted-foreground">
+              The date the money actually left your account, not today, if you
+              paid earlier. This is the date used to decide whether you paid on
+              time, so it stands even if the treasurer takes a while to check it
+              off.
+            </p>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="paid-method">How?</Label>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger id="paid-method">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {METHODS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="paid-reference">
+              Anything that helps them find it{" "}
+              <span className="font-normal text-muted-foreground">
+                (optional)
+              </span>
+            </Label>
+            <Input
+              id="paid-reference"
+              type="text"
+              placeholder="@your-venmo, check #204, gave it to Marcus"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              maxLength={200}
+            />
+          </div>
+
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={invalid || saving}>
+              {saving && <LoadingSpinner size="sm" />}
+              {saving ? "Sending…" : "Send to the treasurer"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

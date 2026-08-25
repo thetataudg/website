@@ -1,20 +1,58 @@
-// app/(members-only)/member/admin/members/MemberEditorModal.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { LoadingSpinner } from "../../../components/LoadingState";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Award,
+  BriefcaseBusiness,
+  Check,
+  Eye,
+  EyeOff,
+  FileText,
+  History,
+  ImageIcon,
+  Link2,
+  Loader2,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  Users,
+  WandSparkles,
+} from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import PhotoUploader from "../../profile/[rollNo]/PhotoUploader";
 import ResumeUploader from "../../profile/[rollNo]/ResumeUploader";
-
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faLock,
-  faImage,
-  faEye,
-  faEyeSlash,
-  faUpload,
-  faUserTag,
-} from "@fortawesome/free-solid-svg-icons";
 
 type ProjectItem = { title?: string; description?: string; link?: string };
 type WorkItem = {
@@ -46,8 +84,8 @@ export interface MemberData {
   ecouncilPosition: string;
   isCommitteeHead: boolean;
   familyLine: string;
-  bigs: any[];
-  littles: any[];
+  bigs: string[];
+  littles: string[];
   majors: string[];
   minors?: string[];
   gradYear: number;
@@ -77,149 +115,26 @@ interface MemberShort {
   lName: string;
 }
 
-function getMemberDisplayName(member: MemberShort) {
-  return `${member.fName} ${member.lName}`;
-}
-
-type MemberPickerProps = {
-  label: string;
-  members: MemberShort[];
-  selectedIds: string[];
-  onChange: (values: string[]) => void;
-};
-
-function MemberTokenPicker({
-  label,
-  members,
-  selectedIds,
-  onChange,
-}: MemberPickerProps) {
-  const [query, setQuery] = useState("");
-
-  const selectedMembers = useMemo(
-    () =>
-      selectedIds
-        .map((id) => members.find((member) => member._id === id))
-        .filter(Boolean) as MemberShort[],
-    [members, selectedIds]
-  );
-
-  const availableMembers = useMemo(() => {
-    const selected = new Set(selectedIds);
-    const normalizedQuery = query.trim().toLowerCase();
-    return members
-      .filter((member) => !selected.has(member._id))
-      .filter((member) => {
-        if (!normalizedQuery) return true;
-        const label = getMemberDisplayName(member).toLowerCase();
-        return label.includes(normalizedQuery);
-      })
-      .slice(0, 8);
-  }, [members, query, selectedIds]);
-
-  const addMember = (memberId: string) => {
-    if (!memberId || selectedIds.includes(memberId)) return;
-    onChange([...selectedIds, memberId]);
-    setQuery("");
-  };
-
-  const removeMember = (memberId: string) => {
-    onChange(selectedIds.filter((id) => id !== memberId));
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if ((event.key === "Enter" || event.key === "Tab") && availableMembers.length > 0) {
-      event.preventDefault();
-      addMember(availableMembers[0]._id);
-      return;
-    }
-
-    if (event.key === "Backspace" && !query && selectedIds.length > 0) {
-      event.preventDefault();
-      removeMember(selectedIds[selectedIds.length - 1]);
-    }
-  };
-
-  return (
-    <div className="mb-3">
-      <label className="form-label">{label}</label>
-      <div className="member-token-picker">
-        {selectedMembers.map((selectedMember) => (
-          <button
-            key={selectedMember._id}
-            type="button"
-            className="member-token-pill"
-            onClick={() => removeMember(selectedMember._id)}
-            title={`Remove ${selectedMember.fName} ${selectedMember.lName}`}
-          >
-            <span>
-              {selectedMember.fName} {selectedMember.lName}
-            </span>
-            <span aria-hidden="true" className="member-token-pill__remove">
-              ×
-            </span>
-          </button>
-        ))}
-        <input
-          className="member-token-picker__input"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={selectedIds.length ? "" : "Type a name and press Enter"}
-        />
-      </div>
-      {availableMembers.length > 0 && (
-        <div className="member-token-picker__menu">
-          {availableMembers.map((availableMember) => (
-            <button
-              key={availableMember._id}
-              type="button"
-              className="member-token-picker__option"
-              onClick={() => addMember(availableMember._id)}
-            >
-              {getMemberDisplayName(availableMember)}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="form-text">Press Enter or Tab to add the highlighted match.</div>
-    </div>
-  );
-}
-
-function SelectedMemberSummary({
-  members,
-  selectedIds,
-}: {
-  members: MemberShort[];
-  selectedIds: string[];
-}) {
-  const selectedMembers = selectedIds
-    .map((id) => members.find((member) => member._id === id))
-    .filter(Boolean) as MemberShort[];
-
-  if (!selectedMembers.length) {
-    return <div className="member-summary__empty">None selected</div>;
-  }
-
-  return (
-    <div className="member-summary-pills">
-      {selectedMembers.map((selectedMember) => (
-        <span key={selectedMember._id} className="member-summary-pill">
-          {getMemberDisplayName(selectedMember)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 interface Props {
   member: MemberData;
   show: boolean;
   onClose: () => void;
   onSave: (updates: Partial<MemberData>) => Promise<void>;
-  editorRole: "superadmin" | "admin";
 }
+
+type EditorSection = "profile" | "access" | "highlights" | "experience" | "history";
+
+const EDITOR_SECTIONS: Array<{
+  value: EditorSection;
+  label: string;
+  icon: typeof UserRound;
+}> = [
+  { value: "profile", label: "Profile", icon: UserRound },
+  { value: "access", label: "Access & chapter", icon: ShieldCheck },
+  { value: "highlights", label: "Links & highlights", icon: Link2 },
+  { value: "experience", label: "Experience", icon: BriefcaseBusiness },
+  { value: "history", label: "History", icon: History },
+];
 
 const pledgeClassOptions = [
   "Zeta Gamma",
@@ -243,79 +158,98 @@ const pledgeClassOptions = [
   "Omega Gamma",
 ];
 
-const getMemberId = (value: any) => {
+function getMemberId(value: unknown) {
   if (!value) return "";
   if (typeof value === "string") return value;
-  return value._id || "";
-};
+  if (typeof value === "object" && "_id" in value) {
+    return String((value as { _id?: unknown })._id ?? "");
+  }
+  return "";
+}
 
-const getMemberIds = (values: any[] | undefined) =>
-  Array.isArray(values) ? values.map((value) => getMemberId(value)).filter(Boolean) : [];
+function getMemberIds(values: unknown[] | undefined) {
+  return Array.isArray(values)
+    ? values.map((value) => getMemberId(value)).filter(Boolean)
+    : [];
+}
 
-const formatHistoryList = (values?: string[]) =>
-  Array.isArray(values) && values.length ? values.join(", ") : "None recorded";
-
-export default function MemberEditorModal({
-  member,
-  show,
-  onClose,
-  onSave,
-  editorRole,
-}: Props) {
-  const socials = member.socialLinks || {};
-  const [form, setForm] = useState({
+function createFormState(member: MemberData) {
+  const socials = member.socialLinks ?? {};
+  return {
     rollNo: member.rollNo,
     fName: member.fName,
     lName: member.lName,
-    status: member.status || "Active",
-    role: member.role,
+    status: member.status ?? "Active",
+    // Legacy superadmin records behave exactly like admins and normalize on save.
+    role: member.role === "superadmin" ? "admin" : member.role,
     isHidden: Boolean(member.isHidden),
     isECouncil: member.isECouncil,
     ecouncilPosition: member.ecouncilPosition,
     isCommitteeHead: member.isCommitteeHead,
     familyLine: member.familyLine,
-    discordId: member.discordId || "",
+    discordId: member.discordId ?? "",
     bigs: getMemberIds(member.bigs),
     littles: getMemberIds(member.littles),
-    headline: member.headline || "",
-    pronouns: member.pronouns || "",
-    majors: (member.majors || []).join(", "),
-    minors: member.minors?.join(", ") || "",
+    headline: member.headline ?? "",
+    pronouns: member.pronouns ?? "",
+    majors: (member.majors ?? []).join(", "),
+    minors: member.minors?.join(", ") ?? "",
     gradYear: member.gradYear ? String(member.gradYear) : "",
-    bio: member.bio || "",
-    hometown: member.hometown || "",
-    pledgeClass: member.pledgeClass || "",
-    skills: (member.skills || []).join("\n"),
-    funFacts: (member.funFacts || []).join("\n"),
-    github: socials.github || "",
-    linkedin: socials.linkedin || "",
-    instagram: socials.instagram || "",
-    website: socials.website || "",
-    projects: (member.projects || []).map((p) => ({
-      title: p.title || "",
-      description: p.description || "",
-      link: p.link || "",
+    bio: member.bio ?? "",
+    hometown: member.hometown ?? "",
+    pledgeClass: member.pledgeClass ?? "",
+    skills: (member.skills ?? []).join("\n"),
+    funFacts: (member.funFacts ?? []).join("\n"),
+    github: socials.github ?? "",
+    linkedin: socials.linkedin ?? "",
+    instagram: socials.instagram ?? "",
+    website: socials.website ?? "",
+    projects: (member.projects ?? []).map((item) => ({
+      title: item.title ?? "",
+      description: item.description ?? "",
+      link: item.link ?? "",
     })),
-    work: (member.work || []).map((w) => ({
-      title: w.title || "",
-      organization: w.organization || "",
-      start: w.start || "",
-      end: w.end || "",
-      description: w.description || "",
-      link: w.link || "",
+    work: (member.work ?? []).map((item) => ({
+      title: item.title ?? "",
+      organization: item.organization ?? "",
+      start: item.start ?? "",
+      end: item.end ?? "",
+      description: item.description ?? "",
+      link: item.link ?? "",
     })),
-    awards: (member.awards || []).map((a) => ({
-      title: a.title || "",
-      issuer: a.issuer || "",
-      date: a.date || "",
-      description: a.description || "",
+    awards: (member.awards ?? []).map((item) => ({
+      title: item.title ?? "",
+      issuer: item.issuer ?? "",
+      date: item.date ?? "",
+      description: item.description ?? "",
     })),
-    customSections: (member.customSections || []).map((s) => ({
-      title: s.title || "",
-      body: s.body || "",
+    customSections: (member.customSections ?? []).map((item) => ({
+      title: item.title ?? "",
+      body: item.body ?? "",
     })),
-  });
+  };
+}
 
+type FormState = ReturnType<typeof createFormState>;
+
+function parseList(text: string) {
+  return text
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatHistoryList(values?: string[]) {
+  return Array.isArray(values) && values.length ? values.join("\n") : "None recorded";
+}
+
+function getMemberDisplayName(member: MemberShort) {
+  return `${member.fName} ${member.lName}`;
+}
+
+export default function MemberEditorModal({ member, show, onClose, onSave }: Props) {
+  const [form, setForm] = useState<FormState>(() => createFormState(member));
+  const [activeSection, setActiveSection] = useState<EditorSection>("profile");
   const [allMembers, setAllMembers] = useState<MemberShort[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -326,148 +260,114 @@ export default function MemberEditorModal({
 
   useEffect(() => {
     if (!show) return;
-    setForm({
-      rollNo: member.rollNo,
-      fName: member.fName,
-      lName: member.lName,
-      status: member.status || "Active",
-      role: member.role,
-      isHidden: Boolean(member.isHidden),
-      isECouncil: member.isECouncil,
-      ecouncilPosition: member.ecouncilPosition,
-      isCommitteeHead: member.isCommitteeHead,
-      familyLine: member.familyLine,
-      discordId: member.discordId || "",
-      bigs: getMemberIds(member.bigs),
-      littles: getMemberIds(member.littles),
-      headline: member.headline || "",
-      pronouns: member.pronouns || "",
-      majors: (member.majors || []).join(", "),
-      minors: member.minors?.join(", ") || "",
-      gradYear: member.gradYear ? String(member.gradYear) : "",
-      bio: member.bio || "",
-      hometown: member.hometown || "",
-      pledgeClass: member.pledgeClass || "",
-      skills: (member.skills || []).join("\n"),
-      funFacts: (member.funFacts || []).join("\n"),
-      github: socials.github || "",
-      linkedin: socials.linkedin || "",
-      instagram: socials.instagram || "",
-      website: socials.website || "",
-      projects: (member.projects || []).map((p) => ({
-        title: p.title || "",
-        description: p.description || "",
-        link: p.link || "",
-      })),
-      work: (member.work || []).map((w) => ({
-        title: w.title || "",
-        organization: w.organization || "",
-        start: w.start || "",
-        end: w.end || "",
-        description: w.description || "",
-        link: w.link || "",
-      })),
-      awards: (member.awards || []).map((a) => ({
-        title: a.title || "",
-        issuer: a.issuer || "",
-        date: a.date || "",
-        description: a.description || "",
-      })),
-      customSections: (member.customSections || []).map((s) => ({
-        title: s.title || "",
-        body: s.body || "",
-      })),
-    });
+    let active = true;
+
+    setForm(createFormState(member));
+    setActiveSection("profile");
+    setSaved(false);
+    setError(null);
 
     fetch("/api/members")
-      .then((r) => r.json())
+      .then((response) => response.json())
       .then((list: MemberData[]) => {
+        if (!active) return;
         setAllMembers(
           list
-            .filter((m) => m.role !== "superadmin" && m.rollNo !== member.rollNo)
-            .map((m) => ({
-              _id: m._id,
-              fName: m.fName,
-              lName: m.lName,
+            .filter((candidate) => candidate.rollNo !== member.rollNo)
+            .map((candidate) => ({
+              _id: candidate._id,
+              fName: candidate.fName,
+              lName: candidate.lName,
             }))
         );
       })
-      .catch(console.error);
-  }, [show, member]);
+      .catch(() => {
+        if (active) setAllMembers([]);
+      });
 
-  const update = <K extends keyof typeof form>(key: K, val: any) =>
-    setForm((f) => ({ ...f, [key]: val }));
+    return () => {
+      active = false;
+    };
+  }, [member, show]);
 
-  const updateSelectedMembers = (key: "bigs" | "littles", values: string[]) =>
-    setForm((f) => ({ ...f, [key]: values }));
+  const resolvedPhotoUrl = useMemo(() => {
+    const raw = member.profilePicUrl?.trim() ?? "";
+    if (
+      raw.startsWith("http://") ||
+      raw.startsWith("https://") ||
+      raw.startsWith("data:") ||
+      raw.startsWith("/")
+    ) {
+      return raw;
+    }
+    return "";
+  }, [member.profilePicUrl]);
 
-  const updateArrayItem = <T, K extends keyof T>(
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateArrayItem<T, K extends keyof T>(
     key: "projects" | "work" | "awards" | "customSections",
     index: number,
     field: K,
     value: string
-  ) =>
-    setForm((f) => {
-      const copy = [...(f[key] as T[])];
+  ) {
+    setForm((current) => {
+      const copy = [...(current[key] as T[])];
       copy[index] = { ...copy[index], [field]: value };
-      return { ...f, [key]: copy };
+      return { ...current, [key]: copy };
     });
+  }
 
-  const addArrayItem = (
-    key: "projects" | "work" | "awards" | "customSections"
-  ) =>
-    setForm((f) => {
+  function addArrayItem(key: "projects" | "work" | "awards" | "customSections") {
+    setForm((current) => {
       const empty =
         key === "projects"
           ? { title: "", description: "", link: "" }
           : key === "work"
-          ? {
-              title: "",
-              organization: "",
-              start: "",
-              end: "",
-              description: "",
-              link: "",
-            }
-          : key === "awards"
-          ? { title: "", issuer: "", date: "", description: "" }
-          : { title: "", body: "" };
-      return { ...f, [key]: [...(f[key] as any[]), empty] };
+            ? {
+                title: "",
+                organization: "",
+                start: "",
+                end: "",
+                description: "",
+                link: "",
+              }
+            : key === "awards"
+              ? { title: "", issuer: "", date: "", description: "" }
+              : { title: "", body: "" };
+      return { ...current, [key]: [...current[key], empty] } as FormState;
     });
+  }
 
-  const removeArrayItem = (
+  function removeArrayItem(
     key: "projects" | "work" | "awards" | "customSections",
     index: number
-  ) =>
-    setForm((f) => {
-      const copy = [...(f[key] as any[])];
-      copy.splice(index, 1);
-      return { ...f, [key]: copy };
-    });
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: current[key].filter((_, itemIndex) => itemIndex !== index),
+    }));
+  }
 
-  const parseList = (text: string) =>
-    text
-      .split(/\n|,/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-  const handleSave = async () => {
+  async function handleSave() {
     setSaving(true);
     setError(null);
 
     const gradYear = Number(form.gradYear);
-    const discordIdValue = form.discordId.trim();
     const payload: Partial<MemberData> = {
       rollNo: form.rollNo.trim(),
       fName: form.fName.trim(),
       lName: form.lName.trim(),
+      role: form.role,
       status: form.status,
       isHidden: form.isHidden,
       isECouncil: form.isECouncil,
       ecouncilPosition: form.isECouncil ? form.ecouncilPosition : "",
       isCommitteeHead: form.isCommitteeHead,
       familyLine: form.familyLine,
-      discordId: discordIdValue || undefined,
+      discordId: form.discordId.trim() || undefined,
       bigs: form.bigs,
       littles: form.littles,
       headline: form.headline.trim(),
@@ -492,878 +392,1041 @@ export default function MemberEditorModal({
       },
     };
 
-    if (
-      editorRole === "superadmin" &&
-      member.role !== "superadmin" &&
-      (form.role === "admin" || form.role === "member")
-    ) {
-      payload.role = form.role;
-    }
-
     try {
       await onSave(payload);
       setSaved(true);
-      setTimeout(() => {
-        setSaved(false);
-        onClose();
-      }, 1500);
-    } catch (err: any) {
-      setError(err?.message || "Save failed");
+      window.setTimeout(onClose, 700);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Save failed");
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const resolvedPhotoUrl = useMemo(() => {
-    const raw = member.profilePicUrl?.trim() || "";
-    if (!raw) return "";
-    if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:")) {
-      return raw;
-    }
-    if (raw.startsWith("/")) return raw;
-    return "";
-  }, [member.profilePicUrl]);
+  const initials = `${member.fName?.[0] ?? ""}${member.lName?.[0] ?? ""}`;
 
-  const photoLabel = useMemo(
-    () => (resolvedPhotoUrl ? "Update Photo" : "Add Photo"),
-    [resolvedPhotoUrl]
-  );
-  const resumeLabel = useMemo(
-    () => (member.resumeUrl ? "Update Resume" : "Add Resume"),
-    [member.resumeUrl]
-  );
-
-  if (!show) return null;
   return (
-    <div
-      className="modal fade show"
-      style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-    >
-      <div className="modal-dialog modal-dialog-scrollable admin-modal-wide">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">Edit {member.fName}’s Profile</h5>
-            <button className="btn-close" onClick={onClose} />
-          </div>
+    <>
+      <Dialog
+        open={show}
+        onOpenChange={(open) => {
+          if (!open && !saving) onClose();
+        }}
+      >
+        <DialogContent className="flex h-[min(92vh,900px)] w-[calc(100%-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b px-5 py-5 pr-14 text-left sm:px-6">
+            <DialogTitle>Edit {member.fName}’s profile</DialogTitle>
+            <DialogDescription>
+              Update profile details, chapter access, relationships, and highlights.
+            </DialogDescription>
+          </DialogHeader>
 
-          {saved && (
-            <div className="alert alert-success m-3">✔ Changes saved!</div>
-          )}
-          {error && <div className="alert alert-danger m-3">{error}</div>}
+          {saved ? (
+            <Alert className="m-4 mb-0 border-emerald-600/30 bg-emerald-600/10 sm:mx-6">
+              <Check className="size-4 text-emerald-600" />
+              <AlertTitle>Changes saved</AlertTitle>
+              <AlertDescription>The member profile is up to date.</AlertDescription>
+            </Alert>
+          ) : null}
+          {error ? (
+            <Alert variant="destructive" className="m-4 mb-0 sm:mx-6">
+              <AlertTitle>Unable to save changes</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
 
-          <div className="modal-body">
-            <div className="row g-4">
-              <div className="col-lg-4">
-                <div className="border rounded p-3">
-                  <h6 className="mb-3 d-flex align-items-center gap-2">
-                    <FontAwesomeIcon icon={faUserTag} />
-                    Profile Media
-                  </h6>
-                  <div className="text-center">
-                    {resolvedPhotoUrl ? (
-                      <img
-                        src={resolvedPhotoUrl}
-                        alt={`${member.fName} ${member.lName}`}
-                        className="rounded-circle mb-3"
-                        style={{ width: 120, height: 120, objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div
-                        className="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3"
-                        style={{ width: 120, height: 120 }}
-                      >
-                        <FontAwesomeIcon icon={faImage} className="text-muted" />
+          <Tabs
+            value={activeSection}
+            onValueChange={(value) => setActiveSection(value as EditorSection)}
+            className="flex min-h-0 flex-1 flex-col md:flex-row"
+          >
+            <aside className="shrink-0 border-b bg-muted/30 p-3 md:w-60 md:border-b-0 md:border-r md:p-4">
+              <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 md:flex-col md:items-stretch">
+                {EDITOR_SECTIONS.map((section) => {
+                  const Icon = section.icon;
+                  return (
+                    <TabsTrigger
+                      key={section.value}
+                      value={section.value}
+                      className="shrink-0 justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-background md:w-full"
+                    >
+                      <Icon className="size-4" />
+                      {section.label}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </aside>
+
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                <TabsContent value="profile" className="mt-0 space-y-5">
+                  <SectionHeading
+                    title="Profile"
+                    description="The details members see first on this profile."
+                  />
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Profile media</CardTitle>
+                      <CardDescription>Photo and résumé shown on the member profile.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                      <Avatar className="size-24 border-2 border-primary/20">
+                        {resolvedPhotoUrl ? (
+                          <AvatarImage
+                            src={resolvedPhotoUrl}
+                            alt={`${member.fName} ${member.lName}`}
+                          />
+                        ) : null}
+                        <AvatarFallback className="text-xl font-semibold">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowPhotoModal(true)}
+                        >
+                          <ImageIcon className="size-4" />
+                          {resolvedPhotoUrl ? "Update photo" : "Add photo"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowResumeModal(true)}
+                        >
+                          <FileText className="size-4" />
+                          {member.resumeUrl ? "Update résumé" : "Add résumé"}
+                        </Button>
                       </div>
-                    )}
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm w-100"
-                      onClick={() => setShowPhotoModal(true)}
-                    >
-                      <FontAwesomeIcon icon={faImage} className="me-2" />
-                      {photoLabel}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm w-100 mt-2"
-                      onClick={() => setShowResumeModal(true)}
-                    >
-                      <FontAwesomeIcon icon={faUpload} className="me-2" />
-                      {resumeLabel}
-                    </button>
-                  </div>
-                </div>
+                    </CardContent>
+                  </Card>
 
-                <div className="border rounded p-3 mt-3">
-                  <h6 className="mb-3">Admin Controls</h6>
-                  <div className="mb-3">
-                    <label className="form-label">First Name</label>
-                    <input
-                      className="form-control"
-                      value={form.fName}
-                      onChange={(e) => update("fName", e.target.value)}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Last Name</label>
-                    <input
-                      className="form-control"
-                      value={form.lName}
-                      onChange={(e) => update("lName", e.target.value)}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Roll No</label>
-                    <input
-                      className="form-control"
-                      value={form.rollNo}
-                      onChange={(e) => update("rollNo", e.target.value)}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${
-                        form.isHidden ? "btn-outline-secondary" : "btn-outline-success"
-                      }`}
-                      aria-pressed={!form.isHidden}
-                      onClick={() => update("isHidden", !form.isHidden)}
-                    >
-                      <FontAwesomeIcon
-                        icon={form.isHidden ? faEyeSlash : faEye}
-                        className="me-2"
-                      />
-                      {form.isHidden
-                        ? "Hidden from public site"
-                        : "Visible on public site"}
-                    </button>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Previous E-Council Roles</label>
-                    <textarea
-                      className="form-control"
-                      value={formatHistoryList(member.previousECouncilRoles)}
-                      readOnly
-                      rows={3}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Previous Committees Chaired</label>
-                    <textarea
-                      className="form-control"
-                      value={formatHistoryList(member.previousCommitteesChaired)}
-                      readOnly
-                      rows={3}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Previous Committees Member Of</label>
-                    <textarea
-                      className="form-control"
-                      value={formatHistoryList(member.previousCommitteesMemberOf)}
-                      readOnly
-                      rows={3}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Status</label>
-                    <select
-                      className="form-select"
-                      value={form.status}
-                      onChange={(e) => update("status", e.target.value)}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Alumni">Alumni</option>
-                      <option value="Removed">Removed</option>
-                      <option value="Deceased">Deceased</option>
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Discord User ID{" "}
-                      <a
-                        href="https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID"
-                        target="_blank"
-                        rel="noreferrer"
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Profile basics</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Headline or tagline" className="sm:col-span-2">
+                        <Input
+                          value={form.headline}
+                          onChange={(event) => update("headline", event.target.value)}
+                          placeholder="Aspiring robotics engineer • Project lead"
+                        />
+                      </Field>
+                      <Field label="Pronouns">
+                        <Input
+                          value={form.pronouns}
+                          onChange={(event) => update("pronouns", event.target.value)}
+                          placeholder="he/him, she/her, they/them"
+                        />
+                      </Field>
+                      <Field label="Hometown">
+                        <Input
+                          value={form.hometown}
+                          onChange={(event) => update("hometown", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Majors" description="Separate multiple majors with commas.">
+                        <Input
+                          value={form.majors}
+                          onChange={(event) => update("majors", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Minors" description="Separate multiple minors with commas.">
+                        <Input
+                          value={form.minors}
+                          onChange={(event) => update("minors", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Graduation year">
+                        <Input
+                          type="number"
+                          value={form.gradYear}
+                          onChange={(event) => update("gradYear", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Pledge class">
+                        <Select
+                          value={form.pledgeClass || "none"}
+                          onValueChange={(value) =>
+                            update("pledgeClass", value === "none" ? "" : value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select pledge class" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not selected</SelectItem>
+                            {pledgeClassOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Bio" className="sm:col-span-2">
+                        <Textarea
+                          value={form.bio}
+                          onChange={(event) => update("bio", event.target.value)}
+                          placeholder="Share their story, interests, or current work."
+                          className="min-h-32"
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="access" className="mt-0 space-y-5">
+                  <SectionHeading
+                    title="Access & chapter"
+                    description="Identity, account permissions, status, and chapter relationships."
+                  />
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Identity</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 sm:grid-cols-2">
+                      <Field label="First name">
+                        <Input
+                          value={form.fName}
+                          onChange={(event) => update("fName", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Last name">
+                        <Input
+                          value={form.lName}
+                          onChange={(event) => update("lName", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Roll number">
+                        <Input
+                          value={form.rollNo}
+                          onChange={(event) => update("rollNo", event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Status">
+                        <Select
+                          value={form.status}
+                          onValueChange={(value) =>
+                            update("status", value as FormState["status"])
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Alumni">Alumni</SelectItem>
+                            <SelectItem value="Removed">Removed</SelectItem>
+                            <SelectItem value="Deceased">Deceased</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field
+                        label="Discord user ID"
+                        description="Enable Developer Mode in Discord to copy a user ID."
+                        className="sm:col-span-2"
                       >
-                        (how to find it)
-                      </a>
-                    </label>
-                    <input
-                      className="form-control"
-                      value={form.discordId}
-                      onChange={(e) => update("discordId", e.target.value)}
-                      placeholder="123456789012345678"
-                    />
-                  </div>
-                  <div className="form-check mb-3">
-                    <input
-                      id="isAdmin"
-                      type="checkbox"
-                      className="form-check-input"
-                      checked={form.role === "admin"}
-                      disabled={
-                        editorRole !== "superadmin" || member.role === "superadmin"
-                      }
-                      onChange={(e) =>
-                        update("role", e.target.checked ? "admin" : "member")
-                      }
-                    />
-                    <label htmlFor="isAdmin" className="form-check-label">
-                      Admin
-                    </label>
-                    {editorRole !== "superadmin" && (
-                      <FontAwesomeIcon
-                        icon={faLock}
-                        className="ms-2 text-muted"
-                        title="Only superadmins can change"
+                        <Input
+                          value={form.discordId}
+                          onChange={(event) => update("discordId", event.target.value)}
+                          placeholder="123456789012345678"
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Permissions</CardTitle>
+                      <CardDescription>
+                        Admin and legacy superadmin accounts now share the same access.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 sm:grid-cols-2">
+                      <ToggleRow
+                        pressed={form.role === "admin"}
+                        onPressedChange={(pressed) =>
+                          update("role", pressed ? "admin" : "member")
+                        }
+                        icon={ShieldCheck}
+                        title="Administrator"
+                        description="Full chapter administration access."
                       />
-                    )}
-                  </div>
-                  <div className="form-check mb-3">
-                    <input
-                      id="isECouncil"
-                      type="checkbox"
-                      className="form-check-input"
-                      checked={form.isECouncil}
-                      onChange={(e) => update("isECouncil", e.target.checked)}
-                    />
-                    <label htmlFor="isECouncil" className="form-check-label">
-                      E-Council
-                    </label>
-                  </div>
-                  {form.isECouncil && (
-                    <div className="mb-3">
-                      <label className="form-label">E-Council Position</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={form.ecouncilPosition}
-                        onChange={(e) => update("ecouncilPosition", e.target.value)}
+                      <ToggleRow
+                        pressed={!form.isHidden}
+                        onPressedChange={(pressed) => update("isHidden", !pressed)}
+                        icon={form.isHidden ? EyeOff : Eye}
+                        title="Public profile"
+                        description="Visible in chapter directories."
                       />
-                    </div>
-                  )}
-                  <div className="mb-3">
-                    <label className="form-label">Family Line</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={form.familyLine}
-                      onChange={(e) => update("familyLine", e.target.value)}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label d-block">Bigs & Littles</label>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm mb-3"
-                      onClick={() => setShowRelationsModal(true)}
-                    >
-                      Manage Bigs and Littles
-                    </button>
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <div className="member-summary-card">
-                          <div className="member-summary-card__label">Bigs</div>
-                          <SelectedMemberSummary
+                      <ToggleRow
+                        pressed={form.isECouncil}
+                        onPressedChange={(pressed) => update("isECouncil", pressed)}
+                        icon={Users}
+                        title="E-Council"
+                        description="Current executive council member."
+                      />
+                      <ToggleRow
+                        pressed={form.isCommitteeHead}
+                        onPressedChange={(pressed) => update("isCommitteeHead", pressed)}
+                        icon={WandSparkles}
+                        title="Committee head"
+                        description="Leads one or more committees."
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Chapter relationships</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 sm:grid-cols-2">
+                      {form.isECouncil ? (
+                        <Field label="E-Council position">
+                          <Input
+                            value={form.ecouncilPosition}
+                            onChange={(event) =>
+                              update("ecouncilPosition", event.target.value)
+                            }
+                          />
+                        </Field>
+                      ) : null}
+                      <Field label="Family line">
+                        <Input
+                          value={form.familyLine}
+                          onChange={(event) => update("familyLine", event.target.value)}
+                        />
+                      </Field>
+                      <div className="space-y-3 sm:col-span-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <Label>Bigs & littles</Label>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Keep family relationships connected to member records.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowRelationsModal(true)}
+                          >
+                            Manage relationships
+                          </Button>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <RelationshipSummary
+                            label="Bigs"
                             members={allMembers}
                             selectedIds={form.bigs}
                           />
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="member-summary-card">
-                          <div className="member-summary-card__label">Littles</div>
-                          <SelectedMemberSummary
+                          <RelationshipSummary
+                            label="Littles"
                             members={allMembers}
                             selectedIds={form.littles}
                           />
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-              <div className="col-lg-8">
-                <div className="mb-4">
-                  <h5 className="mb-3">Profile Builder</h5>
-                  <div className="row mb-3">
-                    <div className="col-md-8">
-                      <label className="form-label">Headline / Tagline</label>
-                      <input
-                        className="form-control"
-                        value={form.headline}
-                        onChange={(e) => update("headline", e.target.value)}
-                        placeholder="Aspiring robotics engineer • Project lead"
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Pronouns</label>
-                      <input
-                        className="form-control"
-                        value={form.pronouns}
-                        onChange={(e) => update("pronouns", e.target.value)}
-                        placeholder="he/him, she/her, they/them"
-                      />
-                    </div>
-                  </div>
+                <TabsContent value="highlights" className="mt-0 space-y-5">
+                  <SectionHeading
+                    title="Links & highlights"
+                    description="External profiles and personal details shown on the profile."
+                  />
+                  <Card>
+                    <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
+                      <Field label="GitHub URL">
+                        <Input
+                          type="url"
+                          value={form.github}
+                          onChange={(event) => update("github", event.target.value)}
+                          placeholder="https://github.com/username"
+                        />
+                      </Field>
+                      <Field label="LinkedIn URL">
+                        <Input
+                          type="url"
+                          value={form.linkedin}
+                          onChange={(event) => update("linkedin", event.target.value)}
+                          placeholder="https://linkedin.com/in/username"
+                        />
+                      </Field>
+                      <Field label="Instagram URL">
+                        <Input
+                          type="url"
+                          value={form.instagram}
+                          onChange={(event) => update("instagram", event.target.value)}
+                          placeholder="https://instagram.com/username"
+                        />
+                      </Field>
+                      <Field label="Personal website">
+                        <Input
+                          type="url"
+                          value={form.website}
+                          onChange={(event) => update("website", event.target.value)}
+                          placeholder="https://your-site.com"
+                        />
+                      </Field>
+                      <Field label="Skills" description="Enter one skill per line.">
+                        <Textarea
+                          value={form.skills}
+                          onChange={(event) => update("skills", event.target.value)}
+                          placeholder={"CAD\nPython\nProject Management"}
+                          className="min-h-40"
+                        />
+                      </Field>
+                      <Field label="Fun facts" description="Enter one fact per line.">
+                        <Textarea
+                          value={form.funFacts}
+                          onChange={(event) => update("funFacts", event.target.value)}
+                          placeholder={"Loves sunrise hikes\nCollects vintage cameras"}
+                          className="min-h-40"
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">Majors (comma-separated)</label>
-                      <input
-                        className="form-control"
-                        value={form.majors}
-                        onChange={(e) => update("majors", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">Minors (comma-separated)</label>
-                      <input
-                        className="form-control"
-                        value={form.minors}
-                        onChange={(e) => update("minors", e.target.value)}
-                      />
-                    </div>
-                  </div>
+                <TabsContent value="experience" className="mt-0 space-y-5">
+                  <SectionHeading
+                    title="Experience"
+                    description="Projects, work, awards, and custom profile sections."
+                  />
 
-                  <div className="row mb-3">
-                    <div className="col-sm-4">
-                      <label className="form-label">Graduation Year</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        value={form.gradYear}
-                        onChange={(e) => update("gradYear", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-sm-4">
-                      <label className="form-label">Pledge Class</label>
-                      <select
-                        className="form-select"
-                        value={form.pledgeClass}
-                        onChange={(e) => update("pledgeClass", e.target.value)}
-                      >
-                        <option value="">Select pledge class</option>
-                        {pledgeClassOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-sm-4">
-                      <label className="form-label">Hometown</label>
-                      <input
-                        className="form-control"
-                        value={form.hometown}
-                        onChange={(e) => update("hometown", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label">Bio</label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={form.bio}
-                      onChange={(e) => update("bio", e.target.value)}
-                      placeholder="Share your story, interests, or what you're working on."
-                    />
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <h5 className="mb-3">Links & Highlights</h5>
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">GitHub URL</label>
-                      <input
-                        className="form-control"
-                        value={form.github}
-                        onChange={(e) => update("github", e.target.value)}
-                        placeholder="https://github.com/username"
-                      />
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">LinkedIn URL</label>
-                      <input
-                        className="form-control"
-                        value={form.linkedin}
-                        onChange={(e) => update("linkedin", e.target.value)}
-                        placeholder="https://linkedin.com/in/username"
-                      />
-                    </div>
-                  </div>
-                  <div className="row mb-3">
-                    <div className="col-sm-6">
-                      <label className="form-label">Instagram URL</label>
-                      <input
-                        className="form-control"
-                        value={form.instagram}
-                        onChange={(e) => update("instagram", e.target.value)}
-                        placeholder="https://instagram.com/username"
-                      />
-                    </div>
-                    <div className="col-sm-6">
-                      <label className="form-label">Personal Website</label>
-                      <input
-                        className="form-control"
-                        value={form.website}
-                        onChange={(e) => update("website", e.target.value)}
-                        placeholder="https://your-site.com"
-                      />
-                    </div>
-                  </div>
-                  <div className="row mb-0">
-                    <div className="col-md-6">
-                      <label className="form-label">Skills (one per line)</label>
-                      <textarea
-                        className="form-control"
-                        rows={4}
-                        value={form.skills}
-                        onChange={(e) => update("skills", e.target.value)}
-                        placeholder="CAD\nPython\nProject Management"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Fun Facts (one per line)</label>
-                      <textarea
-                        className="form-control"
-                        rows={4}
-                        value={form.funFacts}
-                        onChange={(e) => update("funFacts", e.target.value)}
-                        placeholder="Loves sunrise hikes\nCollects vintage cameras"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Projects</h5>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("projects")}
-                    >
-                      Add Project
-                    </button>
-                  </div>
-                  {form.projects.map((project: ProjectItem, index: number) => (
-                    <div className="border rounded p-3 mb-3" key={`project-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Project {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("projects", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="row">
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
+                  <RepeaterHeader
+                    icon={WandSparkles}
+                    title="Projects"
+                    actionLabel="Add project"
+                    onAdd={() => addArrayItem("projects")}
+                  />
+                  {form.projects.length ? (
+                    form.projects.map((project, index) => (
+                      <Card key={`project-${index}`}>
+                        <ItemHeader
+                          title={`Project ${index + 1}`}
+                          onRemove={() => removeArrayItem("projects", index)}
+                        />
+                        <CardContent className="grid gap-3 sm:grid-cols-2">
+                          <Input
+                            aria-label={`Project ${index + 1} title`}
                             placeholder="Project title"
                             value={project.title}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<ProjectItem, "title">(
                                 "projects",
                                 index,
                                 "title",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
+                          <Input
+                            aria-label={`Project ${index + 1} link`}
                             placeholder="Project link"
                             value={project.link}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<ProjectItem, "link">(
                                 "projects",
                                 index,
                                 "link",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                      </div>
-                      <textarea
-                        className="form-control"
-                        rows={3}
-                        placeholder="Short description"
-                        value={project.description}
-                        onChange={(e) =>
-                          updateArrayItem<ProjectItem, "description">(
-                            "projects",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                          <Textarea
+                            aria-label={`Project ${index + 1} description`}
+                            placeholder="Short description"
+                            className="sm:col-span-2"
+                            value={project.description}
+                            onChange={(event) =>
+                              updateArrayItem<ProjectItem, "description">(
+                                "projects",
+                                index,
+                                "description",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <EmptyCollection label="No projects added." />
+                  )}
 
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Work / Internships</h5>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("work")}
-                    >
-                      Add Experience
-                    </button>
-                  </div>
-                  {form.work.map((item: WorkItem, index: number) => (
-                    <div className="border rounded p-3 mb-3" key={`work-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Experience {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("work", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="row">
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
+                  <Separator />
+                  <RepeaterHeader
+                    icon={BriefcaseBusiness}
+                    title="Work & internships"
+                    actionLabel="Add experience"
+                    onAdd={() => addArrayItem("work")}
+                  />
+                  {form.work.length ? (
+                    form.work.map((item, index) => (
+                      <Card key={`work-${index}`}>
+                        <ItemHeader
+                          title={`Experience ${index + 1}`}
+                          onRemove={() => removeArrayItem("work", index)}
+                        />
+                        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          <Input
+                            aria-label={`Experience ${index + 1} title`}
                             placeholder="Role title"
                             value={item.title}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<WorkItem, "title">(
                                 "work",
                                 index,
                                 "title",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                        <div className="col-md-6 mb-2">
-                          <input
-                            className="form-control"
+                          <Input
+                            aria-label={`Experience ${index + 1} organization`}
                             placeholder="Organization"
                             value={item.organization}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<WorkItem, "organization">(
                                 "work",
                                 index,
                                 "organization",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                      </div>
-                      <div className="row mb-2">
-                        <div className="col-md-4">
-                          <input
-                            className="form-control"
-                            placeholder="Start (e.g. Aug 2023)"
-                            value={item.start}
-                            onChange={(e) =>
-                              updateArrayItem<WorkItem, "start">(
-                                "work",
-                                index,
-                                "start",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <input
-                            className="form-control"
-                            placeholder="End (e.g. May 2024)"
-                            value={item.end}
-                            onChange={(e) =>
-                              updateArrayItem<WorkItem, "end">(
-                                "work",
-                                index,
-                                "end",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <input
-                            className="form-control"
+                          <Input
+                            aria-label={`Experience ${index + 1} link`}
                             placeholder="Link"
                             value={item.link}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<WorkItem, "link">(
                                 "work",
                                 index,
                                 "link",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                      </div>
-                      <textarea
-                        className="form-control"
-                        rows={3}
-                        placeholder="Description"
-                        value={item.description}
-                        onChange={(e) =>
-                          updateArrayItem<WorkItem, "description">(
-                            "work",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                          <Input
+                            aria-label={`Experience ${index + 1} start date`}
+                            placeholder="Start (e.g. Aug 2023)"
+                            value={item.start}
+                            onChange={(event) =>
+                              updateArrayItem<WorkItem, "start">(
+                                "work",
+                                index,
+                                "start",
+                                event.target.value
+                              )
+                            }
+                          />
+                          <Input
+                            aria-label={`Experience ${index + 1} end date`}
+                            placeholder="End (e.g. May 2024)"
+                            value={item.end}
+                            onChange={(event) =>
+                              updateArrayItem<WorkItem, "end">(
+                                "work",
+                                index,
+                                "end",
+                                event.target.value
+                              )
+                            }
+                          />
+                          <Textarea
+                            aria-label={`Experience ${index + 1} description`}
+                            placeholder="Description"
+                            className="sm:col-span-2 lg:col-span-3"
+                            value={item.description}
+                            onChange={(event) =>
+                              updateArrayItem<WorkItem, "description">(
+                                "work",
+                                index,
+                                "description",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <EmptyCollection label="No work experience added." />
+                  )}
 
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Awards / Certifications</h5>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("awards")}
-                    >
-                      Add Award
-                    </button>
-                  </div>
-                  {form.awards.map((award: AwardItem, index: number) => (
-                    <div className="border rounded p-3 mb-3" key={`award-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Award {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("awards", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="row mb-2">
-                        <div className="col-md-6">
-                          <input
-                            className="form-control"
+                  <Separator />
+                  <RepeaterHeader
+                    icon={Award}
+                    title="Awards & certifications"
+                    actionLabel="Add award"
+                    onAdd={() => addArrayItem("awards")}
+                  />
+                  {form.awards.length ? (
+                    form.awards.map((award, index) => (
+                      <Card key={`award-${index}`}>
+                        <ItemHeader
+                          title={`Award ${index + 1}`}
+                          onRemove={() => removeArrayItem("awards", index)}
+                        />
+                        <CardContent className="grid gap-3 sm:grid-cols-3">
+                          <Input
+                            aria-label={`Award ${index + 1} title`}
                             placeholder="Title"
                             value={award.title}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<AwardItem, "title">(
                                 "awards",
                                 index,
                                 "title",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                        <div className="col-md-3">
-                          <input
-                            className="form-control"
+                          <Input
+                            aria-label={`Award ${index + 1} issuer`}
                             placeholder="Issuer"
                             value={award.issuer}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<AwardItem, "issuer">(
                                 "awards",
                                 index,
                                 "issuer",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                        <div className="col-md-3">
-                          <input
-                            className="form-control"
+                          <Input
+                            aria-label={`Award ${index + 1} date`}
                             placeholder="Date"
                             value={award.date}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateArrayItem<AwardItem, "date">(
                                 "awards",
                                 index,
                                 "date",
-                                e.target.value
+                                event.target.value
                               )
                             }
                           />
-                        </div>
-                      </div>
-                      <textarea
-                        className="form-control"
-                        rows={2}
-                        placeholder="Description"
-                        value={award.description}
-                        onChange={(e) =>
-                          updateArrayItem<AwardItem, "description">(
-                            "awards",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                          <Textarea
+                            aria-label={`Award ${index + 1} description`}
+                            placeholder="Description"
+                            className="sm:col-span-3"
+                            value={award.description}
+                            onChange={(event) =>
+                              updateArrayItem<AwardItem, "description">(
+                                "awards",
+                                index,
+                                "description",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <EmptyCollection label="No awards added." />
+                  )}
 
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Custom Sections</h5>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => addArrayItem("customSections")}
-                    >
-                      Add Section
-                    </button>
-                  </div>
-                  {form.customSections.map((section: CustomSection, index: number) => (
-                    <div className="border rounded p-3 mb-3" key={`section-${index}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <strong>Section {index + 1}</strong>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeArrayItem("customSections", index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <input
-                        className="form-control mb-2"
-                        placeholder="Section title"
-                        value={section.title}
-                        onChange={(e) =>
-                          updateArrayItem<CustomSection, "title">(
-                            "customSections",
-                            index,
-                            "title",
-                            e.target.value
-                          )
-                        }
-                      />
-                      <textarea
-                        className="form-control"
-                        rows={3}
-                        placeholder="Section body"
-                        value={section.body}
-                        onChange={(e) =>
-                          updateArrayItem<CustomSection, "body">(
-                            "customSections",
-                            index,
-                            "body",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                  <Separator />
+                  <RepeaterHeader
+                    icon={FileText}
+                    title="Custom sections"
+                    actionLabel="Add section"
+                    onAdd={() => addArrayItem("customSections")}
+                  />
+                  {form.customSections.length ? (
+                    form.customSections.map((section, index) => (
+                      <Card key={`section-${index}`}>
+                        <ItemHeader
+                          title={`Section ${index + 1}`}
+                          onRemove={() => removeArrayItem("customSections", index)}
+                        />
+                        <CardContent className="space-y-3">
+                          <Input
+                            aria-label={`Custom section ${index + 1} title`}
+                            placeholder="Section title"
+                            value={section.title}
+                            onChange={(event) =>
+                              updateArrayItem<CustomSection, "title">(
+                                "customSections",
+                                index,
+                                "title",
+                                event.target.value
+                              )
+                            }
+                          />
+                          <Textarea
+                            aria-label={`Custom section ${index + 1} body`}
+                            placeholder="Section body"
+                            value={section.body}
+                            onChange={(event) =>
+                              updateArrayItem<CustomSection, "body">(
+                                "customSections",
+                                index,
+                                "body",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <EmptyCollection label="No custom sections added." />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="history" className="mt-0 space-y-5">
+                  <SectionHeading
+                    title="Chapter history"
+                    description="Read-only records retained from previous service."
+                  />
+                  <Card>
+                    <CardContent className="grid gap-4 p-5 lg:grid-cols-3">
+                      <Field label="Previous E-Council roles">
+                        <Textarea
+                          value={formatHistoryList(member.previousECouncilRoles)}
+                          readOnly
+                          className="min-h-40 bg-muted/40"
+                        />
+                      </Field>
+                      <Field label="Previous committees chaired">
+                        <Textarea
+                          value={formatHistoryList(member.previousCommitteesChaired)}
+                          readOnly
+                          className="min-h-40 bg-muted/40"
+                        />
+                      </Field>
+                      <Field label="Previous committee memberships">
+                        <Textarea
+                          value={formatHistoryList(member.previousCommitteesMemberOf)}
+                          readOnly
+                          className="min-h-40 bg-muted/40"
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
               </div>
+
+              <DialogFooter className="shrink-0 gap-2 border-t bg-background p-4 sm:px-6">
+                <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={() => void handleSave()} disabled={saving}>
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </DialogFooter>
             </div>
-          </div>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
 
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose} disabled={saving}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <LoadingSpinner size="sm" className="me-2" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
+      <Dialog open={showRelationsModal} onOpenChange={setShowRelationsModal}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Manage bigs and littles</DialogTitle>
+            <DialogDescription>
+              Search for members and assign chapter family relationships.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-5 md:grid-cols-2">
+            <MemberTokenPicker
+              label="Bigs"
+              members={allMembers}
+              selectedIds={form.bigs}
+              onChange={(values) => update("bigs", values)}
+            />
+            <MemberTokenPicker
+              label="Littles"
+              members={allMembers}
+              selectedIds={form.littles}
+              onChange={(values) => update("littles", values)}
+            />
           </div>
-        </div>
-      </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setShowRelationsModal(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {showRelationsModal && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.35)" }}
-        >
-          <div className="modal-dialog modal-dialog-centered admin-relations-modal">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Manage Bigs and Littles</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowRelationsModal(false)}
-                />
-              </div>
-              <div className="modal-body">
-                <div className="row g-4">
-                  <div className="col-md-6">
-                    <MemberTokenPicker
-                      label="Bigs"
-                      members={allMembers}
-                      selectedIds={form.bigs}
-                      onChange={(values) => updateSelectedMembers("bigs", values)}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <MemberTokenPicker
-                      label="Littles"
-                      members={allMembers}
-                      selectedIds={form.littles}
-                      onChange={(values) => updateSelectedMembers("littles", values)}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowRelationsModal(false)}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPhotoModal && (
+      {showPhotoModal ? (
         <PhotoUploader
           show={showPhotoModal}
           initialUrl={member.profilePicUrl}
-          onError={(msg) => setError(msg)}
+          onError={setError}
           onClose={() => setShowPhotoModal(false)}
           targetRollNo={member.rollNo}
         />
-      )}
-      {showResumeModal && (
+      ) : null}
+      {showResumeModal ? (
         <ResumeUploader
           show={showResumeModal}
           initialUrl={member.resumeUrl}
-          onError={(msg) => setError(msg)}
+          onError={setError}
           onClose={() => setShowResumeModal(false)}
           targetRollNo={member.rollNo}
         />
-      )}
+      ) : null}
+    </>
+  );
+}
+
+function SectionHeading({ title, description }: { title: string; description: string }) {
+  return (
+    <div>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  description,
+  className = "",
+  children,
+}: {
+  label: string;
+  description?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      <Label>{label}</Label>
+      {children}
+      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+    </div>
+  );
+}
+
+function ToggleRow({
+  pressed,
+  onPressedChange,
+  icon: Icon,
+  title,
+  description,
+}: {
+  pressed: boolean;
+  onPressedChange: (pressed: boolean) => void;
+  icon: typeof ShieldCheck;
+  title: string;
+  description: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={() => onPressedChange(!pressed)}
+      className="flex items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[pressed=true]:border-primary/50 data-[pressed=true]:bg-primary/10"
+      data-pressed={pressed}
+    >
+      <span className="rounded-md bg-muted p-2 text-muted-foreground">
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center justify-between gap-2 font-medium">
+          {title}
+          <Badge variant={pressed ? "default" : "muted"}>
+            {pressed ? "On" : "Off"}
+          </Badge>
+        </span>
+        <span className="mt-1 block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function RepeaterHeader({
+  icon: Icon,
+  title,
+  actionLabel,
+  onAdd,
+}: {
+  icon: typeof Award;
+  title: string;
+  actionLabel: string;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h3 className="flex items-center gap-2 font-semibold">
+        <Icon className="size-4 text-primary" />
+        {title}
+      </h3>
+      <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+        <Plus className="size-4" />
+        {actionLabel}
+      </Button>
+    </div>
+  );
+}
+
+function ItemHeader({ title, onRemove }: { title: string; onRemove: () => void }) {
+  return (
+    <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+      <CardTitle className="text-sm">{title}</CardTitle>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-destructive hover:text-destructive"
+        onClick={onRemove}
+      >
+        <Trash2 className="size-4" />
+        Remove
+      </Button>
+    </CardHeader>
+  );
+}
+
+function EmptyCollection({ label }: { label: string }) {
+  return (
+    <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+      {label}
+    </div>
+  );
+}
+
+function RelationshipSummary({
+  label,
+  members,
+  selectedIds,
+}: {
+  label: string;
+  members: MemberShort[];
+  selectedIds: string[];
+}) {
+  const selected = selectedIds
+    .map((id) => members.find((member) => member._id === id))
+    .filter(Boolean) as MemberShort[];
+
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {selected.length ? (
+          selected.map((member) => (
+            <Badge key={member._id} variant="secondary">
+              {getMemberDisplayName(member)}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-sm text-muted-foreground">None selected</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MemberTokenPicker({
+  label,
+  members,
+  selectedIds,
+  onChange,
+}: {
+  label: string;
+  members: MemberShort[];
+  selectedIds: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const selectedMembers = useMemo(
+    () =>
+      selectedIds
+        .map((id) => members.find((member) => member._id === id))
+        .filter(Boolean) as MemberShort[],
+    [members, selectedIds]
+  );
+  const availableMembers = useMemo(() => {
+    const selected = new Set(selectedIds);
+    const normalizedQuery = query.trim().toLowerCase();
+    return members
+      .filter((member) => !selected.has(member._id))
+      .filter((member) =>
+        normalizedQuery
+          ? getMemberDisplayName(member).toLowerCase().includes(normalizedQuery)
+          : true
+      )
+      .slice(0, 8);
+  }, [members, query, selectedIds]);
+
+  function addMember(memberId: string) {
+    if (!memberId || selectedIds.includes(memberId)) return;
+    onChange([...selectedIds, memberId]);
+    setQuery("");
+  }
+
+  function removeMember(memberId: string) {
+    onChange(selectedIds.filter((id) => id !== memberId));
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border border-input bg-background p-1.5">
+        {selectedMembers.map((member) => (
+          <Badge key={member._id} variant="secondary" className="gap-1 pr-1">
+            {getMemberDisplayName(member)}
+            <button
+              type="button"
+              onClick={() => removeMember(member._id)}
+              aria-label={`Remove ${getMemberDisplayName(member)}`}
+              className="rounded-full px-1 hover:bg-foreground/10"
+            >
+              ×
+            </button>
+          </Badge>
+        ))}
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && availableMembers[0]) {
+              event.preventDefault();
+              addMember(availableMembers[0]._id);
+            }
+          }}
+          className="min-w-32 flex-1 bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
+          placeholder={selectedIds.length ? "Search…" : "Type a member name"}
+        />
+      </div>
+      {query && availableMembers.length ? (
+        <div className="rounded-md border bg-popover p-1 shadow-sm">
+          {availableMembers.map((member) => (
+            <Button
+              key={member._id}
+              type="button"
+              variant="ghost"
+              className="w-full justify-start font-normal"
+              onClick={() => addMember(member._id)}
+            >
+              {getMemberDisplayName(member)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      <p className="text-xs text-muted-foreground">
+        Search and select members. Press Enter to choose the first match.
+      </p>
     </div>
   );
 }

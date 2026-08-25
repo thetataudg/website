@@ -1,9 +1,53 @@
-// app/(members-only)/member/profile/[rollNo]/ProfileInfoEditor.tsx
 "use client";
 
-import { useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
+import { CircleAlert, Loader2, Save } from "lucide-react";
 import type { MemberDoc } from "@/types/member";
-import { LoadingSpinner } from "../../../components/LoadingState";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  CollectionCard,
+  CollectionItem,
+  Field,
+} from "../../../components/shell/FormSections";
+
+const PLEDGE_CLASS_OPTIONS = [
+  "Zeta Gamma",
+  "Eta Gamma",
+  "Theta Gamma",
+  "Iota Gamma",
+  "Kappa Gamma",
+  "Lambda Gamma",
+  "Mu Gamma",
+  "Nu Gamma",
+  "Xi Gamma",
+  "Omicron Gamma",
+  "Pi Gamma",
+  "Rho Gamma",
+  "Sigma Gamma",
+  "Tau Gamma",
+  "Upsilon Gamma",
+  "Phi Gamma",
+  "Chi Gamma",
+  "Psi Gamma",
+  "Omega Gamma",
+];
 
 const resolveRollNo = (entry: any) => {
   if (!entry) return "";
@@ -30,39 +74,36 @@ type WorkItem = {
   description: string;
   link: string;
 };
-type AwardItem = { title: string; issuer: string; date: string; description: string };
+type AwardItem = {
+  title: string;
+  issuer: string;
+  date: string;
+  description: string;
+};
 type CustomSection = { title: string; body: string };
+type ArrayKey = "projects" | "work" | "awards" | "customSections";
+export type ProfileEditorSection =
+  | "basics"
+  | "links"
+  | "skills"
+  | "funFacts"
+  | "projects"
+  | "work"
+  | "awards"
+  | "customSections";
 
 export default function ProfileInfoEditor({
   member,
+  section,
   onDone,
+  onCancel,
 }: {
   member: MemberDoc;
+  section: ProfileEditorSection;
   onDone: () => void;
+  onCancel: () => void;
 }) {
   const socials = member.socialLinks || {};
-  const pledgeClassOptions = [
-    "Zeta Gamma",
-    "Eta Gamma",
-    "Theta Gamma",
-    "Iota Gamma",
-    "Kappa Gamma",
-    "Lambda Gamma",
-    "Mu Gamma",
-    "Nu Gamma",
-    "Xi Gamma",
-    "Omicron Gamma",
-    "Pi Gamma",
-    "Rho Gamma",
-    "Sigma Gamma",
-    "Tau Gamma",
-    "Upsilon Gamma",
-    "Phi Gamma",
-    "Chi Gamma",
-    "Psi Gamma",
-    "Omega Gamma",
-  ];
-
   const [form, setForm] = useState({
     headline: member.headline || "",
     pronouns: member.pronouns || "",
@@ -70,7 +111,7 @@ export default function ProfileInfoEditor({
     minors: member.minors?.join(", ") || "",
     gradYear: member.gradYear?.toString() || "",
     bio: member.bio || "",
-    hometown: member.hometown,
+    hometown: member.hometown || "",
     pledgeClass: member.pledgeClass || "",
     big: resolveRollNo(member.bigs?.[0]),
     littles: (member.littles || [])
@@ -83,49 +124,50 @@ export default function ProfileInfoEditor({
     linkedin: socials.linkedin || "",
     instagram: socials.instagram || "",
     website: socials.website || "",
-    projects: (member.projects || []).map((p) => ({
-      title: p.title || "",
-      description: p.description || "",
-      link: p.link || "",
+    projects: (member.projects || []).map((project) => ({
+      title: project.title || "",
+      description: project.description || "",
+      link: project.link || "",
     })),
-    work: (member.work || []).map((w) => ({
-      title: w.title || "",
-      organization: w.organization || "",
-      start: w.start || "",
-      end: w.end || "",
-      description: w.description || "",
-      link: w.link || "",
+    work: (member.work || []).map((item) => ({
+      title: item.title || "",
+      organization: item.organization || "",
+      start: item.start || "",
+      end: item.end || "",
+      description: item.description || "",
+      link: item.link || "",
     })),
-    awards: (member.awards || []).map((a) => ({
-      title: a.title || "",
-      issuer: a.issuer || "",
-      date: a.date || "",
-      description: a.description || "",
+    awards: (member.awards || []).map((award) => ({
+      title: award.title || "",
+      issuer: award.issuer || "",
+      date: award.date || "",
+      description: award.description || "",
     })),
-    customSections: (member.customSections || []).map((s) => ({
-      title: s.title || "",
-      body: s.body || "",
+    customSections: (member.customSections || []).map((section) => ({
+      title: section.title || "",
+      body: section.body || "",
     })),
   });
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const updateField = <K extends keyof typeof form>(key: K, value: string) =>
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((current) => ({ ...current, [key]: value }));
 
   const updateArrayItem = <T, K extends keyof T>(
-    key: "projects" | "work" | "awards" | "customSections",
+    key: ArrayKey,
     index: number,
     field: K,
     value: string
   ) =>
-    setForm((f) => {
-      const copy = [...(f[key] as T[])];
+    setForm((current) => {
+      const copy = [...(current[key] as T[])];
       copy[index] = { ...copy[index], [field]: value };
-      return { ...f, [key]: copy };
+      return { ...current, [key]: copy };
     });
 
-  const addArrayItem = (key: "projects" | "work" | "awards" | "customSections") =>
-    setForm((f) => {
+  const addArrayItem = (key: ArrayKey) =>
+    setForm((current) => {
       const empty =
         key === "projects"
           ? { title: "", description: "", link: "" }
@@ -141,596 +183,648 @@ export default function ProfileInfoEditor({
           : key === "awards"
           ? { title: "", issuer: "", date: "", description: "" }
           : { title: "", body: "" };
-      return { ...f, [key]: [...(f[key] as any[]), empty] };
+      return { ...current, [key]: [...(current[key] as any[]), empty] };
     });
 
-  const removeArrayItem = (
-    key: "projects" | "work" | "awards" | "customSections",
-    index: number
-  ) =>
-    setForm((f) => {
-      const copy = [...(f[key] as any[])];
+  const removeArrayItem = (key: ArrayKey, index: number) =>
+    setForm((current) => {
+      const copy = [...(current[key] as any[])];
       copy.splice(index, 1);
-      return { ...f, [key]: copy };
+      return { ...current, [key]: copy };
     });
 
   const parseList = (text: string) =>
     text
       .split(/\n|,/)
-      .map((s) => s.trim())
+      .map((item) => item.trim())
       .filter(Boolean);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (event: FormEvent) => {
+    event.preventDefault();
     setLoading(true);
+    setSaveError(null);
 
-    const payload = {
-      headline: form.headline.trim(),
-      pronouns: form.pronouns.trim(),
-      majors: parseList(form.majors),
-      minors: parseList(form.minors),
-      gradYear: Number(form.gradYear),
-      bio: form.bio,
-      hometown: form.hometown,
-      pledgeClass: form.pledgeClass.trim(),
-      bigs: form.big ? [form.big.trim()] : [],
-      littles: parseList(form.littles).slice(0, 5),
-      skills: parseList(form.skills),
-      funFacts: parseList(form.funFacts),
-      projects: form.projects,
-      work: form.work,
-      awards: form.awards,
-      customSections: form.customSections,
-      socialLinks: {
-        github: form.github.trim(),
-        linkedin: form.linkedin.trim(),
-        instagram: form.instagram.trim(),
-        website: form.website.trim(),
+    const payloadBySection: Record<
+      ProfileEditorSection,
+      Record<string, unknown>
+    > = {
+      basics: {
+        headline: form.headline.trim(),
+        pronouns: form.pronouns.trim(),
+        majors: parseList(form.majors),
+        minors: parseList(form.minors),
+        gradYear: Number(form.gradYear),
+        bio: form.bio,
+        hometown: form.hometown,
+        pledgeClass: form.pledgeClass.trim(),
+        bigs: form.big ? [form.big.trim()] : [],
+        littles: parseList(form.littles).slice(0, 5),
       },
+      links: {
+        socialLinks: {
+          github: form.github.trim(),
+          linkedin: form.linkedin.trim(),
+          instagram: form.instagram.trim(),
+          website: form.website.trim(),
+        },
+      },
+      skills: { skills: parseList(form.skills) },
+      funFacts: { funFacts: parseList(form.funFacts) },
+      projects: { projects: form.projects },
+      work: { work: form.work },
+      awards: { awards: form.awards },
+      customSections: { customSections: form.customSections },
     };
 
     try {
-      const res = await fetch("/api/members/me", {
+      const response = await fetch("/api/members/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payloadBySection[section]),
       });
-      if (!res.ok) throw new Error("Save failed");
+      if (!response.ok) {
+        throw new Error("Your profile could not be saved. Please try again.");
+      }
       onDone();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Your profile could not be saved. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSave} className="profile-editor">
-      <div className="profile-editor__section">
-        <h4 className="mb-4">Profile Builder</h4>
+    <form
+      onSubmit={handleSave}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+        {section === "basics" && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle role="heading" aria-level={3} className="text-base">
+              Profile basics
+            </CardTitle>
+            <CardDescription>
+              The details brothers will see first on your profile.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
+            <Field id="profile-headline" label="Headline or tagline" className="lg:col-span-8">
+              <Input
+                id="profile-headline"
+                value={form.headline}
+                onChange={(event) => updateField("headline", event.target.value)}
+                placeholder="Aspiring robotics engineer • Project lead"
+              />
+            </Field>
+            <Field id="profile-pronouns" label="Pronouns" className="lg:col-span-4">
+              <Input
+                id="profile-pronouns"
+                value={form.pronouns}
+                onChange={(event) => updateField("pronouns", event.target.value)}
+                placeholder="he/him, she/her, they/them"
+              />
+            </Field>
 
-        <div className="row mb-3">
-          <div className="col-md-8">
-            <label className="form-label">Headline / Tagline</label>
-            <input
-              className="form-control"
-              value={form.headline}
-              onChange={(e) => updateField("headline", e.target.value)}
-              placeholder="Aspiring robotics engineer • Project lead"
-            />
-          </div>
-          <div className="col-md-4">
-            <label className="form-label">Pronouns</label>
-            <input
-              className="form-control"
-              value={form.pronouns}
-              onChange={(e) => updateField("pronouns", e.target.value)}
-              placeholder="he/him, she/her, they/them"
-            />
-          </div>
-        </div>
-
-        <div className="row mb-3">
-          <div className="col-sm-6">
-            <label className="form-label">Majors (comma-separated)</label>
-            <input
-              className="form-control"
-              value={form.majors}
-              onChange={(e) => updateField("majors", e.target.value)}
-            />
-          </div>
-          <div className="col-sm-6">
-            <label className="form-label">Minors (comma-separated)</label>
-            <input
-              className="form-control"
-              value={form.minors}
-              onChange={(e) => updateField("minors", e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="row mb-3">
-          <div className="col-sm-4">
-            <label className="form-label">Graduation Year</label>
-            <input
-              type="number"
-              className="form-control"
-              value={form.gradYear}
-              onChange={(e) => updateField("gradYear", e.target.value)}
-            />
-          </div>
-          <div className="col-sm-4">
-            <label className="form-label">Pledge Class</label>
-            <select
-              className="form-select"
-              value={form.pledgeClass}
-              onChange={(e) => updateField("pledgeClass", e.target.value)}
+            <Field
+              id="profile-majors"
+              label="Majors"
+              hint="Separate multiple majors with commas."
+              className="lg:col-span-6"
             >
-              <option value="">Select pledge class</option>
-              {pledgeClassOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-sm-4">
-            <label className="form-label">Hometown</label>
-            <input
-              className="form-control"
-              value={form.hometown}
-              onChange={(e) => updateField("hometown", e.target.value)}
-            />
-          </div>
-        </div>
+              <Input
+                id="profile-majors"
+                aria-describedby="profile-majors-hint"
+                value={form.majors}
+                onChange={(event) => updateField("majors", event.target.value)}
+              />
+            </Field>
+            <Field
+              id="profile-minors"
+              label="Minors"
+              hint="Separate multiple minors with commas."
+              className="lg:col-span-6"
+            >
+              <Input
+                id="profile-minors"
+                aria-describedby="profile-minors-hint"
+                value={form.minors}
+                onChange={(event) => updateField("minors", event.target.value)}
+              />
+            </Field>
 
-        <div className="row mb-3">
-          <div className="col-sm-6">
-            <label className="form-label">Big (roll number)</label>
-            <input
-              className="form-control"
-              value={form.big}
-              onChange={(e) => updateField("big", e.target.value)}
-              placeholder="e.g. 12345"
-            />
-          </div>
-          <div className="col-sm-6">
-            <label className="form-label">Littles (comma-separated, up to 5)</label>
-            <input
-              className="form-control"
-              value={form.littles}
-              onChange={(e) => updateField("littles", e.target.value)}
-              placeholder="e.g. 54321, 67890"
-            />
-          </div>
-        </div>
-
-        <div className="mb-0">
-          <label className="form-label">Bio</label>
-          <textarea
-            className="form-control"
-            rows={4}
-            value={form.bio}
-            onChange={(e) => updateField("bio", e.target.value)}
-            placeholder="Share your story, interests, or what you're working on."
-          />
-        </div>
-      </div>
-
-      <div className="profile-editor__section">
-        <h5 className="mb-3">Links & Highlights</h5>
-
-        <div className="row mb-3">
-          <div className="col-sm-6">
-            <label className="form-label">GitHub URL</label>
-            <input
-              className="form-control"
-              value={form.github}
-              onChange={(e) => updateField("github", e.target.value)}
-              placeholder="https://github.com/username"
-            />
-          </div>
-          <div className="col-sm-6">
-            <label className="form-label">LinkedIn URL</label>
-            <input
-              className="form-control"
-              value={form.linkedin}
-              onChange={(e) => updateField("linkedin", e.target.value)}
-              placeholder="https://linkedin.com/in/username"
-            />
-          </div>
-        </div>
-
-        <div className="row mb-3">
-          <div className="col-sm-6">
-            <label className="form-label">Instagram URL</label>
-            <input
-              className="form-control"
-              value={form.instagram}
-              onChange={(e) => updateField("instagram", e.target.value)}
-              placeholder="https://instagram.com/username"
-            />
-          </div>
-          <div className="col-sm-6">
-            <label className="form-label">Personal Website</label>
-            <input
-              className="form-control"
-              value={form.website}
-              onChange={(e) => updateField("website", e.target.value)}
-              placeholder="https://your-site.com"
-            />
-          </div>
-        </div>
-
-        <div className="row mb-0">
-          <div className="col-md-6">
-            <label className="form-label">Skills (one per line)</label>
-            <textarea
-              className="form-control"
-              rows={4}
-              value={form.skills}
-              onChange={(e) => updateField("skills", e.target.value)}
-              placeholder="CAD\nPython\nProject Management"
-            />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Fun Facts (one per line)</label>
-            <textarea
-              className="form-control"
-              rows={4}
-              value={form.funFacts}
-              onChange={(e) => updateField("funFacts", e.target.value)}
-              placeholder="Loves sunrise hikes\nCollects vintage cameras"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="profile-editor__section">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5 className="mb-0">Projects</h5>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => addArrayItem("projects")}
-          >
-            Add Project
-          </button>
-        </div>
-        {form.projects.map((project: ProjectItem, index: number) => (
-          <div className="border rounded p-3 mb-3" key={`project-${index}`}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <strong>Project {index + 1}</strong>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => removeArrayItem("projects", index)}
+            <Field id="profile-grad-year" label="Graduation year" className="lg:col-span-4">
+              <Input
+                id="profile-grad-year"
+                type="number"
+                inputMode="numeric"
+                value={form.gradYear}
+                onChange={(event) => updateField("gradYear", event.target.value)}
+              />
+            </Field>
+            <Field id="profile-pledge-class" label="Pledge class" className="lg:col-span-4">
+              <Select
+                value={form.pledgeClass}
+                onValueChange={(value) => updateField("pledgeClass", value)}
               >
-                Remove
-              </button>
-            </div>
-            <div className="row">
-              <div className="col-md-6 mb-2">
-                <input
-                  className="form-control"
-                  placeholder="Project title"
-                  value={project.title}
-                  onChange={(e) =>
-                    updateArrayItem<ProjectItem, "title">(
-                      "projects",
-                      index,
-                      "title",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-              <div className="col-md-6 mb-2">
-                <input
-                  className="form-control"
-                  placeholder="Project link"
-                  value={project.link}
-                  onChange={(e) =>
-                    updateArrayItem<ProjectItem, "link">(
-                      "projects",
-                      index,
-                      "link",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-            </div>
-            <textarea
-              className="form-control"
-              rows={3}
-              placeholder="Short description"
-              value={project.description}
-              onChange={(e) =>
-                updateArrayItem<ProjectItem, "description">(
-                  "projects",
-                  index,
-                  "description",
-                  e.target.value
-                )
-              }
-            />
-          </div>
-        ))}
-      </div>
+                <SelectTrigger id="profile-pledge-class">
+                  <SelectValue placeholder="Select pledge class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLEDGE_CLASS_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field id="profile-hometown" label="Hometown" className="lg:col-span-4">
+              <Input
+                id="profile-hometown"
+                value={form.hometown}
+                onChange={(event) => updateField("hometown", event.target.value)}
+                placeholder="Tempe, AZ"
+              />
+            </Field>
 
-      <div className="profile-editor__section">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5 className="mb-0">Work / Internships</h5>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => addArrayItem("work")}
-          >
-            Add Experience
-          </button>
-        </div>
-        {form.work.map((item: WorkItem, index: number) => (
-          <div className="border rounded p-3 mb-3" key={`work-${index}`}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <strong>Experience {index + 1}</strong>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => removeArrayItem("work", index)}
-              >
-                Remove
-              </button>
-            </div>
-            <div className="row">
-              <div className="col-md-6 mb-2">
-                <input
-                  className="form-control"
-                  placeholder="Role title"
-                  value={item.title}
-                  onChange={(e) =>
-                    updateArrayItem<WorkItem, "title">(
-                      "work",
-                      index,
-                      "title",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-              <div className="col-md-6 mb-2">
-                <input
-                  className="form-control"
-                  placeholder="Organization"
-                  value={item.organization}
-                  onChange={(e) =>
-                    updateArrayItem<WorkItem, "organization">(
-                      "work",
-                      index,
-                      "organization",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-            </div>
-            <div className="row mb-2">
-              <div className="col-md-4">
-                <input
-                  className="form-control"
-                  placeholder="Start (e.g. Aug 2023)"
-                  value={item.start}
-                  onChange={(e) =>
-                    updateArrayItem<WorkItem, "start">(
-                      "work",
-                      index,
-                      "start",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-              <div className="col-md-4">
-                <input
-                  className="form-control"
-                  placeholder="End (e.g. May 2024)"
-                  value={item.end}
-                  onChange={(e) =>
-                    updateArrayItem<WorkItem, "end">(
-                      "work",
-                      index,
-                      "end",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-              <div className="col-md-4">
-                <input
-                  className="form-control"
-                  placeholder="Link"
-                  value={item.link}
-                  onChange={(e) =>
-                    updateArrayItem<WorkItem, "link">(
-                      "work",
-                      index,
-                      "link",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-            </div>
-            <textarea
-              className="form-control"
-              rows={3}
-              placeholder="Description"
-              value={item.description}
-              onChange={(e) =>
-                updateArrayItem<WorkItem, "description">(
-                  "work",
-                  index,
-                  "description",
-                  e.target.value
-                )
-              }
-            />
-          </div>
-        ))}
-      </div>
+            <Field id="profile-big" label="Big’s roll number" className="lg:col-span-6">
+              <Input
+                id="profile-big"
+                inputMode="numeric"
+                value={form.big}
+                onChange={(event) => updateField("big", event.target.value)}
+                placeholder="e.g. 12345"
+              />
+            </Field>
+            <Field
+              id="profile-littles"
+              label="Littles’ roll numbers"
+              hint="Enter up to five, separated with commas."
+              className="lg:col-span-6"
+            >
+              <Input
+                id="profile-littles"
+                aria-describedby="profile-littles-hint"
+                value={form.littles}
+                onChange={(event) => updateField("littles", event.target.value)}
+                placeholder="e.g. 54321, 67890"
+              />
+            </Field>
 
-      <div className="profile-editor__section">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5 className="mb-0">Awards / Certifications</h5>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => addArrayItem("awards")}
-          >
-            Add Award
-          </button>
-        </div>
-        {form.awards.map((award: AwardItem, index: number) => (
-          <div className="border rounded p-3 mb-3" key={`award-${index}`}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <strong>Award {index + 1}</strong>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => removeArrayItem("awards", index)}
-              >
-                Remove
-              </button>
-            </div>
-            <div className="row mb-2">
-              <div className="col-md-6">
-                <input
-                  className="form-control"
-                  placeholder="Title"
-                  value={award.title}
-                  onChange={(e) =>
-                    updateArrayItem<AwardItem, "title">(
-                      "awards",
-                      index,
-                      "title",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-              <div className="col-md-3">
-                <input
-                  className="form-control"
-                  placeholder="Issuer"
-                  value={award.issuer}
-                  onChange={(e) =>
-                    updateArrayItem<AwardItem, "issuer">(
-                      "awards",
-                      index,
-                      "issuer",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-              <div className="col-md-3">
-                <input
-                  className="form-control"
-                  placeholder="Date"
-                  value={award.date}
-                  onChange={(e) =>
-                    updateArrayItem<AwardItem, "date">(
-                      "awards",
-                      index,
-                      "date",
-                      e.target.value
-                    )
-                  }
-                />
-              </div>
-            </div>
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Description"
-              value={award.description}
-              onChange={(e) =>
-                updateArrayItem<AwardItem, "description">(
-                  "awards",
-                  index,
-                  "description",
-                  e.target.value
-                )
-              }
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="profile-editor__section">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5 className="mb-0">Custom Sections</h5>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => addArrayItem("customSections")}
-          >
-            Add Section
-          </button>
-        </div>
-        {form.customSections.map((section: CustomSection, index: number) => (
-          <div className="border rounded p-3 mb-3" key={`section-${index}`}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <strong>Section {index + 1}</strong>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => removeArrayItem("customSections", index)}
-              >
-                Remove
-              </button>
-            </div>
-            <input
-              className="form-control mb-2"
-              placeholder="Section title"
-              value={section.title}
-              onChange={(e) =>
-                updateArrayItem<CustomSection, "title">(
-                  "customSections",
-                  index,
-                  "title",
-                  e.target.value
-                )
-              }
-            />
-            <textarea
-              className="form-control"
-              rows={3}
-              placeholder="Section body"
-              value={section.body}
-              onChange={(e) =>
-                updateArrayItem<CustomSection, "body">(
-                  "customSections",
-                  index,
-                  "body",
-                  e.target.value
-                )
-              }
-            />
-          </div>
-        ))}
-      </div>
-
-      <button className="btn btn-primary align-self-start" disabled={loading}>
-        {loading ? (
-          <>
-            <LoadingSpinner size="sm" className="me-2" />
-            Saving...
-          </>
-        ) : (
-          "Save Info"
+            <Field id="profile-bio" label="Bio" className="sm:col-span-2 lg:col-span-12">
+              <Textarea
+                id="profile-bio"
+                rows={4}
+                value={form.bio}
+                onChange={(event) => updateField("bio", event.target.value)}
+                placeholder="Share your story, interests, or what you're working on."
+              />
+            </Field>
+          </CardContent>
+        </Card>
         )}
-      </button>
+
+        {section === "links" && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle role="heading" aria-level={3} className="text-base">
+              Profile links
+            </CardTitle>
+            <CardDescription>
+              Help brothers find your work and connect with you elsewhere.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field id="profile-github" label="GitHub URL">
+              <Input
+                id="profile-github"
+                inputMode="url"
+                value={form.github}
+                onChange={(event) => updateField("github", event.target.value)}
+                placeholder="https://github.com/username"
+              />
+            </Field>
+            <Field id="profile-linkedin" label="LinkedIn URL">
+              <Input
+                id="profile-linkedin"
+                inputMode="url"
+                value={form.linkedin}
+                onChange={(event) => updateField("linkedin", event.target.value)}
+                placeholder="https://linkedin.com/in/username"
+              />
+            </Field>
+            <Field id="profile-instagram" label="Instagram URL">
+              <Input
+                id="profile-instagram"
+                inputMode="url"
+                value={form.instagram}
+                onChange={(event) => updateField("instagram", event.target.value)}
+                placeholder="https://instagram.com/username"
+              />
+            </Field>
+            <Field id="profile-website" label="Personal website">
+              <Input
+                id="profile-website"
+                inputMode="url"
+                value={form.website}
+                onChange={(event) => updateField("website", event.target.value)}
+                placeholder="https://your-site.com"
+              />
+            </Field>
+          </CardContent>
+        </Card>
+        )}
+
+        {section === "skills" && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle role="heading" aria-level={3} className="text-base">
+              Skills
+            </CardTitle>
+            <CardDescription>
+              Add the tools, disciplines, and strengths you want brothers to know about.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Field id="profile-skills" label="Skills" hint="Enter one skill per line or separate them with commas.">
+              <Textarea
+                id="profile-skills"
+                aria-describedby="profile-skills-hint"
+                rows={4}
+                value={form.skills}
+                onChange={(event) => updateField("skills", event.target.value)}
+                placeholder={"CAD\nPython\nProject Management"}
+              />
+            </Field>
+          </CardContent>
+        </Card>
+        )}
+
+        {section === "funFacts" && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle role="heading" aria-level={3} className="text-base">
+              Fun facts
+            </CardTitle>
+            <CardDescription>
+              Share a few memorable details that make your profile feel personal.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Field id="profile-fun-facts" label="Fun facts" hint="Enter one fact per line.">
+              <Textarea
+                id="profile-fun-facts"
+                aria-describedby="profile-fun-facts-hint"
+                rows={4}
+                value={form.funFacts}
+                onChange={(event) => updateField("funFacts", event.target.value)}
+                placeholder={"Loves sunrise hikes\nCollects vintage cameras"}
+              />
+            </Field>
+          </CardContent>
+        </Card>
+        )}
+
+        {section === "projects" && (
+        <CollectionCard
+          title="Projects"
+          description="Showcase projects, research, or things you have built."
+          addLabel="Add project"
+          onAdd={() => addArrayItem("projects")}
+          empty={form.projects.length === 0}
+        >
+          {form.projects.map((project: ProjectItem, index: number) => (
+            <CollectionItem
+              key={`project-${index}`}
+              title={`Project ${index + 1}`}
+              removeLabel={`Remove project ${index + 1}`}
+              onRemove={() => removeArrayItem("projects", index)}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field id={`project-${index}-title`} label="Project title">
+                  <Input
+                    id={`project-${index}-title`}
+                    value={project.title}
+                    onChange={(event) =>
+                      updateArrayItem<ProjectItem, "title">(
+                        "projects",
+                        index,
+                        "title",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+                <Field id={`project-${index}-link`} label="Project link">
+                  <Input
+                    id={`project-${index}-link`}
+                    inputMode="url"
+                    value={project.link}
+                    onChange={(event) =>
+                      updateArrayItem<ProjectItem, "link">(
+                        "projects",
+                        index,
+                        "link",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+              <Field id={`project-${index}-description`} label="Description">
+                <Textarea
+                  id={`project-${index}-description`}
+                  rows={3}
+                  value={project.description}
+                  onChange={(event) =>
+                    updateArrayItem<ProjectItem, "description">(
+                      "projects",
+                      index,
+                      "description",
+                      event.target.value
+                    )
+                  }
+                />
+              </Field>
+            </CollectionItem>
+          ))}
+        </CollectionCard>
+        )}
+
+        {section === "work" && (
+        <CollectionCard
+          title="Work and internships"
+          description="Add roles, internships, and other professional experience."
+          addLabel="Add experience"
+          onAdd={() => addArrayItem("work")}
+          empty={form.work.length === 0}
+        >
+          {form.work.map((item: WorkItem, index: number) => (
+            <CollectionItem
+              key={`work-${index}`}
+              title={`Experience ${index + 1}`}
+              removeLabel={`Remove experience ${index + 1}`}
+              onRemove={() => removeArrayItem("work", index)}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field id={`work-${index}-title`} label="Role title">
+                  <Input
+                    id={`work-${index}-title`}
+                    value={item.title}
+                    onChange={(event) =>
+                      updateArrayItem<WorkItem, "title">(
+                        "work",
+                        index,
+                        "title",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+                <Field id={`work-${index}-organization`} label="Organization">
+                  <Input
+                    id={`work-${index}-organization`}
+                    value={item.organization}
+                    onChange={(event) =>
+                      updateArrayItem<WorkItem, "organization">(
+                        "work",
+                        index,
+                        "organization",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field id={`work-${index}-start`} label="Start">
+                  <Input
+                    id={`work-${index}-start`}
+                    value={item.start}
+                    onChange={(event) =>
+                      updateArrayItem<WorkItem, "start">(
+                        "work",
+                        index,
+                        "start",
+                        event.target.value
+                      )
+                    }
+                    placeholder="Aug 2023"
+                  />
+                </Field>
+                <Field id={`work-${index}-end`} label="End">
+                  <Input
+                    id={`work-${index}-end`}
+                    value={item.end}
+                    onChange={(event) =>
+                      updateArrayItem<WorkItem, "end">(
+                        "work",
+                        index,
+                        "end",
+                        event.target.value
+                      )
+                    }
+                    placeholder="May 2024"
+                  />
+                </Field>
+                <Field id={`work-${index}-link`} label="Link">
+                  <Input
+                    id={`work-${index}-link`}
+                    inputMode="url"
+                    value={item.link}
+                    onChange={(event) =>
+                      updateArrayItem<WorkItem, "link">(
+                        "work",
+                        index,
+                        "link",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+              <Field id={`work-${index}-description`} label="Description">
+                <Textarea
+                  id={`work-${index}-description`}
+                  rows={3}
+                  value={item.description}
+                  onChange={(event) =>
+                    updateArrayItem<WorkItem, "description">(
+                      "work",
+                      index,
+                      "description",
+                      event.target.value
+                    )
+                  }
+                />
+              </Field>
+            </CollectionItem>
+          ))}
+        </CollectionCard>
+        )}
+
+        {section === "awards" && (
+        <CollectionCard
+          title="Awards and certifications"
+          description="Recognize certifications, honors, and other accomplishments."
+          addLabel="Add award"
+          onAdd={() => addArrayItem("awards")}
+          empty={form.awards.length === 0}
+        >
+          {form.awards.map((award: AwardItem, index: number) => (
+            <CollectionItem
+              key={`award-${index}`}
+              title={`Award ${index + 1}`}
+              removeLabel={`Remove award ${index + 1}`}
+              onRemove={() => removeArrayItem("awards", index)}
+            >
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Field id={`award-${index}-title`} label="Title" className="lg:col-span-2">
+                  <Input
+                    id={`award-${index}-title`}
+                    value={award.title}
+                    onChange={(event) =>
+                      updateArrayItem<AwardItem, "title">(
+                        "awards",
+                        index,
+                        "title",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+                <Field id={`award-${index}-issuer`} label="Issuer">
+                  <Input
+                    id={`award-${index}-issuer`}
+                    value={award.issuer}
+                    onChange={(event) =>
+                      updateArrayItem<AwardItem, "issuer">(
+                        "awards",
+                        index,
+                        "issuer",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+                <Field id={`award-${index}-date`} label="Date">
+                  <Input
+                    id={`award-${index}-date`}
+                    value={award.date}
+                    onChange={(event) =>
+                      updateArrayItem<AwardItem, "date">(
+                        "awards",
+                        index,
+                        "date",
+                        event.target.value
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+              <Field id={`award-${index}-description`} label="Description">
+                <Textarea
+                  id={`award-${index}-description`}
+                  rows={3}
+                  value={award.description}
+                  onChange={(event) =>
+                    updateArrayItem<AwardItem, "description">(
+                      "awards",
+                      index,
+                      "description",
+                      event.target.value
+                    )
+                  }
+                />
+              </Field>
+            </CollectionItem>
+          ))}
+        </CollectionCard>
+        )}
+
+        {section === "customSections" && (
+        <CollectionCard
+          title="Custom sections"
+          description="Add anything else you want to highlight on your profile."
+          addLabel="Add section"
+          onAdd={() => addArrayItem("customSections")}
+          empty={form.customSections.length === 0}
+        >
+          {form.customSections.map((section: CustomSection, index: number) => (
+            <CollectionItem
+              key={`section-${index}`}
+              title={`Section ${index + 1}`}
+              removeLabel={`Remove custom section ${index + 1}`}
+              onRemove={() => removeArrayItem("customSections", index)}
+            >
+              <Field id={`section-${index}-title`} label="Section title">
+                <Input
+                  id={`section-${index}-title`}
+                  value={section.title}
+                  onChange={(event) =>
+                    updateArrayItem<CustomSection, "title">(
+                      "customSections",
+                      index,
+                      "title",
+                      event.target.value
+                    )
+                  }
+                />
+              </Field>
+              <Field id={`section-${index}-body`} label="Section body">
+                <Textarea
+                  id={`section-${index}-body`}
+                  rows={3}
+                  value={section.body}
+                  onChange={(event) =>
+                    updateArrayItem<CustomSection, "body">(
+                      "customSections",
+                      index,
+                      "body",
+                      event.target.value
+                    )
+                  }
+                />
+              </Field>
+            </CollectionItem>
+          ))}
+        </CollectionCard>
+        )}
+
+        {saveError && (
+          <Alert variant="destructive" aria-live="assertive">
+            <CircleAlert aria-hidden="true" />
+            <AlertTitle>Couldn’t save profile</AlertTitle>
+            <AlertDescription>{saveError}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading} aria-busy={loading}>
+          {loading ? (
+            <>
+              <Loader2 aria-hidden="true" className="animate-spin" />
+              Saving…
+            </>
+          ) : (
+            <>
+              <Save aria-hidden="true" />
+              Save changes
+            </>
+          )}
+        </Button>
+      </div>
     </form>
   );
 }

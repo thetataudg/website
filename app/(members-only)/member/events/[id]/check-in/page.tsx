@@ -2,9 +2,40 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import { QrCode, Search, TriangleAlert, X } from "lucide-react";
+
 import LoadingState from "../../../../components/LoadingState";
+import {
+  PageContainer,
+  PageHeader,
+} from "../../../../components/shell/PageShell";
+import { EmptyState } from "../../../../components/shell/States";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Member = {
   _id: string;
@@ -296,132 +327,188 @@ function stopScanner() {
 
   if (!isSignedIn) {
     return (
-      <div className="container">
-        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>You must be logged into use this function.</h3>
-          <RedirectToSignIn />
-        </div>
-      </div>
+      <PageContainer className="max-w-2xl">
+        <Alert variant="destructive" role="alert">
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>
+            You must be logged in to use this function.
+          </AlertDescription>
+        </Alert>
+        <RedirectToSignIn />
+      </PageContainer>
     );
   }
 
   if (!isAdmin && !isHead) {
     return (
-      <div className="container">
-        <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>Only committee heads or admins can check in attendees.</h3>
-        </div>
-      </div>
+      <PageContainer className="max-w-2xl">
+        <Alert variant="destructive" role="alert">
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>
+            Only committee heads or admins can check in attendees.
+          </AlertDescription>
+        </Alert>
+      </PageContainer>
     );
   }
 
   if (event?.status && event.status !== "ongoing") {
     return (
-      <div className="container">
-        <div className="alert alert-warning d-flex align-items-center mt-5" role="alert">
-          <FontAwesomeIcon icon={faTimes} className="h2" />
-          <h3>Check-in is only available while the event is ongoing.</h3>
-        </div>
-      </div>
+      <PageContainer className="max-w-2xl">
+        <Alert variant="warning" role="alert">
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>
+            Check-in is only available while the event is ongoing.
+          </AlertDescription>
+        </Alert>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="member-dashboard checkin-page">
-      <section className="bento-card checkin-hero">
-        <div>
-          <div className="hero-eyebrow">Event Tools</div>
-          <h1 className="hero-title">Event Check-In</h1>
-          <p className="hero-subtitle">
-            {event?.name || "Check in attendees and track participation."}
+    <PageContainer className="max-w-5xl">
+      <PageHeader
+        eyebrow={
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Event Tools
           </p>
-        </div>
-        <div className="checkin-meta">
-          <span className="checkin-meta__label">Location</span>
-          <span>{event?.location || "TBD"}</span>
-          <span className="checkin-meta__label">Start</span>
-          <span>
-            {event?.startTime ? formatMstDateTime(event.startTime) : "TBD"}
-          </span>
-          {event?.status === "ongoing" && (isAdmin || isHead) && (
-            <button
-              className="btn btn-outline-danger btn-sm"
+        }
+        title="Event Check-In"
+        description={
+          event?.name || "Check in attendees and track participation."
+        }
+        actions={
+          event?.status === "ongoing" && (isAdmin || isHead) ? (
+            <Button
+              variant="outline"
+              className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={endEvent}
               disabled={endingEvent}
             >
-              {endingEvent ? "Ending..." : "End event"}
-            </button>
-          )}
-        </div>
-      </section>
+              {endingEvent ? "Ending…" : "End event"}
+            </Button>
+          ) : null
+        }
+      />
 
-      <div className="checkin-grid">
-        <div className="bento-card checkin-card">
-          <div className="checkin-card__header">
-            <h4>Scan QR Code</h4>
-          </div>
-          <video ref={videoRef} className="checkin-video" playsInline />
-          <div className="checkin-actions">
-            <button className="btn btn-primary" onClick={startScanner}>
-              Start Scanner
-            </button>
-            <button className="btn btn-outline-secondary" onClick={stopScanner}>
-              Stop
-            </button>
-          </div>
-          {status && <p className="checkin-status">{status}</p>}
+      <dl className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Location
+          </dt>
+          <dd className="m-0 text-sm text-foreground">
+            {event?.location || "TBD"}
+          </dd>
         </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Start
+          </dt>
+          <dd className="m-0 text-sm text-foreground">
+            {event?.startTime ? formatMstDateTime(event.startTime) : "TBD"}
+          </dd>
+        </div>
+      </dl>
 
-        <div className="bento-card checkin-card">
-          <div className="checkin-card__header">
-            <h4>Manual Check-In</h4>
-          </div>
-          <input
-            className="form-control checkin-input"
-            placeholder="Type a name or roll number"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {matches.length > 0 && (
-            <div className="list-group checkin-matches">
-              {matches.slice(0, 8).map((m) => (
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <QrCode aria-hidden="true" className="size-4" />
+              Scan QR Code
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <video
+              ref={videoRef}
+              playsInline
+              className="aspect-video w-full rounded-lg border border-border bg-muted object-cover"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={startScanner}>Start Scanner</Button>
+              <Button variant="outline" onClick={stopScanner}>
+                Stop
+              </Button>
+            </div>
+            <p aria-live="polite" className="m-0 text-sm text-muted-foreground empty:hidden">
+              {status}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Manual Check-In</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Icon, field, and clear button as flex siblings so the icon can
+              * never overlap the text — the house pattern for icon-in-field. */}
+            <div className="flex h-10 min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              <Search
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+              />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Type a name or roll number"
+                aria-label="Search members to check in"
+                className="m-0 h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {query ? (
                 <button
                   type="button"
-                  key={m._id}
-                  className="list-group-item list-group-item-action"
-                  onClick={() => {
-                    setPendingCheckIn(m);
-                  }}
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  {m.fName} {m.lName} (#{m.rollNo})
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
-              ))}
+              ) : null}
             </div>
-          )}
-        </div>
+
+            {matches.length > 0 && (
+              <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                {matches.slice(0, 8).map((m) => (
+                  <li key={m._id}>
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      onClick={() => {
+                        setPendingCheckIn(m);
+                      }}
+                    >
+                      {m.fName} {m.lName} (#{m.rollNo})
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <section className="bento-card checkin-attendees">
-        <div className="checkin-attendees__header">
-          <div>
-            <h4>Checked-In Attendees</h4>
-            <p className="text-muted">
-              Total checked in: {event?.attendees?.length || 0}
-            </p>
-          </div>
-        </div>
-        {event?.attendees?.length ? (
-          <div className="table-responsive">
-            <table className="table admin-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th className="text-end">Checked In At</th>
-                </tr>
-              </thead>
-              <tbody>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Checked-In Attendees</CardTitle>
+          <p className="m-0 text-sm text-muted-foreground">
+            Total checked in: {event?.attendees?.length || 0}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {event?.attendees?.length ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">Name</TableHead>
+                    <TableHead scope="col" className="text-right">
+                      Checked In At
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {event.attendees.map((entry: any) => {
                   const memberObj =
                     entry?.memberId &&
@@ -454,74 +541,63 @@ function stopScanner() {
                   const rollNo = memberObj?.rollNo || fallback?.rollNo || "";
                   const hasName = fName || lName || rollNo;
                   return (
-                    <tr key={key || entry.checkedInAt}>
-                      <td>
+                    <TableRow key={key || entry.checkedInAt}>
+                      <TableCell>
                         {hasName
                           ? `${fName} ${lName} ${rollNo ? `(#${rollNo})` : ""}`
                           : key
                           ? `Member ${key}`
                           : "Unknown member"}
-                      </td>
-                      <td className="text-end text-muted">
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
                         {entry?.checkedInAt
                           ? formatMstDateTime(entry.checkedInAt)
                           : ""}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-muted">No one checked in yet.</p>
-        )}
-      </section>
-
-      {pendingCheckIn && (
-        <div
-          className="modal fade show"
-          style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Check-In</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setPendingCheckIn(null)}
-                />
-              </div>
-              <div className="modal-body">
-                <p>
-                  Check in {pendingCheckIn.fName} {pendingCheckIn.lName} (#
-                  {pendingCheckIn.rollNo})?
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={() => setPendingCheckIn(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-primary"
-                  onClick={async () => {
-                    await manualCheckIn(pendingCheckIn._id);
-                    setPendingCheckIn(null);
-                  }}
-                >
-                  Confirm
-                </button>
-              </div>
+                </TableBody>
+              </Table>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          ) : (
+            <EmptyState
+              title="No one checked in yet"
+              description="Attendees appear here as they scan in or are added manually."
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog
+        open={!!pendingCheckIn}
+        onOpenChange={(next) => {
+          if (!next) setPendingCheckIn(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Check-In</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingCheckIn
+                ? `Check in ${pendingCheckIn.fName} ${pendingCheckIn.lName} (#${pendingCheckIn.rollNo})?`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!pendingCheckIn) return;
+                await manualCheckIn(pendingCheckIn._id);
+                setPendingCheckIn(null);
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
   );
 }
