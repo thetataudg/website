@@ -2,42 +2,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import InviteForm from "./InviteForm";
-import InvitationsList from "./InvitationsList";
+import { ShieldAlert } from "lucide-react";
 import type { Invitation } from "@clerk/clerk-sdk-node";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faTimes, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
-import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+
+import InviteForm from "./InviteForm";
+import InvitationsList from "./InvitationsList";
+import LoadingState from "../../../components/LoadingState";
+import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ClientInvitePanel() {
-
   const { isLoaded, isSignedIn } = useAuth();
+
+  const [invites, setInvites] = useState<Invitation[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // initial load
   useEffect(() => {
     loadInvites();
   }, []);
-
-  const [invites, setInvites] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  if (!isLoaded) {
-    return <LoadingState message="Loading invitations..." />;
-  }
-
-  if (!isSignedIn) {
-    return (
-        <div className="container">
-            <div className="alert alert-danger d-flex align-items-center mt-5" role="alert">
-            <FontAwesomeIcon icon={faTimes} className="h2" />
-            <h3>You must be logged into use this function.</h3>
-            <RedirectToSignIn />
-            </div>
-        </div>
-    );
-  }
 
   // load pending invites from our API
   async function loadInvites() {
@@ -63,20 +60,77 @@ export default function ClientInvitePanel() {
     await loadInvites();
   }
 
+  if (!isLoaded) {
+    return <LoadingState message="Loading invitations..." />;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <PageContainer>
+        <Alert variant="destructive" role="alert">
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Sign-in required</AlertTitle>
+          <AlertDescription>
+            You must be logged in to use this function. Redirecting you to sign
+            in&hellip;
+          </AlertDescription>
+        </Alert>
+        <RedirectToSignIn />
+      </PageContainer>
+    );
+  }
+
   return (
-    <div className="bento-card admin-table-card">
-      <div className="admin-members-header">
-        <h2>Invite Members</h2>
-      </div>
-      <InviteForm onSuccess={handleInviteSuccess} />
-      {loading ? (
-        <div className="text-center py-4 text-muted">
-          <LoadingSpinner size="sm" className="me-2" />
-          Loading...
-        </div>
-      ) : (
-        <InvitationsList invites={invites} onRevoke={handleRevoke} />
-      )}
-    </div>
+    <PageContainer className="max-w-7xl space-y-6">
+      <PageHeader
+        title="Invite members"
+        description="Send an account invitation and manage the ones already out."
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Send an invitation</CardTitle>
+          <CardDescription>
+            The recipient gets a link to create their chapter account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <InviteForm onSuccess={handleInviteSuccess} />
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b">
+          <CardTitle>Pending invitations</CardTitle>
+          <CardDescription>
+            {loading
+              ? "Loading invitations…"
+              : `${invites.length} invitation${
+                  invites.length === 1 ? "" : "s"
+                } sent.`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div
+              className="space-y-3 p-6"
+              role="status"
+              aria-busy="true"
+              aria-live="polite"
+            >
+              <span className="sr-only">Loading invitations…</span>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-4">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <InvitationsList invites={invites} onRevoke={handleRevoke} />
+          )}
+        </CardContent>
+      </Card>
+    </PageContainer>
   );
 }

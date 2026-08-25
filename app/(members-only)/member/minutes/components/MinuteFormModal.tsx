@@ -1,6 +1,30 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
+import { FileText, Loader2 } from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 export type EventOption = {
   _id: string;
@@ -28,6 +52,7 @@ type MinuteFormModalProps = {
   showFileInput?: boolean;
   initialValues?: MinuteFormValues;
   events?: EventOption[];
+  error?: string | null;
 };
 
 const blankValues: MinuteFormValues = {
@@ -37,6 +62,56 @@ const blankValues: MinuteFormValues = {
   quorumRequired: false,
   executiveSummary: "",
 };
+
+const NO_EVENT = "__none";
+
+const splitDateTime = (value: string) => {
+  const [date = "", time = ""] = value.split("T");
+  return {
+    date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "",
+    time: /^\d{2}:\d{2}/.test(time) ? time.slice(0, 5) : "",
+  };
+};
+
+function DateTimeField({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+  invalid,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  invalid: boolean;
+}) {
+  const parts = splitDateTime(value);
+  const update = (date: string, time: string) =>
+    onChange(date || time ? `${date}T${time}` : "");
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-foreground">{label}</legend>
+      {/* One control rather than a date box beside a time box: they set one
+        * value between them, and the picker already pairs them the way the
+        * rest of the site does. */}
+      <DateTimePicker
+        id={`${id}-when`}
+        value={parts.date || parts.time ? `${parts.date}T${parts.time}` : ""}
+        onChange={(next) => {
+          const [date = "", time = ""] = next.split("T");
+          update(date, time);
+        }}
+        disabled={disabled}
+        placeholder="Choose date"
+        className={invalid ? "[&>button]:border-destructive" : undefined}
+      />
+    </fieldset>
+  );
+}
 
 export default function MinuteFormModal({
   open,
@@ -48,6 +123,7 @@ export default function MinuteFormModal({
   showFileInput = false,
   initialValues,
   events,
+  error,
 }: MinuteFormModalProps) {
   const buildInitial = useCallback(
     () => ({
@@ -63,31 +139,23 @@ export default function MinuteFormModal({
   const [values, setValues] = useState<MinuteFormValues>(blankValues);
   const [file, setFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("");
-  const [selectedEventId, setSelectedEventId] = useState(initialValues?.eventId ?? "");
+  const [selectedEventId, setSelectedEventId] = useState(
+    initialValues?.eventId ?? ""
+  );
+  const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
     setValues(buildInitial());
     setFile(null);
     setSelectedFileName("");
     setSelectedEventId(initialValues?.eventId ?? "");
+    setValidationError("");
   }, [buildInitial, initialValues, open]);
 
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown, open]);
-
-  const handleChange = (field: keyof MinuteFormValues, value: string | boolean) => {
+  const handleChange = (
+    field: keyof MinuteFormValues,
+    value: string | boolean
+  ) => {
     setValues((current) => ({ ...current, [field]: value }));
   };
 
@@ -100,6 +168,13 @@ export default function MinuteFormModal({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (disabled) return;
+    const start = splitDateTime(values.startTime);
+    const end = splitDateTime(values.endTime);
+    if (!start.date || !start.time || !end.date || !end.time) {
+      setValidationError("Choose both a date and time for the meeting start and end.");
+      return;
+    }
+    setValidationError("");
     await Promise.resolve(
       onSubmit({
         ...values,
@@ -109,192 +184,173 @@ export default function MinuteFormModal({
     );
   };
 
-  if (!open) return null;
-
   return (
-    <div className="minutes-modal" role="presentation">
-      <div className="minutes-modal__backdrop" onClick={onClose} />
-      <div
-        className="minutes-modal__content"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="minutes-modal-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="minutes-modal__header">
-          <h2 id="minutes-modal-title" className="h5 mb-0">
-            {title}
-          </h2>
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-secondary minutes-modal__close"
-            aria-label="Close modal"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !disabled) onClose();
+      }}
+    >
+      <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-5 pr-12">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Add meeting details, an executive summary, and the official PDF record.
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="mb-3">
-            <label htmlFor="minute-start" className="form-label">
-              Meeting start
-            </label>
-            <input
+        <div className="space-y-5 overflow-y-auto px-6 py-5">
+          {error ? (
+            <Alert variant="destructive">
+              <AlertTitle>Minutes could not be saved</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <form id="minute-form" onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <DateTimeField
               id="minute-start"
-              type="datetime-local"
-              className="form-control"
+              label="Meeting start"
               value={values.startTime}
-              onChange={(e) => handleChange("startTime", e.target.value)}
+              onChange={(value) => handleChange("startTime", value)}
               disabled={disabled}
-              required
+              invalid={Boolean(validationError)}
             />
-          </div>
-
-          <div className="mb-3">
-            <label htmlFor="minute-end" className="form-label">
-              Meeting end
-            </label>
-            <input
+            <DateTimeField
               id="minute-end"
-              type="datetime-local"
-              className="form-control"
+              label="Meeting end"
               value={values.endTime}
-              onChange={(e) => handleChange("endTime", e.target.value)}
+              onChange={(value) => handleChange("endTime", value)}
+              disabled={disabled}
+              invalid={Boolean(validationError)}
+            />
+          </div>
+          {validationError ? (
+            <p
+              id="minute-time-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {validationError}
+            </p>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="minute-actives">Actives present</Label>
+              <Input
+                id="minute-actives"
+                type="number"
+                min={0}
+                value={values.activesPresent}
+                onChange={(event) =>
+                  handleChange("activesPresent", event.target.value)
+                }
+                disabled={disabled}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="minute-event">Linked event</Label>
+              <Select
+                value={selectedEventId || NO_EVENT}
+                onValueChange={(value) =>
+                  setSelectedEventId(value === NO_EVENT ? "" : value)
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="minute-event">
+                  <SelectValue placeholder="No linked event" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_EVENT}>No linked event</SelectItem>
+                  {events?.map((event) => (
+                    <SelectItem key={event._id} value={event._id}>
+                      {event.name} ·{" "}
+                      {new Intl.DateTimeFormat("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        timeZone: "America/Phoenix",
+                      }).format(new Date(event.startTime))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-lg border border-border p-4">
+            <Checkbox
+              id="minute-quorum"
+              checked={values.quorumRequired}
+              onCheckedChange={(checked) =>
+                handleChange("quorumRequired", checked === true)
+              }
+              disabled={disabled}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="minute-quorum">Quorum was required</Label>
+              <p className="text-sm text-muted-foreground">
+                Record whether this meeting required quorum for chapter business.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="minute-summary">Executive summary</Label>
+            <Textarea
+              id="minute-summary"
+              rows={5}
+              value={values.executiveSummary}
+              onChange={(event) =>
+                handleChange("executiveSummary", event.target.value)
+              }
               disabled={disabled}
               required
+              placeholder="Summarize decisions, votes, announcements, and follow-up items."
             />
           </div>
 
-          <div className="mb-3">
-            <label htmlFor="minute-actives" className="form-label">
-              Actives present
-            </label>
-            <input
-              id="minute-actives"
-              type="number"
-              min={0}
-              className="form-control"
-              value={values.activesPresent}
-              onChange={(e) => handleChange("activesPresent", e.target.value)}
-              disabled={disabled}
-              required
-            />
-          </div>
-
-          <div className="mb-3">
-            <p className="form-label mb-1">Was quorum required?</p>
-            <div className="form-check form-check-inline">
-              <input
-                className="form-check-input"
-                type="radio"
-                name="quorum"
-                id="quorum-yes"
-                checked={values.quorumRequired === true}
-                onChange={() => handleChange("quorumRequired", true)}
-                disabled={disabled}
-              />
-              <label className="form-check-label" htmlFor="quorum-yes">
-                Yes
-              </label>
-            </div>
-            <div className="form-check form-check-inline">
-              <input
-                className="form-check-input"
-                type="radio"
-                name="quorum"
-                id="quorum-no"
-                checked={values.quorumRequired === false}
-                onChange={() => handleChange("quorumRequired", false)}
-                disabled={disabled}
-              />
-              <label className="form-check-label" htmlFor="quorum-no">
-                No
-              </label>
-            </div>
-          </div>
-
-          {showFileInput && (
-            <div className="mb-3">
-              <label htmlFor="minute-file" className="form-label">
-                Upload minutes (PDF)
-              </label>
-              <input
+          {showFileInput ? (
+            <div className="space-y-2">
+              <Label htmlFor="minute-file">Minutes PDF</Label>
+              <Input
                 id="minute-file"
                 type="file"
                 accept="application/pdf"
-                className="form-control"
                 onChange={handleFileChange}
                 disabled={disabled}
               />
-              <p className="form-text text-muted mb-0">
-                Max file size 20 MB. PDF only.
+              <p className="text-sm text-muted-foreground">
+                PDF only, up to 20 MB.
               </p>
-              {selectedFileName && (
-                <p className="form-text small text-truncate mb-0">
-                  Selected file: {selectedFileName}
-                </p>
-              )}
+              {selectedFileName ? (
+                <div className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-foreground">
+                  <FileText className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{selectedFileName}</span>
+                </div>
+              ) : null}
             </div>
-          )}
+          ) : null}
+          </form>
+        </div>
 
-          <div className="mb-3">
-            <label htmlFor="minute-summary" className="form-label">
-              Executive summary
-            </label>
-            <textarea
-              id="minute-summary"
-              className="form-control"
-              rows={4}
-              value={values.executiveSummary}
-              onChange={(e) => handleChange("executiveSummary", e.target.value)}
-              disabled={disabled}
-              required
-            />
-          </div>
-
-          <div className="mb-3">
-            <label htmlFor="minute-event" className="form-label">
-              Link to event (optional)
-            </label>
-            <select
-              id="minute-event"
-              className="form-select"
-              value={selectedEventId}
-              onChange={(event) => {
-                setSelectedEventId(event.target.value);
-              }}
-              disabled={disabled}
-            >
-              <option value="">Select an event</option>
-              {events?.map((event) => (
-                <option key={event._id} value={event._id}>
-                  {event.name} –{" "}
-                  {new Intl.DateTimeFormat("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    timeZone: "America/Phoenix",
-                  }).format(new Date(event.startTime))}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="d-flex justify-content-end gap-2 mt-4">
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={onClose}
-              disabled={disabled}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={disabled}>
-              {submitLabel}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <DialogFooter className="border-t border-border bg-muted/30 px-6 py-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={disabled}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" form="minute-form" disabled={disabled}>
+            {disabled ? <Loader2 className="size-4 animate-spin" /> : null}
+            {disabled ? "Saving…" : submitLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,9 +1,37 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark, faPaperclip, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { CircleAlert, Paperclip, Trash2 } from "lucide-react";
+
 import { LoadingSpinner } from "../../components/LoadingState";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Attachment,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const CATEGORIES = [
   { value: "rush", label: "Rush" },
@@ -97,63 +125,49 @@ export default function SubmitReimbursementModal({
   }
 
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !saving && !uploading) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-        onClick={(event) => event.stopPropagation()}
+      <DialogContent
+        className="grid max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+        /* No backdrop dismissal mid-claim: an upload may be in flight. */
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <form className="modal-content" onSubmit={submit}>
-          <div className="modal-header">
-            <h5 className="modal-title">Claim a reimbursement</h5>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
+        <DialogHeader className="border-b border-border px-6 py-5 pr-12 text-left">
+          <DialogTitle>Claim a reimbursement</DialogTitle>
+          <DialogDescription>
+            For money you spent on the chapter&apos;s behalf. Once approved it
+            comes off what you owe. If you owe nothing, it&apos;s
+            held as credit against your next dues.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="modal-body">
-            <p className="text-muted small mb-3">
-              For money you spent on the chapter&apos;s behalf. Once approved it
-              comes off what you owe &mdash; and if you owe nothing, it&apos;s
-              held as credit against your next dues.
-            </p>
-
-            <div className="mb-3">
-              <label className="form-label" htmlFor="reimb-amount">
-                How much did you spend?
-              </label>
-              <div className="input-group">
-                <span className="input-group-text">$</span>
-                <input
-                  id="reimb-amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className="form-control"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  required
-                />
-              </div>
+        <form
+          onSubmit={submit}
+          className="contents"
+          id="reimbursement-form"
+        >
+          <div className="space-y-4 overflow-y-auto px-6 py-5">
+            <div className="space-y-1.5">
+              <Label htmlFor="reimb-amount">How much did you spend?</Label>
+              <CurrencyInput
+                id="reimb-amount"
+                step="0.01"
+                min="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                required
+              />
             </div>
 
-            <div className="mb-3">
-              <label className="form-label" htmlFor="reimb-what">
-                What was it for?
-              </label>
-              <input
+            <div className="space-y-1.5">
+              <Label htmlFor="reimb-what">What was it for?</Label>
+              <Input
                 id="reimb-what"
                 type="text"
-                className="form-control"
                 placeholder="Pizza for rush night"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -162,111 +176,126 @@ export default function SubmitReimbursementModal({
               />
             </div>
 
-            <div className="row g-3 mb-3">
-              <div className="col-sm-6">
-                <label className="form-label" htmlFor="reimb-category">
-                  Category
-                </label>
-                <select
-                  id="reimb-category"
-                  className="form-select"
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                >
-                  {CATEGORIES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="reimb-category">Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger id="reimb-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="col-sm-6">
-                <label className="form-label" htmlFor="reimb-date">
-                  When you bought it
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="reimb-date">When you bought it</Label>
+                <DatePicker
                   id="reimb-date"
-                  type="date"
-                  className="form-control"
                   value={purchasedOn}
-                  max={todayLocal()}
-                  onChange={(event) => setPurchasedOn(event.target.value)}
-                  required
+                  maxDate={new Date()}
+                  onChange={setPurchasedOn}
+                  placeholder="Choose the day"
                 />
               </div>
             </div>
 
-            <div className="mb-1">
-              <label className="form-label">
-                Receipts <span className="text-muted">(optional, but they get approved faster)</span>
-              </label>
+            <div className="space-y-2">
+              <Label asChild>
+                <p>
+                  Receipts{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (optional, but they get approved faster)
+                  </span>
+                </p>
+              </Label>
+
               {receipts.length > 0 && (
-                <ul className="list-group mb-2">
+                <ul className="space-y-2">
                   {receipts.map((receipt) => (
-                    <li
-                      key={receipt.url}
-                      className="list-group-item d-flex justify-content-between align-items-center py-2"
-                    >
-                      <span className="small text-truncate">{receipt.name}</span>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-link text-danger p-0"
-                        onClick={() =>
-                          setReceipts((current) =>
-                            current.filter((item) => item.url !== receipt.url)
-                          )
-                        }
-                        aria-label={`Remove ${receipt.name}`}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
+                    <li key={receipt.url}>
+                      <Attachment>
+                        <AttachmentMedia>
+                          <Paperclip aria-hidden="true" />
+                        </AttachmentMedia>
+                        <AttachmentContent>
+                          <AttachmentTitle>{receipt.name}</AttachmentTitle>
+                        </AttachmentContent>
+                        <AttachmentActions>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() =>
+                              setReceipts((current) =>
+                                current.filter(
+                                  (item) => item.url !== receipt.url
+                                )
+                              )
+                            }
+                            aria-label={`Remove ${receipt.name}`}
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </Button>
+                        </AttachmentActions>
+                      </Attachment>
                     </li>
                   ))}
                 </ul>
               )}
+
               <input
                 ref={fileInput}
                 type="file"
-                className="d-none"
+                className="sr-only"
                 accept="image/*,.pdf"
                 onChange={attach}
               />
-              <button
+              <Button
                 type="button"
-                className="btn btn-outline-secondary btn-sm"
+                variant="outline"
+                size="sm"
                 onClick={() => fileInput.current?.click()}
                 disabled={uploading || receipts.length >= 8}
               >
                 {uploading ? (
                   <LoadingSpinner size="sm" />
                 ) : (
-                  <>
-                    <FontAwesomeIcon icon={faPaperclip} className="me-1" />
-                    Attach a receipt
-                  </>
+                  <Paperclip aria-hidden="true" />
                 )}
-              </button>
+                {uploading ? "Uploading…" : "Attach a receipt"}
+              </Button>
             </div>
 
             {error && (
-              <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>
+              <Alert variant="destructive" role="alert">
+                <CircleAlert aria-hidden="true" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={invalid || saving || uploading}
+          <DialogFooter className="gap-2 border-t border-border px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={saving}
             >
-              {saving ? <LoadingSpinner size="sm" /> : "Send to the treasurer"}
-            </button>
-          </div>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={invalid || saving || uploading}>
+              {saving && <LoadingSpinner size="sm" />}
+              {saving ? "Sending…" : "Send to the treasurer"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

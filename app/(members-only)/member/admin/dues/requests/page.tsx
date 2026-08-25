@@ -1,13 +1,74 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faCircleCheck,
-  faInbox,
-  faTriangleExclamation,
-} from "@fortawesome/free-solid-svg-icons";
+import { CircleCheck, Inbox, TriangleAlert } from "lucide-react";
+
 import LoadingState from "../../../../components/LoadingState";
+import { PageContainer, PageHeader } from "../../../../components/shell/PageShell";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+/** Waiting-time badge: red past a week, amber past three days. */
+function AgeBadge({ days }: { days: number }) {
+  return (
+    <Badge
+      variant={days >= 7 ? "destructive" : days >= 3 ? "warning" : "muted"}
+    >
+      {days}d
+    </Badge>
+  );
+}
+
+/** Shared zero-state for all three queues. */
+function QueueEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+      <div className="rounded-full bg-muted p-3">
+        <Inbox className="size-5 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
+}
+
+/** One count in a queue summary. Renders <dt>/<dd> — wrap in a <dl>. */
+function QueueTile({
+  label,
+  value,
+  danger,
+}: {
+  label: string;
+  value: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "mt-1 text-xl font-semibold tabular-nums",
+          danger ? "text-destructive" : "text-foreground"
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
 import VerifyPaymentModal, { QueuedSubmission } from "./VerifyPaymentModal";
 import ReviewReimbursementModal, {
   QueuedReimbursement,
@@ -50,7 +111,7 @@ function money(cents: number) {
 }
 
 function dayLabel(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "Not set";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -100,12 +161,17 @@ export default function DuesRequestsPage() {
 
   if (error || !data) {
     return (
-      <div className="container py-4">
-        <div className="alert alert-danger">{error || "Couldn't load the queue"}</div>
-        <button className="btn btn-outline-secondary" onClick={() => load()}>
+      <PageContainer className="max-w-7xl space-y-4">
+        <Alert variant="destructive" role="alert">
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>
+            {error || "Couldn't load the queue"}
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={() => load()}>
           Try again
-        </button>
-      </div>
+        </Button>
+      </PageContainer>
     );
   }
 
@@ -124,179 +190,162 @@ export default function DuesRequestsPage() {
   };
 
   return (
-    <div className="container py-4" style={{ maxWidth: 960 }}>
-      <h1 className="h4 mb-1">Requests</h1>
-      <p className="text-muted">
-        Payments members have reported, waiting on you.
-      </p>
+    <PageContainer className="max-w-7xl space-y-6">
+      <PageHeader
+        title="Requests"
+        description="Payments members have reported, waiting on you."
+      />
 
-      {flash && (
-        <div className="alert alert-success d-flex align-items-center gap-2">
-          <FontAwesomeIcon icon={faCircleCheck} />
-          <span>{flash}</span>
-        </div>
-      )}
-
-      <ul className="nav nav-tabs mb-4">
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "payments" ? "active" : ""}`}
-            onClick={() => setTab("payments")}
-          >
-            Payments
-            {totals.pendingCount > 0 && (
-              <span className="badge bg-primary ms-2">{totals.pendingCount}</span>
-            )}
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "reimbursements" ? "active" : ""}`}
-            onClick={() => setTab("reimbursements")}
-          >
-            Reimbursements
-            {claimTotals.pendingCount > 0 && (
-              <span className="badge bg-primary ms-2">
-                {claimTotals.pendingCount}
-              </span>
-            )}
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "plans" ? "active" : ""}`}
-            onClick={() => setTab("plans")}
-          >
-            Payment plans
-            {planTotals.pendingCount > 0 && (
-              <span className="badge bg-primary ms-2">
-                {planTotals.pendingCount}
-              </span>
-            )}
-          </button>
-        </li>
-      </ul>
-
-      {tab === "plans" ? (
-        <PlanList rows={plans?.plans ?? []} onReview={setReviewingPlan} />
-      ) : tab === "reimbursements" ? (
-        <ReimbursementList
-          rows={claims?.reimbursements ?? []}
-          onReview={setReviewingClaim}
-        />
-      ) : (
-      <>
-      <div className="row g-3 mb-4">
-        <div className="col-sm-4">
-          <div className="card h-100">
-            <div className="card-body">
-              <div className="text-muted small text-uppercase">Waiting</div>
-              <div className="fs-4 fw-semibold">{totals.pendingCount}</div>
-            </div>
-          </div>
-        </div>
-        <div className="col-sm-4">
-          <div className="card h-100">
-            <div className="card-body">
-              <div className="text-muted small text-uppercase">Unconfirmed</div>
-              <div className="fs-4 fw-semibold">{money(totals.pendingCents)}</div>
-            </div>
-          </div>
-        </div>
-        <div className="col-sm-4">
-          <div className="card h-100">
-            <div className="card-body">
-              <div className="text-muted small text-uppercase">Oldest</div>
-              <div
-                className={`fs-4 fw-semibold ${totals.oldestPendingDays >= 7 ? "text-danger" : ""}`}
-              >
-                {totals.oldestPendingDays}d
-              </div>
-            </div>
-          </div>
-        </div>
+      <div aria-live="polite" className="empty:hidden">
+        {flash && (
+          <Alert variant="success">
+            <CircleCheck aria-hidden="true" />
+            <AlertDescription>{flash}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
-      {totals.oldestPendingDays >= 7 && (
-        <div className="alert alert-warning d-flex align-items-start gap-2">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="mt-1" />
-          <div>
-            Something has been waiting {totals.oldestPendingDays} days. Nobody is
-            marked late while their claim sits here, but they also can&apos;t see
-            their balance clear.
-          </div>
-        </div>
-      )}
+      {/* Was a Bootstrap nav-tabs list of buttons with no tab semantics. */}
+      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+        <TabsList className="h-auto flex-wrap">
+          <TabsTrigger value="payments" className="gap-2">
+            Payments
+            {totals.pendingCount > 0 && (
+              <Badge variant="secondary">{totals.pendingCount}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="reimbursements" className="gap-2">
+            Reimbursements
+            {claimTotals.pendingCount > 0 && (
+              <Badge variant="secondary">{claimTotals.pendingCount}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="plans" className="gap-2">
+            Payment plans
+            {planTotals.pendingCount > 0 && (
+              <Badge variant="secondary">{planTotals.pendingCount}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {submissions.length === 0 ? (
-        <div className="text-center text-muted py-5">
-          <FontAwesomeIcon icon={faInbox} size="2x" className="mb-3 d-block mx-auto" />
-          Nothing waiting. The queue is clear.
-        </div>
-      ) : (
-        <div className="table-responsive">
-          <table className="table align-middle">
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Charge</th>
-                <th>Paid on</th>
-                <th className="text-end">Amount</th>
-                <th>Waiting</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {submissions.map((submission) => (
-                <tr key={submission._id}>
-                  <td>
-                    <div className="fw-semibold">
-                      {submission.member
-                        ? `${submission.member.fName} ${submission.member.lName}`
-                        : "Unknown"}
-                    </div>
-                    <div className="small text-muted">
-                      #{submission.member?.rollNo ?? "—"}
-                    </div>
-                  </td>
-                  <td>
-                    <div>{submission.charge?.description ?? "—"}</div>
-                    <div className="small text-muted">
-                      {submission.charge?.term}
-                      {submission.reference && ` · ${submission.reference}`}
-                    </div>
-                  </td>
-                  <td>
-                    <div>{dayLabel(submission.paidOn)}</div>
-                    <div className="small text-muted">{submission.method}</div>
-                  </td>
-                  <td className="text-end fw-semibold">
-                    {money(submission.amountCents)}
-                  </td>
-                  <td>
-                    <span
-                      className={`badge ${submission.ageDays >= 7 ? "bg-danger" : submission.ageDays >= 3 ? "bg-warning text-dark" : "bg-secondary"}`}
-                    >
-                      {submission.ageDays}d
-                    </span>
-                  </td>
-                  <td className="text-end">
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => setReviewing(submission)}
-                    >
-                      Review
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        <TabsContent value="payments" className="mt-6 space-y-6">
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <QueueTile label="Waiting" value={totals.pendingCount} />
+            <QueueTile label="Unconfirmed" value={money(totals.pendingCents)} />
+            <QueueTile
+              label="Oldest"
+              value={`${totals.oldestPendingDays}d`}
+              danger={totals.oldestPendingDays >= 7}
+            />
+          </dl>
 
-      </>
-      )}
+          {totals.oldestPendingDays >= 7 && (
+            <Alert variant="warning">
+              <TriangleAlert aria-hidden="true" />
+              <AlertDescription>
+                Something has been waiting {totals.oldestPendingDays} days.
+                Nobody is marked late while their claim sits here, but they also
+                can&apos;t see their balance clear.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {submissions.length === 0 ? (
+                <QueueEmpty message="Nothing waiting. The queue is clear." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-6">Member</TableHead>
+                        <TableHead>Charge</TableHead>
+                        <TableHead>Paid on</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Waiting</TableHead>
+                        <TableHead className="pr-6">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {submissions.map((submission) => (
+                        <TableRow key={submission._id}>
+                          <TableCell className="pl-6">
+                            <p className="font-semibold text-foreground">
+                              {submission.member
+                                ? `${submission.member.fName} ${submission.member.lName}`
+                                : "Unknown"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              #{submission.member?.rollNo ?? "Unknown"}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-sm">
+                              {submission.charge?.description ?? "Unknown charge"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {submission.charge?.term}
+                              {submission.reference &&
+                                ` · ${submission.reference}`}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-sm">
+                              {dayLabel(submission.paidOn)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {submission.method}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">
+                            {money(submission.amountCents)}
+                          </TableCell>
+                          <TableCell>
+                            <AgeBadge days={submission.ageDays} />
+                          </TableCell>
+                          <TableCell className="pr-6 text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => setReviewing(submission)}
+                            >
+                              Review
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reimbursements" className="mt-6">
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <ReimbursementList
+                rows={claims?.reimbursements ?? []}
+                onReview={setReviewingClaim}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="plans" className="mt-6">
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <PlanList
+                rows={plans?.plans ?? []}
+                onReview={setReviewingPlan}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {reviewingPlan && (
         <ReviewPlanModal
@@ -333,7 +382,7 @@ export default function DuesRequestsPage() {
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -345,73 +394,63 @@ function ReimbursementList({
   onReview: (claim: QueuedReimbursement) => void;
 }) {
   if (rows.length === 0) {
-    return (
-      <div className="text-center text-muted py-5">
-        <FontAwesomeIcon icon={faInbox} size="2x" className="mb-3 d-block mx-auto" />
-        No claims waiting.
-      </div>
-    );
+    return <QueueEmpty message="No claims waiting." />;
   }
 
   return (
-    <div className="table-responsive">
-      <table className="table align-middle">
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>What for</th>
-            <th>Receipts</th>
-            <th className="text-end">Amount</th>
-            <th>Waiting</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="pl-6">Member</TableHead>
+            <TableHead>What for</TableHead>
+            <TableHead>Receipts</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>Waiting</TableHead>
+            <TableHead className="pr-6">
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((claim) => (
-            <tr key={claim._id}>
-              <td>
-                <div className="fw-semibold">
+            <TableRow key={claim._id}>
+              <TableCell className="pl-6">
+                <p className="font-semibold text-foreground">
                   {claim.member
                     ? `${claim.member.fName} ${claim.member.lName}`
                     : "Unknown"}
-                </div>
-                <div className="small text-muted">
+                </p>
+                <p className="text-xs text-muted-foreground">
                   #{claim.member?.rollNo ?? "\u2014"}
-                </div>
-              </td>
-              <td>
-                <div>{claim.description}</div>
-                <div className="small text-muted">{claim.category}</div>
-              </td>
-              <td>
+                </p>
+              </TableCell>
+              <TableCell>
+                <p className="text-sm">{claim.description}</p>
+                <p className="text-xs text-muted-foreground">{claim.category}</p>
+              </TableCell>
+              <TableCell>
                 {claim.receiptUrls.length > 0 ? (
-                  <span className="badge bg-secondary">
-                    {claim.receiptUrls.length}
-                  </span>
+                  <Badge variant="muted">{claim.receiptUrls.length}</Badge>
                 ) : (
-                  <span className="badge bg-warning text-dark">none</span>
+                  <Badge variant="warning">none</Badge>
                 )}
-              </td>
-              <td className="text-end fw-semibold">{money(claim.amountCents)}</td>
-              <td>
-                <span
-                  className={`badge ${claim.ageDays >= 7 ? "bg-danger" : claim.ageDays >= 3 ? "bg-warning text-dark" : "bg-secondary"}`}
-                >
-                  {claim.ageDays}d
-                </span>
-              </td>
-              <td className="text-end">
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => onReview(claim)}
-                >
+              </TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">
+                {money(claim.amountCents)}
+              </TableCell>
+              <TableCell>
+                <AgeBadge days={claim.ageDays} />
+              </TableCell>
+              <TableCell className="pr-6 text-right">
+                <Button size="sm" onClick={() => onReview(claim)}>
                   Review
-                </button>
-              </td>
-            </tr>
+                </Button>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -429,78 +468,70 @@ function PlanList({
   onReview: (plan: QueuedPlan) => void;
 }) {
   if (rows.length === 0) {
-    return (
-      <div className="text-center text-muted py-5">
-        <FontAwesomeIcon icon={faInbox} size="2x" className="mb-3 d-block mx-auto" />
-        No plan requests waiting.
-      </div>
-    );
+    return <QueueEmpty message="No plan requests waiting." />;
   }
 
   return (
-    <div className="table-responsive">
-      <table className="table align-middle">
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>Asked for</th>
-            <th>Filed against</th>
-            <th className="text-end">Per month</th>
-            <th>Waiting</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="pl-6">Member</TableHead>
+            <TableHead>Asked for</TableHead>
+            <TableHead>Filed against</TableHead>
+            <TableHead className="text-right">Per month</TableHead>
+            <TableHead>Waiting</TableHead>
+            <TableHead className="pr-6">
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((plan) => (
-            <tr key={plan._id}>
-              <td>
-                <div className="fw-semibold">
+            <TableRow key={plan._id}>
+              <TableCell className="pl-6">
+                <p className="font-semibold text-foreground">
                   {plan.member
                     ? `${plan.member.fName} ${plan.member.lName}`
                     : "Unknown"}
-                </div>
-                <div className="small text-muted">
+                </p>
+                <p className="text-xs text-muted-foreground">
                   #{plan.member?.rollNo ?? "\u2014"}
-                </div>
-              </td>
-              <td>
-                <div>
+                </p>
+              </TableCell>
+              <TableCell>
+                <p className="text-sm">
                   {money(plan.totalCents)} over {plan.installmentCount} months
-                </div>
+                </p>
                 {plan.requestNote && (
-                  <div className="small text-muted text-truncate" style={{ maxWidth: 260 }}>
+                  <p className="max-w-[16rem] truncate text-xs text-muted-foreground">
                     {plan.requestNote}
-                  </div>
+                  </p>
                 )}
-              </td>
-              <td>
-                <div>{dayLabel(plan.proposedAgainstDueDate)}</div>
-                <div className="small text-muted">
+              </TableCell>
+              <TableCell>
+                <p className="text-sm">
+                  {dayLabel(plan.proposedAgainstDueDate)}
+                </p>
+                <p className="text-xs text-muted-foreground">
                   filed {dayLabel(plan.proposedAt)}
-                </div>
-              </td>
-              <td className="text-end fw-semibold">
+                </p>
+              </TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">
                 {money(plan.installments[0]?.amountCents ?? 0)}
-              </td>
-              <td>
-                <span
-                  className={`badge ${plan.ageDays >= 7 ? "bg-danger" : plan.ageDays >= 3 ? "bg-warning text-dark" : "bg-secondary"}`}
-                >
-                  {plan.ageDays}d
-                </span>
-              </td>
-              <td className="text-end">
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => onReview(plan)}
-                >
+              </TableCell>
+              <TableCell>
+                <AgeBadge days={plan.ageDays} />
+              </TableCell>
+              <TableCell className="pr-6 text-right">
+                <Button size="sm" onClick={() => onReview(plan)}>
                   Review
-                </button>
-              </td>
-            </tr>
+                </Button>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

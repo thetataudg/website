@@ -1,9 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { CircleAlert } from "lucide-react";
+
 import { LoadingSpinner } from "../../../components/LoadingState";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const METHODS = [
   { value: "venmo", label: "Venmo" },
@@ -72,108 +92,106 @@ export default function PayOutCreditModal({
   }
 
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !saving) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-dialog-centered"
-        onClick={(event) => event.stopPropagation()}
+      <DialogContent
+        className="w-[calc(100%-2rem)] max-w-md"
+        /* No backdrop dismissal while recording money. */
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <form className="modal-content" onSubmit={submit}>
-          <div className="modal-header">
-            <h5 className="modal-title">Pay out credit</h5>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
+        <DialogHeader>
+          <DialogTitle>Pay out credit</DialogTitle>
+          <DialogDescription>
+            The chapter owes <strong className="font-semibold text-foreground">{member.name}</strong>{" "}
+            #{member.rollNo} {money(member.creditCents)}. Record it here once
+            you&apos;ve actually sent the money. This doesn&apos;t move any
+            funds.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="modal-body">
-            <p className="text-muted small mb-3">
-              The chapter owes <strong>{member.name}</strong> #{member.rollNo}{" "}
-              {money(member.creditCents)}. Record it here once you&apos;ve
-              actually sent the money &mdash; this doesn&apos;t move any funds.
-            </p>
-
-            <div className="mb-3">
-              <label className="form-label" htmlFor="payout-amount">
-                Amount
-              </label>
-              <div className="input-group">
-                <span className="input-group-text">$</span>
-                <input
-                  id="payout-amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className="form-control"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  required
-                />
-              </div>
-              {tooMuch && (
-                <div className="form-text text-danger">
-                  That&apos;s more than the {money(member.creditCents)} owed.
-                </div>
-              )}
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label" htmlFor="payout-method">
-                How did you send it?
-              </label>
-              <select
-                id="payout-method"
-                className="form-select"
-                value={method}
-                onChange={(event) => setMethod(event.target.value)}
-              >
-                {METHODS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-1">
-              <label className="form-label" htmlFor="payout-reference">
-                Reference <span className="text-muted">(optional)</span>
-              </label>
-              <input
-                id="payout-reference"
-                type="text"
-                className="form-control"
-                placeholder="@their-venmo, check #118"
-                value={reference}
-                onChange={(event) => setReference(event.target.value)}
-                maxLength={200}
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="payout-amount">Amount</Label>
+            <CurrencyInput
+                id="payout-amount"
+                step="0.01"
+                min="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                required
+                aria-invalid={tooMuch || undefined}
+                aria-describedby={tooMuch ? "payout-amount-error" : undefined}
               />
-            </div>
-
-            {error && (
-              <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>
+            {tooMuch && (
+              <p
+                id="payout-amount-error"
+                className="text-xs font-medium text-destructive"
+              >
+                That&apos;s more than the {money(member.creditCents)} owed.
+              </p>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={invalid || saving}>
-              {saving ? <LoadingSpinner size="sm" /> : "Record payout"}
-            </button>
+          <div className="space-y-1.5">
+            <Label htmlFor="payout-method">How did you send it?</Label>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger id="payout-method">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {METHODS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="payout-reference">
+              Reference{" "}
+              <span className="font-normal text-muted-foreground">
+                (optional)
+              </span>
+            </Label>
+            <Input
+              id="payout-reference"
+              type="text"
+              placeholder="@their-venmo, check #118"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              maxLength={200}
+            />
+          </div>
+
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={invalid || saving}>
+              {saving && <LoadingSpinner size="sm" />}
+              {saving ? "Recording…" : "Record payout"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

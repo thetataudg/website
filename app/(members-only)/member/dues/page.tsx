@@ -2,15 +2,40 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faCalendarDays,
-  faCircleCheck,
-  faClock,
-  faReceipt,
-  faTriangleExclamation,
-} from "@fortawesome/free-solid-svg-icons";
+  CalendarDays,
+  CircleAlert,
+  CircleCheck,
+  Clock,
+  History,
+  Receipt,
+  TriangleAlert,
+} from "lucide-react";
+
 import LoadingState from "../../components/LoadingState";
+import { PageContainer, PageHeader, SectionHeader } from "../../components/shell/PageShell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Progress } from "@/components/ui/progress";
 import MarkAsPaidModal, { PayableCharge } from "./MarkAsPaidModal";
 import SubmitReimbursementModal from "./SubmitReimbursementModal";
 import RequestPlanModal from "./RequestPlanModal";
@@ -123,17 +148,20 @@ function dayLabel(iso: string | null) {
   });
 }
 
-const INSTALLMENT_BADGES: Record<string, { className: string; label: string }> = {
-  paid: { className: "bg-success", label: "Paid" },
-  due: { className: "bg-primary", label: "Due" },
-  late: { className: "bg-danger", label: "Late" },
-  waived: { className: "bg-secondary", label: "Waived" },
-  upcoming: { className: "bg-light text-dark border", label: "Upcoming" },
+const INSTALLMENT_BADGES: Record<
+  string,
+  { variant: "default" | "secondary" | "destructive" | "outline" | "success" | "muted"; label: string }
+> = {
+  paid: { variant: "success", label: "Paid" },
+  due: { variant: "default", label: "Due" },
+  late: { variant: "destructive", label: "Late" },
+  waived: { variant: "secondary", label: "Waived" },
+  upcoming: { variant: "outline", label: "Upcoming" },
 };
 
 function InstallmentBadge({ status }: { status: string }) {
   const badge = INSTALLMENT_BADGES[status] ?? INSTALLMENT_BADGES.upcoming;
-  return <span className={`badge ${badge.className}`}>{badge.label}</span>;
+  return <Badge variant={badge.variant}>{badge.label}</Badge>;
 }
 
 export default function DuesPage() {
@@ -146,6 +174,11 @@ export default function DuesPage() {
   const [planning, setPlanning] = useState(false);
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
+  /// A payment report the member is taking back. Only ever a pending one —
+  /// once an officer has answered it, the answer is part of the record.
+  const [withdrawing, setWithdrawing] = useState<Submission | null>(null);
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -179,18 +212,45 @@ export default function DuesPage() {
     if (isLoaded && isSignedIn) load();
   }, [isLoaded, isSignedIn, load]);
 
+  async function withdrawClaim(submission: Submission) {
+    setWithdrawBusy(true);
+    setWithdrawError(null);
+    try {
+      const res = await fetch(`/api/dues/submissions/${submission._id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "That claim could not be withdrawn");
+      }
+      await load();
+      setWithdrawing(null);
+      setFlash("Payment report withdrawn.");
+    } catch (err: any) {
+      setWithdrawError(err.message || "That claim could not be withdrawn");
+    } finally {
+      setWithdrawBusy(false);
+    }
+  }
+
   if (!isLoaded) return <LoadingState message="Loading..." />;
   if (!isSignedIn) return <RedirectToSignIn />;
   if (loading) return <LoadingState message="Loading your dues..." />;
 
   if (error || !data) {
     return (
-      <main className="container py-4">
-        <div className="alert alert-danger">{error || "Couldn't load your dues"}</div>
-        <button className="btn btn-outline-secondary" onClick={() => load()}>
+      <PageContainer className="max-w-3xl space-y-4">
+        <Alert variant="destructive" role="alert">
+          <CircleAlert aria-hidden="true" />
+          <AlertTitle>Couldn&apos;t load your dues</AlertTitle>
+          <AlertDescription>
+            {error || "Couldn't load your dues"}
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={() => load()}>
           Try again
-        </button>
-      </main>
+        </Button>
+      </PageContainer>
     );
   }
 
@@ -260,27 +320,39 @@ export default function DuesPage() {
     !data.awaitingReview;
 
   return (
-    <main className="container py-4" style={{ maxWidth: 840 }}>
-      <h1 className="h3 mb-1">Dues</h1>
-      <p className="text-muted mb-4">Your balance with the chapter.</p>
+    <PageContainer className="max-w-3xl">
+      <PageHeader title="Dues" description="Your balance with the chapter." />
 
-      {flash && (
-        <div className="alert alert-success d-flex align-items-center gap-2">
-          <FontAwesomeIcon icon={faCircleCheck} />
-          <span>{flash}</span>
-        </div>
-      )}
+      <div aria-live="polite" className="mb-4 empty:hidden">
+        {flash && (
+          <Alert variant="success">
+            <CircleCheck aria-hidden="true" />
+            <AlertDescription>{flash}</AlertDescription>
+          </Alert>
+        )}
+      </div>
 
-      <section className="card mb-4">
-        <div className="card-body">
+      <Card className="mb-4">
+        <CardContent className="pt-6">
           {owes && (
             <>
-              <div className="text-muted small text-uppercase">You owe</div>
-              <div className="display-6 fw-semibold">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                You owe
+              </div>
+              <div className="text-4xl font-semibold tracking-tight text-foreground">
                 {money(data.amountDueNowCents)}
               </div>
               {data.dueNowDate && (
-                <div className={data.hasOverdue ? "text-danger" : "text-muted"}>
+                <div
+                  className={
+                    data.hasOverdue
+                      ? "mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive"
+                      : "mt-1 text-sm text-muted-foreground"
+                  }
+                >
+                  {data.hasOverdue && (
+                    <TriangleAlert aria-hidden="true" className="size-4" />
+                  )}
                   {data.hasOverdue ? "Was due " : "Due "}
                   {dayLabel(data.dueNowDate)}
                 </div>
@@ -289,7 +361,7 @@ export default function DuesPage() {
                   can't just disappear — it moves to secondary text. */}
               {activePlans.length > 0 &&
                 data.balanceCents > data.amountDueNowCents && (
-                  <div className="small text-muted mt-1">
+                  <div className="mt-1 text-sm text-muted-foreground">
                     {money(data.balanceCents)} owed in total, on{" "}
                     {activePlans.length === 1
                       ? `a ${activePlans[0].installmentCount}-month plan`
@@ -301,13 +373,13 @@ export default function DuesPage() {
 
           {holdsCredit && (
             <>
-              <div className="text-muted small text-uppercase">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 The chapter owes you
               </div>
-              <div className="display-6 fw-semibold text-success">
+              <div className="text-4xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
                 {money(data.creditCents)}
               </div>
-              <div className="text-muted">
+              <div className="mt-1 text-sm text-muted-foreground">
                 This comes off your next dues automatically.
               </div>
             </>
@@ -315,112 +387,109 @@ export default function DuesPage() {
 
           {!owes && !holdsCredit && (
             <>
-              <div className="display-6 fw-semibold text-success">
-                <FontAwesomeIcon icon={faCircleCheck} className="me-2" />
+              <div className="flex items-center gap-2 text-3xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
+                <CircleCheck aria-hidden="true" className="size-7" />
                 All settled
               </div>
-              <div className="text-muted">
+              <div className="mt-1 text-sm text-muted-foreground">
                 Nothing owed, nothing outstanding.
               </div>
             </>
           )}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
-      <div className="d-flex gap-2 flex-wrap mb-4">
+      <div className="mb-4 flex flex-wrap gap-2">
         {canRequestPlan && (
-          <button className="btn btn-outline-primary" onClick={() => setPlanning(true)}>
-            <FontAwesomeIcon icon={faCalendarDays} className="me-2" />
+          <Button variant="outline" onClick={() => setPlanning(true)}>
+            <CalendarDays aria-hidden="true" />
             Ask to pay in installments
-          </button>
+          </Button>
         )}
-        <button
-          className="btn btn-outline-secondary"
-          onClick={() => setClaiming(true)}
-        >
-          <FontAwesomeIcon icon={faReceipt} className="me-2" />
+        <Button variant="outline" onClick={() => setClaiming(true)}>
+          <Receipt aria-hidden="true" />
           Claim a reimbursement
-        </button>
+        </Button>
       </div>
 
       {pendingPlans.map((plan) => (
-        <div key={plan._id} className="alert alert-info d-flex align-items-start gap-2">
-          <FontAwesomeIcon icon={faClock} className="mt-1" />
-          <div>
-            <strong>
-              Plan request for {money(plan.totalCents)} over{" "}
-              {plan.installmentCount} months is with the treasurer.
-            </strong>
-            <div className="small">
-              You asked before your due date, so you won&apos;t be marked late or
-              reminded while it&apos;s in the queue. Nothing is agreed until
-              it&apos;s approved.
-            </div>
-          </div>
-        </div>
+        <Alert key={plan._id} variant="info" className="mb-4">
+          <Clock aria-hidden="true" />
+          <AlertTitle>
+            Plan request for {money(plan.totalCents)} over{" "}
+            {plan.installmentCount} months is with the treasurer.
+          </AlertTitle>
+          <AlertDescription>
+            You asked before your due date, so you won&apos;t be marked late or
+            reminded while it&apos;s in the queue. Nothing is agreed until
+            it&apos;s approved.
+          </AlertDescription>
+        </Alert>
       ))}
 
       {deniedInGrace.map((plan) => (
-        <div key={plan._id} className="alert alert-warning d-flex align-items-start gap-2">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="mt-1" />
-          <div>
-            <strong>Your plan request wasn&apos;t approved.</strong>
-            {plan.reviewNote && <div className="small">{plan.reviewNote}</div>}
-            <div className="small">
+        <Alert key={plan._id} variant="warning" className="mb-4">
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>Your plan request wasn&apos;t approved.</AlertTitle>
+          <AlertDescription>
+            {plan.reviewNote && <span className="block">{plan.reviewNote}</span>}
+            <span className="block">
               The full {money(plan.totalCents)} is owed
               {plan.graceUntil && ` by ${dayLabel(plan.graceUntil)}`}. Talk to
               the treasurer if that isn&apos;t workable.
-            </div>
-          </div>
-        </div>
+            </span>
+          </AlertDescription>
+        </Alert>
       ))}
 
       {activePlans.map((activePlan) => (
-        <section key={activePlan._id} className="card mb-4">
-          <div className="card-body">
-            <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-              <div>
-                <h2 className="h6 text-uppercase text-muted mb-1">
-                  {activePlans.length > 1 ? planLabel(activePlan) : "Your payment plan"}
-                </h2>
-                <div className="small text-muted">
-                  {money(activePlan.paidCents)} of{" "}
-                  {money(activePlan.totalCents)} paid &middot;{" "}
-                  {activePlan.installmentCount} installments
-                </div>
-              </div>
-              {activePlan.missedCount > 0 && (
-                <span className="badge bg-danger align-self-start">
-                  {activePlan.missedCount} missed
-                </span>
+        <Card key={activePlan._id} className="mb-4">
+          <CardContent className="pt-6">
+            <SectionHeader
+              className="mb-3 items-start sm:items-start"
+              title={
+                activePlans.length > 1
+                  ? planLabel(activePlan)
+                  : "Your payment plan"
+              }
+              description={`${money(activePlan.paidCents)} of ${money(
+                activePlan.totalCents
+              )} paid · ${activePlan.installmentCount} installments`}
+              actions={
+                activePlan.missedCount > 0 ? (
+                  <Badge variant="destructive">
+                    {activePlan.missedCount} missed
+                  </Badge>
+                ) : null
+              }
+            />
+
+            <Progress
+              className="mb-3 h-1.5"
+              aria-label="Plan progress"
+              value={Math.min(
+                100,
+                Math.round(
+                  (activePlan.paidCents /
+                    Math.max(1, activePlan.totalCents)) *
+                    100
+                )
               )}
-            </div>
+            />
 
-            <div className="progress mb-3" style={{ height: 6 }}>
-              <div
-                className="progress-bar"
-                role="progressbar"
-                aria-label="Plan progress"
-                aria-valuenow={activePlan.paidCents}
-                aria-valuemin={0}
-                aria-valuemax={activePlan.totalCents}
-                style={{
-                  width: `${Math.min(100, Math.round((activePlan.paidCents / Math.max(1, activePlan.totalCents)) * 100))}%`,
-                }}
-              />
-            </div>
-
-            <ul className="list-group list-group-flush">
+            <ul className="divide-y divide-border">
               {activePlan.installments.map((installment) => (
                 <li
                   key={installment.seq}
-                  className="list-group-item d-flex justify-content-between align-items-center px-0 py-2"
+                  className="flex items-center justify-between gap-2 py-2 text-sm"
                 >
-                  <span className="d-flex align-items-center gap-2">
+                  <span className="flex items-center gap-2">
                     <InstallmentBadge status={installment.status} />
                     <span
                       className={
-                        installment.status === "paid" ? "text-muted" : undefined
+                        installment.status === "paid"
+                          ? "text-muted-foreground"
+                          : "text-foreground"
                       }
                     >
                       {dayLabel(installment.dueDate)}
@@ -429,14 +498,14 @@ export default function DuesPage() {
                   <span
                     className={
                       installment.status === "paid"
-                        ? "text-muted text-decoration-line-through"
-                        : "fw-semibold"
+                        ? "text-muted-foreground line-through"
+                        : "font-semibold text-foreground"
                     }
                   >
                     {money(installment.amountCents)}
                     {installment.remainingCents > 0 &&
                       installment.paidCents > 0 && (
-                        <span className="small text-muted ms-2">
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
                           {money(installment.remainingCents)} left
                         </span>
                       )}
@@ -446,39 +515,41 @@ export default function DuesPage() {
             </ul>
 
             {activePlan.missedCount > 0 && (
-              <p className="small text-muted mb-0 mt-3">
+              <p className="mb-0 mt-3 text-sm text-muted-foreground">
                 A missed installment doesn&apos;t cancel your plan or make the
-                whole balance due &mdash; you&apos;re asked for what you&apos;re
+                whole balance due. You&apos;re asked for what you&apos;re
                 behind on, nothing more.
               </p>
             )}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
       ))}
 
       {archivedPlans.length > 0 && (
         <section className="mb-4">
-          <h2 className="h6 text-uppercase text-muted mb-2">Finished plans</h2>
-          <ul className="list-group">
+          <SectionHeader className="mb-2" title="Finished plans" as="h2" />
+          <ul className="divide-y divide-border rounded-lg border border-border">
             {archivedPlans.map((row) => (
               <li
                 key={row._id}
-                className="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2"
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
               >
-                <span>
-                  <span className="text-muted">{planLabel(row)}</span>
-                  <span className="small text-muted d-block">
+                <span className="min-w-0">
+                  <span className="text-sm text-muted-foreground">
+                    {planLabel(row)}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
                     {row.installmentCount} installments &middot;{" "}
                     {money(row.totalCents)}
                   </span>
                 </span>
-                <span className="badge bg-secondary">
+                <Badge variant="secondary">
                   {row.status === "denied"
                     ? "Not approved"
                     : row.status === "cancelled"
                       ? "Cancelled"
                       : "Paid off"}
-                </span>
+                </Badge>
               </li>
             ))}
           </ul>
@@ -486,61 +557,81 @@ export default function DuesPage() {
       )}
 
       {data.awaitingReview && (
-        <div className="alert alert-info d-flex align-items-start gap-2">
-          <FontAwesomeIcon icon={faClock} className="mt-1" />
-          <div>
-            <strong>{money(data.pendingCents)} waiting to be checked off.</strong>
-            <div className="small">
-              You reported this, and the treasurer hasn&apos;t confirmed it yet.
-              You won&apos;t be marked late or reminded about it while it&apos;s
-              in the queue.
-            </div>
-          </div>
-        </div>
+        <Alert variant="info" className="mb-4">
+          <Clock aria-hidden="true" />
+          <AlertTitle>
+            {money(data.pendingCents)} waiting to be checked off.
+          </AlertTitle>
+          <AlertDescription>
+            You reported this, and the treasurer hasn&apos;t confirmed it yet.
+            You won&apos;t be marked late or reminded about it while it&apos;s
+            in the queue.
+          </AlertDescription>
+        </Alert>
       )}
 
       {outstanding.length > 0 && (
         <section className="mb-4">
-          <h2 className="h6 text-uppercase text-muted mb-3">Outstanding</h2>
-          <div className="list-group">
+          <SectionHeader className="mb-3" title="Outstanding" as="h2" />
+          <div className="divide-y divide-border rounded-lg border border-border">
             {outstanding.map((charge) => {
               const pending = pendingByCharge.get(charge._id);
               return (
-                <div key={charge._id} className="list-group-item">
-                  <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                    <div>
-                      <div className="fw-semibold">{charge.description}</div>
-                      <div className="small text-muted">
+                <div key={charge._id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-foreground">
+                        {charge.description}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
                         {charge.term}
                         {charge.dueDate && ` · due ${dayLabel(charge.dueDate)}`}
                         {charge.paidCents > 0 &&
                           ` · ${money(charge.paidCents)} paid so far`}
                       </div>
                       {charge.isOverdue && (
-                        <div className="small text-danger mt-1">
-                          <FontAwesomeIcon
-                            icon={faTriangleExclamation}
-                            className="me-1"
+                        <div className="mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive">
+                          <TriangleAlert
+                            aria-hidden="true"
+                            className="size-3.5"
                           />
                           Past due
                         </div>
                       )}
                       {pending && (
-                        <div className="small text-info mt-1">
-                          <FontAwesomeIcon icon={faClock} className="me-1" />
-                          {money(pending.amountCents)} reported{" "}
-                          {pending.paidOn && `for ${dayLabel(pending.paidOn)}`} —
-                          waiting on the treasurer
+                        <div className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
+                          <Clock
+                            aria-hidden="true"
+                            className="mt-0.5 size-3.5 shrink-0"
+                          />
+                          <span>
+                            {money(pending.amountCents)} reported{" "}
+                            {pending.paidOn &&
+                              `for ${dayLabel(pending.paidOn)}`}{" "}
+                            , waiting on the treasurer
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="-my-1 h-7 shrink-0 px-2 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              setWithdrawError(null);
+                              setWithdrawing(pending);
+                            }}
+                          >
+                            Withdraw
+                          </Button>
                         </div>
                       )}
                     </div>
-                    <div className="text-end">
-                      <div className="fs-5 fw-semibold">
+                    <div className="shrink-0 text-right">
+                      <div className="text-lg font-semibold text-foreground">
                         {money(charge.balanceCents)}
                       </div>
                       {!pending && (
-                        <button
-                          className="btn btn-sm btn-primary mt-1"
+                        <Button
+                          size="sm"
+                          className="mt-1"
                           onClick={() =>
                             setPaying({
                               _id: charge._id,
@@ -551,7 +642,7 @@ export default function DuesPage() {
                           }
                         >
                           I paid this
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -564,22 +655,22 @@ export default function DuesPage() {
 
       {settled.length > 0 && (
         <section>
-          <h2 className="h6 text-uppercase text-muted mb-3">Settled</h2>
-          <div className="list-group">
+          <SectionHeader className="mb-3" title="Settled" as="h2" />
+          <div className="divide-y divide-border rounded-lg border border-border">
             {settled.map((charge) => (
               <div
                 key={charge._id}
-                className="list-group-item d-flex justify-content-between align-items-center"
+                className="flex items-center justify-between gap-3 px-4 py-3"
               >
-                <div>
-                  <div>{charge.description}</div>
-                  <div className="small text-muted">
+                <div className="min-w-0">
+                  <div className="text-foreground">{charge.description}</div>
+                  <div className="text-sm text-muted-foreground">
                     {charge.term}
                     {charge.status !== "open" && ` · ${charge.status}`}
                   </div>
                 </div>
-                <span className="text-success">
-                  <FontAwesomeIcon icon={faCircleCheck} className="me-1" />
+                <span className="flex shrink-0 items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
+                  <CircleCheck aria-hidden="true" className="size-4" />
                   {money(charge.amountCents)}
                 </span>
               </div>
@@ -590,37 +681,41 @@ export default function DuesPage() {
 
       {reimbursements.length > 0 && (
         <section className="mt-4">
-          <h2 className="h6 text-uppercase text-muted mb-3">Your claims</h2>
-          <div className="list-group">
+          <SectionHeader className="mb-3" title="Your claims" as="h2" />
+          <div className="divide-y divide-border rounded-lg border border-border">
             {reimbursements.map((claim) => (
-              <div key={claim._id} className="list-group-item">
-                <div className="d-flex justify-content-between align-items-start gap-3">
-                  <div>
-                    <div className="fw-semibold">{claim.description}</div>
-                    <div className="small text-muted">
+              <div key={claim._id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-foreground">
+                      {claim.description}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
                       {claim.purchasedOn && dayLabel(claim.purchasedOn)}
                       {" · "}
                       {claim.category}
                     </div>
                     {claim.status === "denied" && claim.reviewNote && (
-                      <div className="small text-danger mt-1">
-                        Denied &mdash; {claim.reviewNote}
+                      <div className="mt-1 text-sm text-destructive">
+                        Denied: {claim.reviewNote}
                       </div>
                     )}
                   </div>
-                  <div className="text-end">
-                    <div className="fw-semibold">{money(claim.amountCents)}</div>
-                    <span
-                      className={`badge ${
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <div className="font-semibold text-foreground">
+                      {money(claim.amountCents)}
+                    </div>
+                    <Badge
+                      variant={
                         claim.status === "approved"
-                          ? "bg-success"
+                          ? "success"
                           : claim.status === "denied"
-                          ? "bg-danger"
-                          : "bg-secondary"
-                      }`}
+                            ? "destructive"
+                            : "secondary"
+                      }
                     >
                       {claim.status}
-                    </span>
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -629,7 +724,70 @@ export default function DuesPage() {
         </section>
       )}
 
-      <FinanceTimeline endpoint="/api/dues/history/me" title="Your history" />
+      {/* Behind a button rather than laid out under the balance: the record is
+        * something a member goes looking for once in a while, and having every
+        * reminder and receipt on the page turned the thing they came for into
+        * the short bit at the top. The sheet also means it only loads when it
+        * is actually opened. */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="outline" className="w-full sm:w-auto">
+            <History aria-hidden="true" className="size-4" />
+            View your history
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          side="right"
+          className="w-full overflow-y-auto sm:max-w-2xl"
+        >
+          <SheetHeader className="mb-4">
+            <SheetTitle>Your history</SheetTitle>
+            <SheetDescription>
+              Every charge, payment, claim and reminder on your record.
+            </SheetDescription>
+          </SheetHeader>
+          <FinanceTimeline endpoint="/api/dues/history/me" bare />
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog
+        open={!!withdrawing}
+        onOpenChange={(open) => {
+          if (!open) {
+            setWithdrawing(null);
+            setWithdrawError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Withdraw this payment report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {withdrawing
+                ? `The ${money(withdrawing.amountCents)} you reported will be taken out of the treasurer's queue. You can report it again afterwards.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {withdrawError ? (
+            <Alert variant="destructive">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{withdrawError}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={withdrawBusy}
+              onClick={() => withdrawing && withdrawClaim(withdrawing)}
+            >
+              {withdrawBusy ? "Withdrawing…" : "Withdraw it"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {claiming && (
         <SubmitReimbursementModal
@@ -657,7 +815,7 @@ export default function DuesPage() {
           onFiled={() => {
             setPlanning(false);
             setFlash(
-              "Request sent. You asked in time — you won't be marked late while the treasurer looks at it."
+              "Request sent. You asked in time, so you won't be marked late while the treasurer looks at it."
             );
             load();
           }}
@@ -671,12 +829,12 @@ export default function DuesPage() {
           onFiled={() => {
             setPaying(null);
             setFlash(
-              "Sent. The treasurer will confirm it — you're covered from the date you entered."
+              "Sent. The treasurer will confirm it. You're covered from the date you entered."
             );
             load();
           }}
         />
       )}
-    </main>
+    </PageContainer>
   );
 }

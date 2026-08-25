@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import BrotherDetailClient from "./BrotherDetailClient";
 import type { MemberDoc } from "@/types/member";
+import MembershipRevokedState from "../../../components/MembershipRevokedState";
 
 interface Params {
   params: { rollNo: string };
@@ -14,7 +15,7 @@ export default async function BrotherDetailPage({ params }: Params) {
   const headerList = headers();
   const host = headerList.get("x-forwarded-host") || headerList.get("host");
   if (!host) {
-    return <Unauthorized />;
+    return <MembershipRevokedState description="You do not have permission to view this brother profile." />;
   }
   const forwardedProto = headerList.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const proto =
@@ -28,14 +29,14 @@ export default async function BrotherDetailPage({ params }: Params) {
     cache: "no-store",
   });
   if (!authRes.ok) {
-    return <Unauthorized />;
+    return <MembershipRevokedState description="You do not have permission to view this brother profile." />;
   }
   const me = await authRes.json();
   const status = String(me.status || "").toLowerCase();
   const allowedStatus = status === "active" || status === "alumni";
   const restricted = !me.memberId || Boolean(me.pending) || !allowedStatus;
   if (restricted) {
-    return <Unauthorized />;
+    return <MembershipRevokedState description="You do not have permission to view this brother profile." />;
   }
 
   const res = await fetch(
@@ -60,15 +61,3 @@ export default async function BrotherDetailPage({ params }: Params) {
   return <BrotherDetailClient member={member} committees={committees} />;
 }
 
-function Unauthorized() {
-  return (
-    <div className="member-dashboard">
-      <div className="bento-card text-center">
-        <h2>Unauthorized</h2>
-        <p className="text-muted">
-          You do not have permission to view this brother profile.
-        </p>
-      </div>
-    </div>
-  );
-}

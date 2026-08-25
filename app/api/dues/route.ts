@@ -149,7 +149,7 @@ export async function GET(req: Request) {
 
         return {
           memberId: id,
-          rollNo: member?.rollNo ?? "—",
+          rollNo: member?.rollNo ?? "Unknown",
           fName: member?.fName ?? "Unknown",
           lName: member?.lName ?? "",
           status: member?.status ?? "Active",

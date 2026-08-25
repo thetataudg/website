@@ -1,0 +1,144 @@
+/*
+ * Members-only shadcn/ui design tokens.
+ *
+ * Scoped to `.members-shell` so the public site (which is styled by
+ * app/(public-site)/globals.css) is never affected. Dark mode is driven by a
+ * `.dark` class on <html> (next-themes, class strategy).
+ *
+ * Token roles (validated for WCAG 2.2 AA — see docs/MEMBERS_SHADCN_AUDIT.md):
+ *   Light: primary = Theta Tau dark red, secondary = gold, bg white / fg near-black
+ *   Dark:  primary = gold,               secondary = dark red, bg near-black / fg near-white
+ */
+
+.members-shell {
+  /* Off-white page with pure-white cards: surfaces lift off the background
+   * without needing heavy shadows, and the interface still reads as white. */
+  --background: 0 0% 98%;
+  --foreground: 40 9% 6%;
+  --card: 0 0% 100%;
+  --card-foreground: 40 9% 6%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 40 9% 6%;
+  --primary: 356 67% 33%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 46 76% 50%;
+  --secondary-foreground: 40 9% 6%;
+  /* Neutral greys (not warm cream) so the interface reads white. */
+  --muted: 0 0% 94%;
+  --muted-foreground: 24 6% 31%;
+  --accent: 0 0% 94%;
+  --accent-foreground: 40 9% 6%;
+  --destructive: 0 74% 42%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 89%;
+  --input: 0 0% 55%;
+  --ring: 356 67% 33%;
+  /* Softer, rounder corners across every shadcn primitive
+   * (lg = cards/dialogs, md = buttons/inputs, sm = menu items). */
+  --radius: 0.875rem;
+  color-scheme: light;
+}
+
+/* `--pointer` interaction convention from the referenced preset. Keep it
+ * scoped to the members app and exclude disabled controls. */
+.members-shell :where(
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled)
+) {
+  cursor: pointer;
+}
+
+.members-shell input[type="file"]::file-selector-button {
+  cursor: pointer;
+}
+
+/* next-themes places `.dark` on <html>; `.members-shell.dark` covers the case
+ * where the class is merged onto the shell body itself. */
+.dark .members-shell,
+.members-shell.dark {
+  /* Near-black rather than pure black: the page feels deeper while the
+   * charcoal card surfaces remain comfortably distinct. */
+  --background: 240 7% 7%;
+  --foreground: 36 20% 95%;
+  --card: 240 6% 13%;
+  --card-foreground: 36 20% 95%;
+  --popover: 240 6% 13%;
+  --popover-foreground: 36 20% 95%;
+  --primary: 46 76% 50%;
+  --primary-foreground: 40 9% 6%;
+  --secondary: 356 67% 33%;
+  --secondary-foreground: 36 20% 95%;
+  --muted: 240 5% 16%;
+  /* Small metadata, placeholders, and inactive navigation stay clearly
+   * readable on both card and muted surfaces while remaining secondary. */
+  --muted-foreground: 32 7% 68%;
+  --accent: 240 5% 18%;
+  --accent-foreground: 36 20% 95%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 240 7% 7%;
+  --border: 240 6% 21%;
+  --input: 240 4% 48%;
+  --ring: 46 76% 50%;
+  color-scheme: dark;
+}
+
+/* Scoped shadcn base surface. Plain (unlayered) CSS, imported BEFORE
+ * members.css — so during the incremental migration the legacy gradient in
+ * members.css (same specificity, later source order) keeps winning, and this
+ * token background takes over once members.css is cleaned up. The public site
+ * (globals.css) is untouched.
+ *
+ * NB: this file cannot use `@layer base` (no `@tailwind base` directive lives
+ * here; that's in globals.css). We also deliberately omit shadcn's default
+ * universal `* { border-color }` rule: shadcn primitives in this repo carry
+ * explicit `border-border` / `border-input` classes instead, so the blanket
+ * rule buys nothing and its specificity would reach legacy members.css
+ * borders that still set their own colour. */
+.members-shell {
+  /* `background` shorthand (not just background-color): the public
+   * globals.css sets a `body { background: linear-gradient(...) ... }`, and a
+   * color-only override would leave that gradient IMAGE painting on top —
+   * it showed as a grey wash in the page margins in dark mode. */
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* --- Dark navbar surface -------------------------------------------------
+ * The member navbar is a dark bar in BOTH themes: in light mode it anchors the
+ * page against the off-white background; in dark mode it reads as an elevated
+ * surface above the page.
+ *
+ * Implemented by re-scoping the semantic tokens on the header itself, so every
+ * child (Button, DropdownMenu trigger, nav links, bell) adapts automatically
+ * with no per-component color overrides.
+ *
+ * NOTE: `primary` is GOLD inside the bar even in light mode. Measured: dark red
+ * on this surface is only 1.76:1 (fails), gold is 8.19:1. Active nav therefore
+ * uses gold on the bar while the rest of the light UI keeps dark-red primary. */
+.members-shell .members-navbar-shell {
+  --background: 240 6% 13%;
+  --foreground: 36 20% 95%;
+  --card: 240 6% 13%;
+  --card-foreground: 36 20% 95%;
+  --muted: 240 5% 18%;
+  --muted-foreground: 32 7% 63%;
+  --accent: 240 5% 20%;
+  --accent-foreground: 36 20% 95%;
+  --primary: 46 76% 50%;
+  --primary-foreground: 40 9% 6%;
+  --border: 240 6% 24%;
+  --input: 240 6% 30%;
+  --ring: 46 76% 50%;
+  color-scheme: dark;
+  /* Re-declare `color` so descendants that set no explicit text colour
+   * (e.g. Button variant="outline") inherit the bar's light foreground
+   * instead of the near-black inherited from body. */
+  color: hsl(var(--foreground));
+}
+

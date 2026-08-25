@@ -1,8 +1,14 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import FinanceTimeline from "../../dues/FinanceTimeline";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /// One member's whole financial story, from the roster.
 ///
@@ -19,39 +25,24 @@ export default function MemberHistoryModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="modal-content">
-          <div className="modal-header">
-            <div>
-              <h5 className="modal-title">{name}</h5>
-              <div className="small text-muted">#{rollNo}</div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
-          <div className="modal-body">
-            <FinanceTimeline
-              endpoint={`/api/dues/history/${encodeURIComponent(rollNo)}`}
-              title="Finance history"
-            />
-          </div>
+      <DialogContent className="grid max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-5 pr-12 text-left">
+          <DialogTitle>{name}</DialogTitle>
+          <DialogDescription>#{rollNo}</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-y-auto px-6 py-5">
+          <FinanceTimeline
+            endpoint={`/api/dues/history/${encodeURIComponent(rollNo)}`}
+            title="Finance history"
+          />
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

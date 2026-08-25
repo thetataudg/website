@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 
 const nextConfig = {
   reactStrictMode: true,
+  transpilePackages: ["geist"],
   experimental: {
     optimizePackageImports: [
       "react-icons",

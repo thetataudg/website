@@ -4,9 +4,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Cropper, { type Area, type Point } from "react-easy-crop";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUpload } from "@fortawesome/free-solid-svg-icons";
-import { LoadingSpinner } from "../../../components/LoadingState";
+import {
+  CircleAlert,
+  Crop,
+  ImagePlus,
+  Loader2,
+  RotateCcw,
+  Upload,
+} from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 interface PhotoUploaderProps {
   show: boolean;
@@ -37,7 +57,16 @@ export default function PhotoUploader({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
+
+  const reportError = useCallback(
+    (message: string) => {
+      setErrorMessage(message);
+      onError(message);
+    },
+    [onError]
+  );
 
   const trackObjectUrl = useCallback((blob: Blob | File) => {
     const url = URL.createObjectURL(blob);
@@ -67,6 +96,7 @@ export default function PhotoUploader({
     setZoom(1);
     setOutputSize(defaultOutputSize);
     setCroppedAreaPixels(null);
+    setErrorMessage(null);
   }, [clearObjectUrls, defaultOutputSize, initialUrl, show]);
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,7 +106,7 @@ export default function PhotoUploader({
       setFile(null);
       setPreview(initialUrl || "");
       setEditorImage(initialUrl || null);
-      onError("File too large. Max size is 5 MB.");
+      reportError("File too large. Max size is 5 MB.");
       return;
     }
     if (f && !f.type.startsWith("image/")) {
@@ -84,11 +114,12 @@ export default function PhotoUploader({
       setFile(null);
       setPreview(initialUrl || "");
       setEditorImage(initialUrl || null);
-      onError("Please select an image file.");
+      reportError("Please select an image file.");
       return;
     }
     setRawFile(f);
     setFile(f);
+    setErrorMessage(null);
     if (!f) {
       setPreview(initialUrl || "");
       setEditorImage(initialUrl || null);
@@ -167,7 +198,7 @@ export default function PhotoUploader({
       setFile(edited);
       setPreview(trackObjectUrl(edited));
     } catch (err: any) {
-      onError(err?.message || "Failed to edit image.");
+      reportError(err?.message || "Failed to edit image.");
     } finally {
       setProcessing(false);
     }
@@ -227,151 +258,178 @@ export default function PhotoUploader({
       onClose();
       router.refresh();
     } catch (err: any) {
-      onError(err.message || "Photo upload failed");
+      reportError(err.message || "Photo upload failed");
     } finally {
       setUploading(false);
     }
   };
 
-  if (!show) return null;
-
   return (
-    <div
-      className="modal fade show photo-uploader-modal"
-      style={{ display: "block", backgroundColor: "rgba(0,0,0,0.5)" }}
+    <Dialog
+      open={show}
+      onOpenChange={(open) => {
+        if (!open && !uploading && !processing) onClose();
+      }}
     >
-      <div className="modal-dialog">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">Edit Profile Picture</h5>
-            <button type="button" className="btn-close" onClick={onClose} />
-          </div>
-          <div className="modal-body text-center">
-            {preview && (
-              <img
-                src={preview}
-                alt="Preview"
-                className="photo-uploader__preview rounded-circle mb-3"
+      <DialogContent className="grid max-h-[92dvh] w-[calc(100%-2rem)] max-w-4xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-5 pr-12">
+          <DialogTitle>Edit profile photo</DialogTitle>
+          <DialogDescription>
+            Choose an image, position the crop, and preview it before uploading.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+          <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center">
+            <Avatar className="size-24 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
+              {preview ? <AvatarImage src={preview} alt="Profile photo preview" /> : null}
+              <AvatarFallback>
+                <ImagePlus className="size-8" aria-hidden="true" />
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="space-y-2">
+              <Label htmlFor="profile-photo-file">Choose a photo</Label>
+              <Input
+                id="profile-photo-file"
+                type="file"
+                accept="image/*"
+                className="cursor-pointer file:cursor-pointer"
+                onChange={onSelect}
+                disabled={uploading || processing}
               />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="form-control photo-uploader__file-input"
-              onChange={onSelect}
-              disabled={uploading || processing}
-            />
-            <div className="form-text photo-uploader__helper-text">
-              Max file size: 5 MB. You can drag, zoom, crop, and resize before
-              uploading.
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                JPG, PNG, or another image format up to 5 MB. The final image
+                will be square.
+              </p>
             </div>
+          </div>
 
-            {editorImage && (
-              <div className="photo-editor mt-3 text-start">
-                <div className="photo-editor__crop-frame">
-                  <Cropper
-                    image={editorImage}
-                    crop={crop}
-                    zoom={zoom}
-                    aspect={1}
-                    cropShape="round"
-                    showGrid={false}
-                    onCropChange={setCrop}
-                    onZoomChange={setZoom}
-                    onCropComplete={(_, areaPixels) =>
-                      setCroppedAreaPixels(areaPixels)
-                    }
-                  />
-                </div>
+          {errorMessage && (
+            <Alert variant="destructive" aria-live="assertive">
+              <CircleAlert aria-hidden="true" />
+              <AlertTitle>Photo could not be updated</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
 
-                <div className="photo-editor__group mt-3">
-                  <label className="form-label photo-editor__label mb-1">
-                    Zoom ({zoom.toFixed(2)}x)
-                  </label>
-                  <input
-                    className="form-range photo-editor__range"
-                    type="range"
-                    min={1}
-                    max={3}
-                    step={0.01}
-                    value={zoom}
-                    onChange={(e) => setZoom(Number(e.target.value))}
-                    disabled={uploading || processing}
-                  />
-                </div>
-
-                <div className="photo-editor__group mt-2">
-                  <label className="form-label photo-editor__label mb-1">
-                    Resize ({outputSize} x {outputSize}px)
-                  </label>
-                  <input
-                    className="form-range photo-editor__range"
-                    type="range"
-                    min={256}
-                    max={1024}
-                    step={32}
-                    value={outputSize}
-                    onChange={(e) => setOutputSize(Number(e.target.value))}
-                    disabled={uploading || processing}
-                  />
-                </div>
-
-                <div className="photo-editor__actions d-flex gap-2 mt-3">
-                  <button
-                    type="button"
-                    className="btn btn-sm photo-editor__btn photo-editor__btn--reset"
-                    onClick={resetEdits}
-                    disabled={uploading || processing || !editorImage}
-                  >
-                    Reset
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={applyEdits}
-                    disabled={uploading || processing || !croppedAreaPixels}
-                  >
-                    {processing ? (
-                      <>
-                        <LoadingSpinner size="sm" className="me-2" />
-                        Applying...
-                      </>
-                    ) : (
-                      "Apply Edits"
-                    )}
-                  </button>
-                </div>
+          {editorImage && (
+            <section className="space-y-5 rounded-lg border border-border bg-muted/25 p-4">
+              <div className="flex items-center gap-2">
+                <Crop className="size-4 text-primary" aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-foreground">
+                  Crop and resize
+                </h3>
               </div>
-            )}
-          </div>
-          <div className="modal-footer">
-            <button
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={uploading || processing}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleUpload}
-              disabled={!file || uploading || processing}
-            >
-              {uploading ? (
-                <>
-                  <LoadingSpinner size="sm" className="me-2" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <FontAwesomeIcon icon={faUpload} className="me-1" />
-                  Upload
-                </>
-              )}
-            </button>
-          </div>
+
+              <div className="relative h-[clamp(280px,48vh,520px)] overflow-hidden rounded-lg border border-border bg-black">
+                <Cropper
+                  image={editorImage}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  cropShape="round"
+                  showGrid={false}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={(_, areaPixels) =>
+                    setCroppedAreaPixels(areaPixels)
+                  }
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="profile-photo-zoom">Zoom</Label>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {zoom.toFixed(2)}×
+                  </span>
+                </div>
+                <Slider
+                  id="profile-photo-zoom"
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={[zoom]}
+                  onValueChange={([value]) => setZoom(value)}
+                  disabled={uploading || processing}
+                  aria-label="Photo zoom"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="profile-photo-size">Output size</Label>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {outputSize} × {outputSize}px
+                  </span>
+                </div>
+                <Slider
+                  id="profile-photo-size"
+                  min={256}
+                  max={1024}
+                  step={32}
+                  value={[outputSize]}
+                  onValueChange={([value]) => setOutputSize(value)}
+                  disabled={uploading || processing}
+                  aria-label="Photo output size"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetEdits}
+                  disabled={uploading || processing || !editorImage}
+                >
+                  <RotateCcw aria-hidden="true" />
+                  Reset
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={applyEdits}
+                  disabled={uploading || processing || !croppedAreaPixels}
+                >
+                  {processing ? (
+                    <Loader2 className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Crop aria-hidden="true" />
+                  )}
+                  {processing ? "Applying…" : "Apply crop"}
+                </Button>
+              </div>
+            </section>
+          )}
         </div>
-      </div>
-    </div>
+
+        <DialogFooter className="border-t border-border bg-background px-4 py-4 sm:px-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={uploading || processing}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleUpload}
+            disabled={!file || uploading || processing}
+            aria-busy={uploading}
+          >
+            {uploading ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Upload aria-hidden="true" />
+            )}
+            {uploading ? "Uploading…" : "Upload photo"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

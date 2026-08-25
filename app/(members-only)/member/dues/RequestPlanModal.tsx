@@ -1,9 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark, faCircleInfo } from "@fortawesome/free-solid-svg-icons";
+import { CircleAlert, Info, TriangleAlert } from "lucide-react";
+
 import { LoadingSpinner } from "../../components/LoadingState";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   MAX_INSTALLMENTS,
   MIN_INSTALLMENTS,
@@ -131,104 +145,114 @@ export default function RequestPlanModal({
     );
 
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !saving) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-        onClick={(event) => event.stopPropagation()}
+      <DialogContent
+        className="grid max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+        /* No backdrop dismissal: this is a commitment to dates and amounts. */
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <form className="modal-content" onSubmit={submit}>
-          <div className="modal-header">
-            <h5 className="modal-title">Request a payment plan</h5>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
+        <DialogHeader className="border-b border-border px-6 py-5 pr-12 text-left">
+          <DialogTitle>Request a payment plan</DialogTitle>
+          <DialogDescription>
+            {money(totalCents)} owed &middot; {balance.term}
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="modal-body">
-            <p className="text-muted small mb-3">
-              {money(totalCents)} owed &middot; {balance.term}
-            </p>
-
+        <form onSubmit={submit} className="contents">
+          <div className="space-y-4 overflow-y-auto px-6 py-5">
             {balance.charges.length > 1 && (
-              <div className="mb-3">
-                <div className="text-uppercase small text-muted mb-2">
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   What should this plan cover?
-                </div>
-                <ul className="list-group">
+                </p>
+                <ul className="divide-y divide-border rounded-lg border border-border">
                   {balance.charges.map((charge) => (
-                    <li key={charge._id} className="list-group-item py-2">
-                      <label className="d-flex justify-content-between align-items-center gap-2 mb-0">
-                        <span className="d-flex align-items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="form-check-input mt-0"
+                    <li key={charge._id}>
+                      <label className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5">
+                        <span className="flex min-w-0 items-center gap-3">
+                          <Checkbox
                             checked={selected.includes(charge._id)}
-                            onChange={() => toggle(charge._id)}
+                            onCheckedChange={() => toggle(charge._id)}
                           />
-                          <span>
-                            {charge.description}
+                          <span className="min-w-0">
+                            <span className="block text-sm text-foreground">
+                              {charge.description}
+                            </span>
                             {charge.dueDate && (
-                              <span className="small text-muted d-block">
+                              <span className="block text-xs text-muted-foreground">
                                 due {dayLabel(new Date(charge.dueDate))}
                               </span>
                             )}
                           </span>
                         </span>
-                        <span className="fw-semibold">
+                        <span className="shrink-0 text-sm font-semibold text-foreground">
                           {money(charge.balanceCents)}
                         </span>
                       </label>
                     </li>
                   ))}
                 </ul>
-                <div className="form-text">
-                  Anything you leave out stays owed in full &mdash; you can put
+                <p className="text-xs text-muted-foreground">
+                  Anything you leave out stays owed in full. You can put
                   it on its own plan later, as long as you ask before its due
                   date.
-                </div>
+                </p>
               </div>
             )}
 
             {nothingChosen ? (
-              <div className="alert alert-warning mb-0">
-                Pick at least one charge for this plan to cover.
-              </div>
+              <Alert variant="warning">
+                <TriangleAlert aria-hidden="true" />
+                <AlertDescription>
+                  Pick at least one charge for this plan to cover.
+                </AlertDescription>
+              </Alert>
             ) : tooSmall ? (
-              <div className="alert alert-warning mb-0">
-                {money(totalCents)} is too small to spread out &mdash;
-                installments can&apos;t be under {money(MIN_INSTALLMENT_CENTS)}.
-              </div>
+              <Alert variant="warning">
+                <TriangleAlert aria-hidden="true" />
+                <AlertDescription>
+                  {money(totalCents)} is too small to spread out.
+                  installments can&apos;t be under{" "}
+                  {money(MIN_INSTALLMENT_CENTS)}.
+                </AlertDescription>
+              </Alert>
             ) : (
               <>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="plan-count">
-                    How many months do you need?
-                  </label>
-                  <div className="btn-group w-100" role="group" id="plan-count">
+                <div className="space-y-1.5">
+                  <Label asChild>
+                    <p id="plan-count-label">How many months do you need?</p>
+                  </Label>
+                  <div
+                    role="radiogroup"
+                    aria-labelledby="plan-count-label"
+                    className="flex w-full flex-wrap gap-1.5"
+                  >
                     {Array.from(
                       { length: MAX_INSTALLMENTS - MIN_INSTALLMENTS + 1 },
                       (_, index) => index + MIN_INSTALLMENTS
                     ).map((option) => {
                       const allowed = option <= maxCount;
+                      const active = option === effectiveCount;
                       return (
                         <button
                           key={option}
                           type="button"
-                          className={`btn btn-sm ${
-                            option === effectiveCount
-                              ? "btn-primary"
-                              : "btn-outline-secondary"
-                          }`}
+                          role="radio"
+                          aria-checked={active}
+                          className={cn(
+                            "h-9 min-w-9 flex-1 rounded-md border text-sm font-semibold transition-colors",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+                            !allowed &&
+                              "cursor-not-allowed opacity-50 hover:bg-background hover:text-foreground"
+                          )}
                           disabled={!allowed}
                           title={
                             allowed
@@ -243,60 +267,64 @@ export default function RequestPlanModal({
                     })}
                   </div>
                   {maxCount < MAX_INSTALLMENTS && (
-                    <div className="form-text">
-                      {money(totalCents)} can be split{" "}
-                      {maxCount} ways at most &mdash; no installment can be under{" "}
+                    <p className="text-xs text-muted-foreground">
+                      {money(totalCents)} can be split {maxCount} ways at most
+                      No installment can be under{" "}
                       {money(MIN_INSTALLMENT_CENTS)}.
-                    </div>
+                    </p>
                   )}
                 </div>
 
-                <div className="mb-3">
-                  <div className="text-uppercase small text-muted mb-2">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Your schedule
-                  </div>
-                  <ul className="list-group list-group-flush border rounded">
+                  </p>
+                  <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
                     {schedule.map((installment) => (
                       <li
                         key={installment.seq}
-                        className="list-group-item d-flex justify-content-between align-items-center py-2"
+                        className="flex items-center justify-between gap-2 px-3 py-2"
                       >
-                        <span className="text-muted small">
+                        <span className="text-sm text-muted-foreground">
                           {dayLabel(installment.dueDate)}
                         </span>
-                        <span className="fw-semibold">
+                        <span className="text-sm font-semibold text-foreground">
                           {money(installment.amountCents)}
                         </span>
                       </li>
                     ))}
-                    <li className="list-group-item d-flex justify-content-between align-items-center py-2 bg-body-tertiary">
-                      <span className="small">Total</span>
-                      <span className="fw-semibold">
+                    <li className="flex items-center justify-between gap-2 bg-muted px-3 py-2">
+                      <span className="text-sm text-foreground">Total</span>
+                      <span className="text-sm font-semibold text-foreground">
                         {money(
                           schedule.reduce((sum, i) => sum + i.amountCents, 0)
                         )}
                       </span>
                     </li>
                   </ul>
-                  <div className="form-text d-flex align-items-start gap-2 mt-2">
-                    <FontAwesomeIcon icon={faCircleInfo} className="mt-1" />
+                  <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <Info
+                      aria-hidden="true"
+                      className="mt-0.5 size-3.5 shrink-0"
+                    />
                     <span>
-                      Installments are allowed to run past your due date &mdash;
+                      Installments are allowed to run past your due date.
                       what matters is that you asked before it. Nothing is
                       agreed until the treasurer approves it, and you won&apos;t
                       be marked late while you wait.
                     </span>
-                  </div>
+                  </p>
                 </div>
 
-                <div className="mb-1">
-                  <label className="form-label" htmlFor="plan-note">
+                <div className="space-y-1.5">
+                  <Label htmlFor="plan-note">
                     Anything the treasurer should know{" "}
-                    <span className="text-muted">(optional)</span>
-                  </label>
-                  <textarea
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </Label>
+                  <Textarea
                     id="plan-note"
-                    className="form-control"
                     rows={2}
                     maxLength={500}
                     placeholder="Paycheque lands the 15th, so the 1st is tight"
@@ -308,24 +336,32 @@ export default function RequestPlanModal({
             )}
 
             {error && (
-              <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>
+              <Alert variant="destructive" role="alert">
+                <CircleAlert aria-hidden="true" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onClose}>
+          <DialogFooter className="gap-2 border-t border-border px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={saving}
+            >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="btn btn-primary"
               disabled={tooSmall || nothingChosen || saving}
             >
-              {saving ? <LoadingSpinner size="sm" /> : "Send to the treasurer"}
-            </button>
-          </div>
+              {saving && <LoadingSpinner size="sm" />}
+              {saving ? "Sending…" : "Send to the treasurer"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

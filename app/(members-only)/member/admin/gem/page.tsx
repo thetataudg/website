@@ -2,9 +2,53 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faList, faTableCellsLarge } from "@fortawesome/free-solid-svg-icons";
+import { LayoutGrid, List, Search, ShieldAlert, TriangleAlert } from "lucide-react";
+
 import LoadingState, { LoadingSpinner } from "../../../components/LoadingState";
+import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
+import { cn } from "@/lib/utils";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   GemCommitteeList,
   GemMemberCard,
@@ -258,7 +302,7 @@ export default function AdminGemDashboardPage() {
   // --- Filtering ----------------------------------------------------------
 
   const visibleMembers = useMemo(
-    () => (status?.members || []).filter((member) => member.role !== "superadmin"),
+    () => status?.members || [],
     [status]
   );
 
@@ -326,102 +370,123 @@ export default function AdminGemDashboardPage() {
   if (!isLoaded) return <LoadingState message="Validating session..." />;
   if (!isSignedIn) {
     return (
-      <div className="container">
-        <div className="alert alert-danger mt-5 d-flex align-items-center">
-          <div>
-            <h4>Please sign in to view GEM data.</h4>
-          </div>
-          <div className="ms-auto">
-            <RedirectToSignIn />
-          </div>
-        </div>
-      </div>
+      <PageContainer>
+        <Alert variant="destructive" role="alert">
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Sign-in required</AlertTitle>
+          <AlertDescription>
+            Please sign in to view GEM data.
+          </AlertDescription>
+        </Alert>
+        <RedirectToSignIn />
+      </PageContainer>
     );
   }
   if (viewerLoading) return <LoadingState message="Loading GEM data..." />;
   if (!canRead) {
     return (
-      <div className="container">
-        <div className="alert alert-danger mt-5">
-          <h4>Access Denied</h4>
-          <p>Only administrators and E-Council members can access the chapter GEM board.</p>
-        </div>
-      </div>
+      <PageContainer>
+        <Alert variant="destructive" role="alert">
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Access denied</AlertTitle>
+          <AlertDescription>
+            Only administrators and E-Council members can access the chapter GEM
+            board.
+          </AlertDescription>
+        </Alert>
+      </PageContainer>
     );
   }
 
   const statBlocks = [
-    { label: "Meeting GEM", value: gemStats.met, pct: gemStats.metPct, tone: "success" },
+    {
+      label: "Meeting GEM",
+      value: gemStats.met,
+      pct: gemStats.metPct,
+      bar: "bg-emerald-600 dark:bg-emerald-500",
+      text: "text-emerald-700 dark:text-emerald-400",
+      badge: "success" as const,
+    },
     {
       label: "Requirement short",
       value: gemStats.requirementShort,
       pct: gemStats.requirementShortPct,
-      tone: "danger",
+      bar: "bg-destructive",
+      text: "text-destructive",
+      badge: "destructive" as const,
     },
-    { label: "1 point away", value: gemStats.onePoint, pct: gemStats.onePointPct, tone: "primary" },
-    { label: "2+ points away", value: gemStats.morePoints, pct: gemStats.morePointsPct, tone: "warning" },
+    {
+      label: "1 point away",
+      value: gemStats.onePoint,
+      pct: gemStats.onePointPct,
+      bar: "bg-primary",
+      text: "text-primary",
+      badge: "default" as const,
+    },
+    {
+      label: "2+ points away",
+      value: gemStats.morePoints,
+      pct: gemStats.morePointsPct,
+      bar: "bg-amber-500 dark:bg-amber-400",
+      text: "text-amber-700 dark:text-amber-400",
+      badge: "warning" as const,
+    },
   ];
 
   return (
-    <div className="member-dashboard gem-dashboard">
-      <section className="bento-card gem-hero">
-        <div className="d-flex flex-column flex-md-row justify-content-between gap-3">
-          <div>
-            <p className="hero-eyebrow text-muted">GEM</p>
-            <h1 className="hero-title mb-1">Manage GEM</h1>
-            {status && (
-              <>
-                <p className="text-muted small mb-1">
-                  Semester: {status.semesterName} ({formatDateShort(status.startDate)} →{" "}
-                  {formatDateShort(status.endDate)})
-                </p>
-                <p className="text-muted small mb-1">
-                  {status.totals.generalTotal} general meetings held ·{" "}
-                  {status.totals.generalRequired} required ·{" "}
-                  {status.totals.pnmMeetingTotal} PNM meetings held
-                </p>
-              </>
-            )}
-            <p className="text-muted small mb-0">
-              Showing {filteredMembers.length} / {visibleMembers.length} members
-              {!canManage && " · read-only"}
-            </p>
-          </div>
-          <div
-            className="btn-group btn-group-sm align-self-start flex-shrink-0"
-            role="group"
-            aria-label="Board layout"
+    <PageContainer className="max-w-7xl space-y-6">
+      <PageHeader
+        title="Manage GEM"
+        description={
+          status
+            ? `${status.semesterName} · ${formatDateShort(
+                status.startDate
+              )} to ${formatDateShort(status.endDate)}`
+            : "Chapter GEM board."
+        }
+        actions={
+          <Tabs
+            value={viewMode}
+            onValueChange={(value) => setViewMode(value as "cards" | "list")}
           >
-            <button
-              type="button"
-              className={`btn ${viewMode === "cards" ? "btn-primary" : "btn-outline-secondary"}`}
-              onClick={() => setViewMode("cards")}
-              aria-pressed={viewMode === "cards"}
-              title="Card view"
-            >
-              <FontAwesomeIcon icon={faTableCellsLarge} />
-              <span className="visually-hidden">Card view</span>
-            </button>
-            <button
-              type="button"
-              className={`btn ${viewMode === "list" ? "btn-primary" : "btn-outline-secondary"}`}
-              onClick={() => setViewMode("list")}
-              aria-pressed={viewMode === "list"}
-              title="List view"
-            >
-              <FontAwesomeIcon icon={faList} />
-              <span className="visually-hidden">List view</span>
-            </button>
-          </div>
-        </div>
+            <TabsList aria-label="Board layout">
+              <TabsTrigger value="cards" className="gap-2">
+                <LayoutGrid className="size-4" />
+                Cards
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-2">
+                <List className="size-4" />
+                List
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
+      />
 
-        <div className="border-top mt-3 pt-3">
-          <div className="row g-3">
-            <div className="col-sm-6 col-md-4 col-xl-3">
-              <label className="form-label small text-muted">Name or roll</label>
-              <input
+      {status && (
+        <p className="text-sm text-muted-foreground">
+          {status.totals.generalTotal} general meetings held ·{" "}
+          {status.totals.generalRequired} required ·{" "}
+          {status.totals.pnmMeetingTotal} PNM meetings held · showing{" "}
+          {filteredMembers.length} of {visibleMembers.length} members
+          {!canManage && " · read only"}
+        </p>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+          <CardDescription>
+            Narrow the board, or reload it for a different date range.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-name">Name or roll</Label>
+              <Input
+                id="gem-name"
                 type="text"
-                className="form-control form-control-sm"
                 placeholder="Search"
                 value={memberFilters.name}
                 onChange={(e) =>
@@ -429,575 +494,638 @@ export default function AdminGemDashboardPage() {
                 }
               />
             </div>
-            <div className="col-sm-6 col-md-4 col-xl-2">
-              <label className="form-label small text-muted">Committee</label>
-              <select
-                className="form-select form-select-sm"
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-committee">Committee</Label>
+              <Select
                 value={memberFilters.committee}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, committee: e.target.value }))
+                onValueChange={(value) =>
+                  setMemberFilters((prev) => ({ ...prev, committee: value }))
                 }
               >
-                <option value="all">All committees</option>
-                {committeeOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="gem-committee">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All committees</SelectItem>
+                  {committeeOptions.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="col-sm-6 col-md-4 col-xl-2">
-              <label className="form-label small text-muted">Standing</label>
-              <select
-                className="form-select form-select-sm"
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-standing">Standing</Label>
+              <Select
                 value={memberFilters.standing}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, standing: e.target.value }))
+                onValueChange={(value) =>
+                  setMemberFilters((prev) => ({ ...prev, standing: value }))
                 }
               >
-                {STANDING_FILTER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="gem-standing">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDING_FILTER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="col-sm-6 col-md-4 col-xl-2">
-              <label className="form-label small text-muted">GEM status</label>
-              <select
-                className="form-select form-select-sm"
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-status">GEM status</Label>
+              <Select
                 value={memberFilters.meeting}
-                onChange={(e) =>
-                  setMemberFilters((prev) => ({ ...prev, meeting: e.target.value }))
+                onValueChange={(value) =>
+                  setMemberFilters((prev) => ({ ...prev, meeting: value }))
                 }
               >
-                <option value="all">All</option>
-                <option value="meeting">Meeting GEM</option>
-                <option value="not">Not meeting GEM</option>
-                <option value="requirements">Requirement not met</option>
-              </select>
+                <SelectTrigger id="gem-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="meeting">Meeting GEM</SelectItem>
+                  <SelectItem value="not">Not meeting GEM</SelectItem>
+                  <SelectItem value="requirements">
+                    Requirement not met
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="col-sm-6 col-md-4 col-xl-2">
-              <label className="form-label small text-muted">Start date</label>
-              <input
-                type="date"
-                className="form-control form-control-sm"
+          </div>
+
+          <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-start">Start date</Label>
+              <DatePicker
+                id="gem-start"
                 value={rangeFilters.start}
-                onChange={(e) =>
-                  setRangeFilters((prev) => ({ ...prev, start: e.target.value }))
+                placeholder="Any start"
+                clearable
+                onChange={(value) =>
+                  setRangeFilters((prev) => ({ ...prev, start: value }))
                 }
               />
             </div>
-            <div className="col-sm-6 col-md-4 col-xl-2">
-              <label className="form-label small text-muted">End date</label>
-              <input
-                type="date"
-                className="form-control form-control-sm"
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-end">End date</Label>
+              <DatePicker
+                id="gem-end"
                 value={rangeFilters.end}
-                onChange={(e) =>
-                  setRangeFilters((prev) => ({ ...prev, end: e.target.value }))
+                placeholder="Any end"
+                clearable
+                onChange={(value) =>
+                  setRangeFilters((prev) => ({ ...prev, end: value }))
                 }
               />
             </div>
-            <div className="col-sm-6 col-md-4 col-xl-2">
-              <label className="form-label small text-muted">Semester</label>
-              <input
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-semester">Semester</Label>
+              <Input
+                id="gem-semester"
                 type="text"
-                className="form-control form-control-sm"
                 placeholder="e.g., Fall 2026"
                 value={rangeFilters.semester}
                 onChange={(e) =>
-                  setRangeFilters((prev) => ({ ...prev, semester: e.target.value }))
+                  setRangeFilters((prev) => ({
+                    ...prev,
+                    semester: e.target.value,
+                  }))
                 }
               />
             </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                onClick={() => loadStatus(rangeFilters)}
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? <LoadingSpinner size="sm" /> : <Search aria-hidden="true" />}
+                {loading ? "Searching…" : "Search"}
+              </Button>
+            </div>
           </div>
-          <div className="d-flex justify-content-end mt-2">
-            <button
-              type="button"
-              className="btn btn-primary px-4"
-              onClick={() => loadStatus(rangeFilters)}
-              disabled={loading}
-            >
-              {loading ? "Searching..." : "Search"}
-            </button>
-          </div>
-        </div>
 
-        {error && (
-          <div className="alert alert-warning mt-3 mb-0" role="alert">
-            {error}
-          </div>
-        )}
-        {loading && <LoadingState message="Loading GEM standings..." />}
-      </section>
+          {error && (
+            <Alert variant="warning" role="alert">
+              <TriangleAlert aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {loading && <LoadingState message="Loading GEM standings..." />}
 
       {!loading && status && (
-        <section className="bento-card mt-3">
-          <h2 className="h5 mb-3">Chapter overview</h2>
-          <div className="row g-3">
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            Chapter overview
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {statBlocks.map((block) => (
-              <div className="col-12 col-md-6 col-xl-3" key={block.label}>
-                <div className={`card border-${block.tone} h-100`}>
-                  <div className="card-body">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <h3 className={`h6 mb-0 text-${block.tone}`}>{block.label}</h3>
-                      <span className={`badge bg-${block.tone}`}>{block.value}</span>
-                    </div>
-                    <div className="progress mb-2" style={{ height: "20px" }}>
-                      <div
-                        className={`progress-bar bg-${block.tone}`}
-                        role="progressbar"
-                        style={{ width: `${block.pct}%` }}
-                        aria-valuenow={block.pct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      >
-                        {block.pct > 10 && `${block.pct.toFixed(0)}%`}
-                      </div>
-                    </div>
-                    <p className="text-muted small mb-0">
-                      {block.value} of {gemStats.total} active members (
-                      {block.pct.toFixed(1)}%)
+              <Card key={block.label}>
+                <CardContent className="space-y-2 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={cn("text-sm font-semibold", block.text)}>
+                      {block.label}
                     </p>
+                    <Badge variant={block.badge}>{block.value}</Badge>
                   </div>
-                </div>
-              </div>
+                  <div
+                    role="progressbar"
+                    aria-valuenow={Math.round(block.pct)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${block.label}: ${block.pct.toFixed(
+                      0
+                    )} percent of active members`}
+                    className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                  >
+                    <div
+                      className={cn("h-full rounded-full", block.bar)}
+                      style={{ width: `${block.pct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {block.value} of {gemStats.total} active members (
+                    {block.pct.toFixed(1)}%)
+                  </p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </section>
       )}
 
-      <section className="bento-card mt-3">
-        {viewMode === "cards" ? (
-          filteredMembers.length === 0 ? (
-            <p className="text-muted text-center py-4 mb-0">
-              No members match the current filters.
-            </p>
-          ) : (
-            <div className="row g-3">
-              {filteredMembers.map((member) => (
-                <div key={member.memberId} className="col-6 col-md-4 col-xl-3">
-                  <GemMemberCard member={member} onOpen={setDetailMember} />
-                </div>
-              ))}
-            </div>
-          )
+      {viewMode === "cards" ? (
+        filteredMembers.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="font-medium">No members match the current filters</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try a different search, committee, or standing.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover align-middle">
-              <thead>
-                <tr>
-                  <th>Member</th>
-                  <th>Requirements</th>
-                  <th>Points</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMembers.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="text-center text-muted">
-                      No members match the current filters.
-                    </td>
-                  </tr>
+          <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredMembers.map((member) => (
+              <li key={member.memberId} className="min-w-0">
+                <GemMemberCard member={member} onOpen={setDetailMember} />
+              </li>
+            ))}
+          </ul>
+        )
+      ) : (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-6">Member</TableHead>
+                    <TableHead>Requirements</TableHead>
+                    <TableHead>Points</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="pr-6">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMembers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-40 text-center">
+                        <p className="font-medium">
+                          No members match the current filters
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Try a different search, committee, or standing.
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredMembers.map((member) => (
+                      <TableRow key={member.memberId}>
+                        <TableCell className="pl-6">
+                          <p className="font-semibold text-foreground">
+                            {formatMemberName(member)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            #{member.rollNo || "N/A"}
+                          </p>
+                          {member.committees.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              {member.committees.join(" · ")}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              member.requirementsMet ? "success" : "destructive"
+                            }
+                          >
+                            {member.requirementsMet ? "Met" : "Not met"}
+                          </Badge>
+                          {!member.requirementsMet && (
+                            <p
+                              className={cn(
+                                "mt-1 text-xs",
+                                gemVerdictTone(member)
+                              )}
+                            >
+                              {gemShortVerdict(member)}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <p className="tabular-nums">
+                            {member.pointsEarned}/{member.pointsRequired}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            of {member.pointsAvailable} available
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1.5">
+                            <GemStatusBadge member={member} />
+                            {member.standing !== "none" && (
+                              <Badge variant={STANDING_BADGES[member.standing]}>
+                                {STANDING_LABELS[member.standing]}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="pr-6 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDetailMember(member)}
+                          >
+                            Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── GEM sheet ── */}
+      <Dialog
+        open={detailMember !== null}
+        onOpenChange={(next) => {
+          if (!next) setDetailMember(null);
+        }}
+      >
+        {detailMember && (
+          <DialogContent className="grid max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-5xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+            <DialogHeader className="border-b border-border px-6 py-5 pr-12 text-left">
+              <DialogTitle>
+                GEM sheet: {formatMemberName(detailMember)}
+              </DialogTitle>
+              <DialogDescription>
+                #{detailMember.rollNo || "N/A"}
+                {detailMember.ecouncilPosition
+                  ? ` · ${detailMember.ecouncilPosition}`
+                  : ""}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 overflow-y-auto px-6 py-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <GemStatusBadge member={detailMember} />
+                <Badge variant={STANDING_BADGES[detailMember.standing]}>
+                  {STANDING_LABELS[detailMember.standing]}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {gemVerdictLine(detailMember)}
+                </span>
+              </div>
+
+              {detailMember.standingNote && (
+                <Alert variant="warning">
+                  <TriangleAlert aria-hidden="true" />
+                  <AlertTitle>Goals</AlertTitle>
+                  <AlertDescription>
+                    {detailMember.standingNote}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <GemSheet
+                member={detailMember}
+                onManage={canManage ? openOverride(detailMember) : undefined}
+              />
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Committee meetings
+                </h3>
+                <GemCommitteeList member={detailMember} />
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Recorded GPA:{" "}
+                {detailMember.gpa.value !== null
+                  ? detailMember.gpa.value.toFixed(2)
+                  : "not recorded"}
+                . Not scored under the current bylaws.
+                {detailMember.gemRecordUpdatedAt && (
+                  <>
+                    {" "}
+                    Last saved{" "}
+                    {new Date(
+                      detailMember.gemRecordUpdatedAt
+                    ).toLocaleDateString()}
+                    .
+                  </>
                 )}
-                {filteredMembers.map((member) => (
-                  <tr key={member.memberId}>
-                    <td>
-                      <strong>{formatMemberName(member)}</strong>
-                      <div className="text-muted small">#{member.rollNo || "N/A"}</div>
-                      {member.committees.length > 0 && (
-                        <div className="text-muted small">
-                          {member.committees.join(" · ")}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${member.requirementsMet ? "bg-success" : "bg-danger"}`}
-                      >
-                        {member.requirementsMet ? "Met" : "Not met"}
-                      </span>
-                      {!member.requirementsMet && (
-                        <div className={`small mt-1 ${gemVerdictTone(member)}`}>
-                          {gemShortVerdict(member)}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div>
-                        {member.pointsEarned}/{member.pointsRequired}
-                      </div>
-                      <div className="text-muted small">
-                        of {member.pointsAvailable} available
-                      </div>
-                    </td>
-                    <td>
-                      <GemStatusBadge member={member} />
-                      {member.standing !== "none" && (
-                        <div className="mt-1">
-                          <span className={`badge ${STANDING_BADGES[member.standing]}`}>
-                            {STANDING_LABELS[member.standing]}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => setDetailMember(member)}
-                      >
-                        Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              </p>
+            </div>
+
+            <DialogFooter className="gap-2 border-t border-border px-6 py-4">
+              {canManage && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setStandingValue(detailMember.standing);
+                      setStandingNote(detailMember.standingNote || "");
+                      setStandingTarget(detailMember);
+                    }}
+                  >
+                    Standing
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setGpaValue(
+                        detailMember.gpa.value !== null
+                          ? String(detailMember.gpa.value)
+                          : ""
+                      );
+                      setGpaTarget(detailMember);
+                    }}
+                  >
+                    GPA
+                  </Button>
+                </>
+              )}
+              <Button type="button" onClick={() => setDetailMember(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         )}
-      </section>
+      </Dialog>
 
-      {detailMember && (
-        <>
-          <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <div>
-                    <h5 className="modal-title">
-                      GEM sheet — {formatMemberName(detailMember)}
-                    </h5>
-                    <p className="text-muted small mb-0">
-                      #{detailMember.rollNo || "N/A"}
-                      {detailMember.ecouncilPosition
-                        ? ` · ${detailMember.ecouncilPosition}`
-                        : ""}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={() => setDetailMember(null)}
-                  />
-                </div>
-                <div className="modal-body">
-                  <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-                    <GemStatusBadge member={detailMember} className="fs-6 px-3 py-2" />
-                    <span className={`badge ${STANDING_BADGES[detailMember.standing]}`}>
-                      {STANDING_LABELS[detailMember.standing]}
-                    </span>
-                    <span className="text-muted small">{gemVerdictLine(detailMember)}</span>
-                  </div>
-                  {detailMember.standingNote && (
-                    <div className="alert alert-warning py-2">
-                      <strong>Goals:</strong> {detailMember.standingNote}
-                    </div>
-                  )}
+      {/* ── Section 2 substitution ── */}
+      <Dialog
+        open={overrideTarget !== null}
+        onOpenChange={(next) => {
+          if (!next && !saving) setOverrideTarget(null);
+        }}
+      >
+        {overrideTarget && (
+          <DialogContent
+            className="w-[calc(100%-2rem)] max-w-lg"
+            onInteractOutside={(event) => event.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>Section 2 substitution</DialogTitle>
+              <DialogDescription>
+                {overrideTarget.criterion.label} ·{" "}
+                {formatMemberName(overrideTarget.member)}
+              </DialogDescription>
+            </DialogHeader>
 
-                  <GemSheet
-                    member={detailMember}
-                    onManage={canManage ? openOverride(detailMember) : undefined}
-                  />
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                A member may replace a requirement with a service to the
+                chapter, documented in writing and presented verbally at a
+                general meeting, approved by a majority vote. Record the outcome
+                of that vote here.
+              </p>
 
-                  <div className="mt-3">
-                    <h6 className="mb-2">Committee meetings</h6>
-                    <GemCommitteeList member={detailMember} />
-                  </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="gem-override-outcome">Outcome</Label>
+                <Select
+                  value={overrideGranted ? "granted" : "denied"}
+                  onValueChange={(value) =>
+                    setOverrideGranted(value === "granted")
+                  }
+                >
+                  <SelectTrigger id="gem-override-outcome">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="granted">
+                      Chapter approved the substitution
+                    </SelectItem>
+                    <SelectItem value="denied">
+                      Chapter denied it (mark unmet)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                  <div className="mt-3 text-muted small">
-                    Recorded GPA:{" "}
-                    {detailMember.gpa.value !== null
-                      ? detailMember.gpa.value.toFixed(2)
-                      : "not recorded"}{" "}
-                    · not scored under the current bylaws.
-                    {detailMember.gemRecordUpdatedAt && (
-                      <>
-                        {" "}
-                        Last saved{" "}
-                        {new Date(detailMember.gemRecordUpdatedAt).toLocaleDateString()}.
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  {canManage && (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-outline-warning"
-                        onClick={() => {
-                          setStandingValue(detailMember.standing);
-                          setStandingNote(detailMember.standingNote || "");
-                          setStandingTarget(detailMember);
-                        }}
-                      >
-                        Standing
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary"
-                        onClick={() => {
-                          setGpaValue(
-                            detailMember.gpa.value !== null
-                              ? String(detailMember.gpa.value)
-                              : ""
-                          );
-                          setGpaTarget(detailMember);
-                        }}
-                      >
-                        GPA
-                      </button>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setDetailMember(null)}
-                  >
-                    Close
-                  </button>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="gem-override-note">Written documentation</Label>
+                <Textarea
+                  id="gem-override-note"
+                  rows={4}
+                  placeholder="What service was performed, and when the chapter voted."
+                  value={overrideNote}
+                  onChange={(e) => setOverrideNote(e.target.value)}
+                />
               </div>
             </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </>
-      )}
 
-      {overrideTarget && (
-        <>
-          <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-dialog-centered" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <div>
-                    <h5 className="modal-title">Section 2 substitution</h5>
-                    <p className="text-muted small mb-0">
-                      {overrideTarget.criterion.label} ·{" "}
-                      {formatMemberName(overrideTarget.member)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={() => setOverrideTarget(null)}
-                  />
-                </div>
-                <div className="modal-body">
-                  <p className="text-muted small">
-                    A member may replace a requirement with a service to the chapter,
-                    documented in writing and presented verbally at a general meeting,
-                    approved by a majority vote. Record the outcome of that vote here.
-                  </p>
-                  <div className="mb-3">
-                    <label className="form-label">Outcome</label>
-                    <select
-                      className="form-select"
-                      value={overrideGranted ? "granted" : "denied"}
-                      onChange={(e) => setOverrideGranted(e.target.value === "granted")}
-                    >
-                      <option value="granted">Chapter approved the substitution</option>
-                      <option value="denied">Chapter denied it (mark unmet)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Written documentation</label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      placeholder="What service was performed, and when the chapter voted."
-                      value={overrideNote}
-                      onChange={(e) => setOverrideNote(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  {overrideTarget.criterion.overridden && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger me-auto"
-                      onClick={() => saveOverride(true)}
-                      disabled={saving}
-                    >
-                      Remove substitution
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => saveOverride(false)}
-                    disabled={saving}
+            <DialogFooter className="gap-2 sm:justify-between">
+              {overrideTarget.criterion.overridden ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => saveOverride(true)}
+                  disabled={saving}
+                >
+                  Remove substitution
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOverrideTarget(null)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => saveOverride(false)}
+                  disabled={saving}
+                >
+                  {saving && <LoadingSpinner size="sm" />}
+                  {saving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
+
+      {/* ── Section 3 standing ── */}
+      <Dialog
+        open={standingTarget !== null}
+        onOpenChange={(next) => {
+          if (!next && !saving) setStandingTarget(null);
+        }}
+      >
+        {standingTarget && (
+          <DialogContent
+            className="w-[calc(100%-2rem)] max-w-lg"
+            onInteractOutside={(event) => event.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                Standing: {formatMemberName(standingTarget)}
+              </DialogTitle>
+              <DialogDescription>
+                Section 3 standing and Membership Integrity goals.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="gem-standing-value">Section 3 standing</Label>
+                <Select
+                  value={standingValue}
+                  onValueChange={(value) =>
+                    setStandingValue(value as GemStandingValue)
+                  }
+                >
+                  <SelectTrigger
+                    id="gem-standing-value"
+                    aria-describedby="gem-standing-hint"
                   >
-                    {saving ? (
-                      <>
-                        <LoadingSpinner size="sm" className="me-2" />
-                        Saving
-                      </>
-                    ) : (
-                      "Save"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setOverrideTarget(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GEM_STANDINGS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {STANDING_LABELS[value]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p
+                  id="gem-standing-hint"
+                  className="text-xs text-muted-foreground"
+                >
+                  Cooldown is the semester after a probation. A member on
+                  cooldown who fails GEM again skips the first round of voting.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="gem-standing-note">
+                  Membership Integrity goals (up to 3)
+                </Label>
+                <Textarea
+                  id="gem-standing-note"
+                  rows={4}
+                  value={standingNote}
+                  onChange={(e) => setStandingNote(e.target.value)}
+                />
               </div>
             </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </>
-      )}
 
-      {standingTarget && (
-        <>
-          <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-dialog-centered" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">
-                    Standing — {formatMemberName(standingTarget)}
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={() => setStandingTarget(null)}
-                  />
-                </div>
-                <div className="modal-body">
-                  <div className="mb-3">
-                    <label className="form-label">Section 3 standing</label>
-                    <select
-                      className="form-select"
-                      value={standingValue}
-                      onChange={(e) =>
-                        setStandingValue(e.target.value as GemStandingValue)
-                      }
-                    >
-                      {GEM_STANDINGS.map((value) => (
-                        <option key={value} value={value}>
-                          {STANDING_LABELS[value]}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="form-text">
-                      Cooldown is the semester after a probation. A member on cooldown who
-                      fails GEM again skips the first round of voting.
-                    </div>
-                  </div>
-                  <div>
-                    <label className="form-label">
-                      Membership Integrity goals (up to 3)
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={standingNote}
-                      onChange={(e) => setStandingNote(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={saveStanding}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <>
-                        <LoadingSpinner size="sm" className="me-2" />
-                        Saving
-                      </>
-                    ) : (
-                      "Save"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setStandingTarget(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </>
-      )}
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStandingTarget(null)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={saveStanding} disabled={saving}>
+                {saving && <LoadingSpinner size="sm" />}
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
 
-      {gpaTarget && (
-        <>
-          <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-dialog-centered" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">GPA for {formatMemberName(gpaTarget)}</h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={() => setGpaTarget(null)}
-                  />
-                </div>
-                <div className="modal-body">
-                  <p className="text-muted small">
-                    Recorded for the chapter&apos;s own reference. The 3.0 GPA point was
-                    removed from GEM, so this does not affect the sheet above.
-                  </p>
-                  <label className="form-label">GPA</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={4}
-                    step={0.01}
-                    className="form-control"
-                    value={gpaValue}
-                    onChange={(e) => setGpaValue(e.target.value)}
-                  />
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={saveGpa}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <>
-                        <LoadingSpinner size="sm" className="me-2" />
-                        Saving
-                      </>
-                    ) : (
-                      "Save"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setGpaTarget(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+      {/* ── Recorded GPA ── */}
+      <Dialog
+        open={gpaTarget !== null}
+        onOpenChange={(next) => {
+          if (!next && !saving) setGpaTarget(null);
+        }}
+      >
+        {gpaTarget && (
+          <DialogContent
+            className="w-[calc(100%-2rem)] max-w-md"
+            onInteractOutside={(event) => event.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>GPA for {formatMemberName(gpaTarget)}</DialogTitle>
+              <DialogDescription>
+                Recorded for the chapter&apos;s own reference. The 3.0 GPA point
+                was removed from GEM, so this does not affect the sheet.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="gem-gpa">GPA</Label>
+              <Input
+                id="gem-gpa"
+                type="number"
+                min={0}
+                max={4}
+                step={0.01}
+                value={gpaValue}
+                onChange={(e) => setGpaValue(e.target.value)}
+              />
             </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </>
-      )}
-    </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setGpaTarget(null)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={saveGpa} disabled={saving}>
+                {saving && <LoadingSpinner size="sm" />}
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
+    </PageContainer>
   );
 }

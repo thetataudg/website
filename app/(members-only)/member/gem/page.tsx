@@ -2,7 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { Info, ShieldAlert, TriangleAlert } from "lucide-react";
+
 import LoadingState from "../../components/LoadingState";
+import { PageContainer, PageHeader } from "../../components/shell/PageShell";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   GemCommitteeList,
   GemSheet,
@@ -134,16 +150,16 @@ export default function GemDashboardPage() {
   }
   if (!isSignedIn) {
     return (
-      <div className="container">
-        <div className="alert alert-danger mt-5 d-flex align-items-center">
-          <div>
-            <h4>Please sign in to view GEM data.</h4>
-          </div>
-          <div className="ms-auto">
-            <RedirectToSignIn />
-          </div>
-        </div>
-      </div>
+      <PageContainer>
+        <Alert variant="destructive" role="alert">
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Sign-in required</AlertTitle>
+          <AlertDescription>
+            Please sign in to view GEM data.
+          </AlertDescription>
+        </Alert>
+        <RedirectToSignIn />
+      </PageContainer>
     );
   }
 
@@ -152,94 +168,111 @@ export default function GemDashboardPage() {
   }
 
   return (
-    <div className="member-dashboard gem-dashboard">
-      <section className="bento-card gem-hero">
-        <div className="d-flex flex-column flex-md-row justify-content-between gap-3">
-          <div>
-            <p className="hero-eyebrow text-muted">GEM Tracker</p>
-            <h1 className="hero-title mb-1">GEM Status</h1>
-            {status && (
-              <p className="text-muted small mb-1">
-                Semester: {status.semesterName} ({formatDateShort(status.startDate)} →{" "}
-                {formatDateShort(status.endDate)})
-              </p>
-            )}
-            {currentMember && (
-              <>
-                <p className="h5 mb-1">
-                  {currentMember.pointsEarned}/{currentMember.pointsRequired} points
-                  <span className="text-muted fs-6">
-                    {" "}
-                    (of {currentMember.pointsAvailable})
-                  </span>
-                </p>
-                <p className="text-muted small mb-0">{gemVerdictLine(currentMember)}</p>
-              </>
-            )}
-          </div>
-          <div className="d-flex flex-column align-items-md-end gap-2">
-            {currentMember ? (
-              <>
-                <GemStatusBadge member={currentMember} className="fs-6 px-3 py-2" />
-                {currentMember.standing !== "none" && (
-                  <span className={`badge ${STANDING_BADGES[currentMember.standing]}`}>
-                    {STANDING_LABELS[currentMember.standing]}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-muted small">GEM data pending</span>
-            )}
-          </div>
+    <PageContainer className="max-w-6xl space-y-6">
+      <PageHeader
+        title="GEM status"
+        description={
+          status
+            ? `${status.semesterName} · ${formatDateShort(
+                status.startDate
+              )} to ${formatDateShort(status.endDate)}`
+            : "Your standing under Article V."
+        }
+        actions={
+          currentMember ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <GemStatusBadge member={currentMember} />
+              {currentMember.standing !== "none" && (
+                <Badge variant={STANDING_BADGES[currentMember.standing]}>
+                  {STANDING_LABELS[currentMember.standing]}
+                </Badge>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              GEM data pending
+            </span>
+          )
+        }
+      />
+
+      {currentMember && (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="text-2xl font-semibold tabular-nums text-foreground">
+            {currentMember.pointsEarned}/{currentMember.pointsRequired}
+            <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+              points (of {currentMember.pointsAvailable})
+            </span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {gemVerdictLine(currentMember)}
+          </p>
         </div>
-        {currentMember?.standing !== "none" && currentMember?.standingNote && (
-          <div className="alert alert-warning mt-3 mb-0" role="alert">
-            <strong>Probation goals:</strong> {currentMember.standingNote}
-          </div>
-        )}
-        {error && (
-          <div className="alert alert-warning mt-3 mb-0" role="alert">
-            {error}
-          </div>
-        )}
-        {loading && <LoadingState message="Loading GEM standings..." />}
-      </section>
+      )}
+
+      {currentMember?.standing !== "none" && currentMember?.standingNote && (
+        <Alert variant="warning">
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>Probation goals</AlertTitle>
+          <AlertDescription>{currentMember.standingNote}</AlertDescription>
+        </Alert>
+      )}
+
+      {error && (
+        <Alert variant="warning" role="alert">
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {loading && <LoadingState message="Loading GEM standings..." />}
 
       {!loading && !currentMember && (
-        <div className="alert alert-secondary mt-3" role="alert">
-          Your GEM record is not yet available. Please check back with E-Council if you
-          need assistance.
-        </div>
+        <Alert>
+          <Info aria-hidden="true" />
+          <AlertTitle>GEM record not available yet</AlertTitle>
+          <AlertDescription>
+            Please check back with E-Council if you need assistance.
+          </AlertDescription>
+        </Alert>
       )}
 
       {!loading && currentMember && (
         <>
-          <section className="bento-card mt-3">
-            <GemSheet member={currentMember} />
-          </section>
+          <GemSheet member={currentMember} />
 
-          <section className="bento-card mt-3">
-            <h2 className="h5 mb-3">Committee meetings</h2>
-            <GemCommitteeList member={currentMember} />
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Committee meetings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GemCommitteeList member={currentMember} />
+            </CardContent>
+          </Card>
 
-          <section className="bento-card mt-3">
-            <h2 className="h5 mb-2">How GEM works</h2>
-            <p className="text-muted small mb-2">
-              Article V of the chapter bylaws. Every member must meet both requirements
-              and earn {currentMember.pointsRequired} of the{" "}
-              {currentMember.pointsAvailable} points each semester. Attendance comes from
-              event check-ins, and the dues point comes from the ledger.
-            </p>
-            <p className="text-muted small mb-0">
-              A requirement or point may be replaced by a service to the chapter under
-              Section 2, documented in writing, presented at a general meeting, and
-              approved by a majority vote. Approved substitutions show as{" "}
-              <span className="badge bg-primary">Chapter vote</span> above.
-            </p>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">How GEM works</CardTitle>
+              <CardDescription>Article V of the chapter bylaws.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Every member must meet both requirements and earn{" "}
+                {currentMember.pointsRequired} of the{" "}
+                {currentMember.pointsAvailable} points each semester. Attendance
+                comes from event check-ins, and the dues point comes from the
+                ledger.
+              </p>
+              <p>
+                A requirement or point may be replaced by a service to the
+                chapter under Section 2, documented in writing, presented at a
+                general meeting, and approved by a majority vote. Approved
+                substitutions are marked with a gavel icon above.
+              </p>
+            </CardContent>
+          </Card>
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

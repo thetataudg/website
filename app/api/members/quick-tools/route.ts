@@ -228,7 +228,6 @@ export async function POST(req: Request) {
 
     const selectedMembers = await Member.find({
       rollNo: { $in: assignedRollNos },
-      role: { $ne: "superadmin" },
       isHidden: { $ne: true },
     }).lean<{ rollNo: string; role?: string; isECouncil?: boolean; ecouncilPosition?: string }[]>();
 
@@ -243,7 +242,6 @@ export async function POST(req: Request) {
       selectedMembers.map((member) => [member.rollNo, member])
     );
     const currentBoardMembers = await Member.find({
-      role: { $ne: "superadmin" },
       isHidden: { $ne: true },
       isECouncil: true,
       ecouncilPosition: { $in: ELECTION_POSITIONS },
@@ -296,7 +294,7 @@ export async function POST(req: Request) {
 
       if (ADMIN_POSITIONS.has(position)) {
         patch.role = "admin";
-      } else if (member.role === "admin") {
+      } else if (member.role === "admin" || member.role === "superadmin") {
         patch.role = "member";
       }
 
@@ -313,7 +311,7 @@ export async function POST(req: Request) {
           isECouncil: false,
           ecouncilPosition: "",
         };
-        if (member.role === "admin") {
+        if (member.role === "admin" || member.role === "superadmin") {
           patch.role = "member";
         }
         addUpdate(member.rollNo, patch);
@@ -326,7 +324,7 @@ export async function POST(req: Request) {
       };
       if (ADMIN_POSITIONS.has(selectedPosition)) {
         patch.role = "admin";
-      } else if (member.role === "admin") {
+      } else if (member.role === "admin" || member.role === "superadmin") {
         patch.role = "member";
       }
       addUpdate(member.rollNo, patch);
@@ -370,7 +368,6 @@ export async function POST(req: Request) {
     const activeMembers = await Member.find({
       rollNo: { $in: rollNos },
       status: "Active",
-      role: { $ne: "superadmin" },
       isHidden: { $ne: true },
     }).lean<{ rollNo: string }[]>();
 

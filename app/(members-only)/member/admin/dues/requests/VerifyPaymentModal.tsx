@@ -1,9 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { CircleAlert } from "lucide-react";
+
 import { LoadingSpinner } from "../../../../components/LoadingState";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 export type QueuedSubmission = {
   _id: string;
@@ -71,7 +87,7 @@ export default function VerifyPaymentModal({
     event.preventDefault();
     if (saving) return;
     if (mode === "reject" && !reviewNote.trim()) {
-      setError("Give them a reason — they'll see it.");
+      setError("Give them a reason. They'll see it.");
       return;
     }
     setSaving(true);
@@ -101,173 +117,166 @@ export default function VerifyPaymentModal({
   }
 
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !saving) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-dialog-centered"
-        onClick={(event) => event.stopPropagation()}
+      <DialogContent
+        className="w-[calc(100%-2rem)] max-w-lg"
+        /* No backdrop dismissal while reviewing a payment claim. */
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <form className="modal-content" onSubmit={submit}>
-          <div className="modal-header">
-            <h5 className="modal-title">Review payment</h5>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
+        <DialogHeader>
+          <DialogTitle>Review payment</DialogTitle>
+          <DialogDescription>
+            {submission.charge?.description} &middot; {submission.charge?.term}{" "}
+            &middot; claimed {money(submission.amountCents)} by{" "}
+            {submission.method}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div className="rounded-md border border-border p-3">
+            <p className="text-sm font-semibold text-foreground">
+              {name}{" "}
+              <span className="font-normal text-muted-foreground">
+                #{submission.member?.rollNo ?? "Unknown"}
+              </span>
+            </p>
+            {submission.reference && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Reference: {submission.reference}
+              </p>
+            )}
           </div>
 
-          <div className="modal-body">
-            <div className="mb-3">
-              <div className="fw-semibold">
-                {name}{" "}
-                <span className="text-muted fw-normal">
-                  #{submission.member?.rollNo ?? "—"}
-                </span>
-              </div>
-              <div className="small text-muted">
-                {submission.charge?.description} &middot;{" "}
-                {submission.charge?.term} &middot; claimed {money(submission.amountCents)}{" "}
-                by {submission.method}
-              </div>
-              {submission.reference && (
-                <div className="small text-muted">
-                  Reference: {submission.reference}
-                </div>
-              )}
-            </div>
+          {/* Was a Bootstrap nav-pills list of plain buttons with no tab
+            * semantics; Tabs gives roving focus and arrow-key navigation. */}
+          <Tabs
+            value={mode}
+            onValueChange={(value) => setMode(value as "verify" | "reject")}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="verify">Verify</TabsTrigger>
+              <TabsTrigger value="reject">Reject</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-            <ul className="nav nav-pills mb-3">
-              <li className="nav-item">
-                <button
-                  type="button"
-                  className={`nav-link ${mode === "verify" ? "active" : ""}`}
-                  onClick={() => setMode("verify")}
+          {mode === "verify" && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="verify-paid-on">Date paid</Label>
+                <DatePicker
+                  id="verify-paid-on"
+                  value={paidOn}
+                  onChange={setPaidOn}
+                  aria-describedby="verify-paid-on-hint"
+                />
+                <p
+                  id="verify-paid-on-hint"
+                  className="text-xs text-muted-foreground"
                 >
-                  Verify
-                </button>
-              </li>
-              <li className="nav-item">
-                <button
-                  type="button"
-                  className={`nav-link ${mode === "reject" ? "active" : ""}`}
-                  onClick={() => setMode("reject")}
-                >
-                  Reject
-                </button>
-              </li>
-            </ul>
+                  Pre-filled with the date {submission.member?.fName ?? "they"}{" "}
+                  gave. This is what decides whether they paid on time, so leave
+                  it alone unless you know it&apos;s wrong. It is not affected
+                  by how long this sat in the queue.
+                  {submission.ageDays > 0 &&
+                    ` (Filed ${submission.ageDays} day${
+                      submission.ageDays === 1 ? "" : "s"
+                    } ago.)`}
+                </p>
+              </div>
 
-            {mode === "verify" && (
-              <>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="verify-paid-on">
-                    Date paid
-                  </label>
-                  <input
-                    id="verify-paid-on"
-                    type="date"
-                    className="form-control"
-                    value={paidOn}
-                    onChange={(event) => setPaidOn(event.target.value)}
+              <div className="space-y-1.5">
+                <Label htmlFor="verify-amount">Amount</Label>
+                <CurrencyInput
+                    id="verify-amount"
+                    step="0.01"
+                    min="0.01"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
                     required
+                    aria-describedby={
+                    submission.charge ? "verify-amount-hint" : undefined
+                    }
                   />
-                  <div className="form-text">
-                    Pre-filled with the date {submission.member?.fName ?? "they"}{" "}
-                    gave. This is what decides whether they paid on time, so
-                    leave it alone unless you know it&apos;s wrong &mdash;
-                    it&apos;s not affected by how long this sat in the queue.
-                    {submission.ageDays > 0 &&
-                      ` (Filed ${submission.ageDays} day${submission.ageDays === 1 ? "" : "s"} ago.)`}
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="verify-amount">
-                    Amount
-                  </label>
-                  <div className="input-group">
-                    <span className="input-group-text">$</span>
-                    <input
-                      id="verify-amount"
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      className="form-control"
-                      value={amount}
-                      onChange={(event) => setAmount(event.target.value)}
-                      required
-                    />
-                  </div>
-                  {submission.charge && (
-                    <div className="form-text">
-                      {money(submission.charge.balanceCents)} outstanding on this
-                      charge.
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            <div className="mb-1">
-              <label className="form-label" htmlFor="verify-note">
-                {mode === "reject" ? "Why?" : "Note"}{" "}
-                {mode === "verify" && (
-                  <span className="text-muted">(optional)</span>
+                {submission.charge && (
+                  <p
+                    id="verify-amount-hint"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {money(submission.charge.balanceCents)} outstanding on this
+                    charge.
+                  </p>
                 )}
-              </label>
-              <textarea
-                id="verify-note"
-                className="form-control"
-                rows={2}
-                value={reviewNote}
-                onChange={(event) => setReviewNote(event.target.value)}
-                placeholder={
-                  mode === "reject"
-                    ? "Couldn't find this in the Venmo history — can you send a screenshot?"
-                    : ""
-                }
-              />
-              {mode === "reject" && (
-                <div className="form-text">
-                  They&apos;ll see this, and both the claim and your reason stay
-                  in their history.
-                </div>
-              )}
-            </div>
+              </div>
+            </>
+          )}
 
-            {error && (
-              <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>
+          <div className="space-y-1.5">
+            <Label htmlFor="verify-note">
+              {mode === "reject" ? "Why?" : "Note"}{" "}
+              {mode === "verify" && (
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              )}
+            </Label>
+            <Textarea
+              id="verify-note"
+              rows={2}
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+              placeholder={
+                mode === "reject"
+                  ? "Couldn't find this in the Venmo history. Can you send a screenshot?"
+                  : ""
+              }
+              aria-describedby={
+                mode === "reject" ? "verify-note-hint" : undefined
+              }
+            />
+            {mode === "reject" && (
+              <p id="verify-note-hint" className="text-xs text-muted-foreground">
+                They&apos;ll see this, and both the claim and your reason stay in
+                their history.
+              </p>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={`btn ${mode === "verify" ? "btn-success" : "btn-danger"}`}
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
               disabled={saving}
             >
-              {saving ? (
-                <LoadingSpinner size="sm" />
-              ) : mode === "verify" ? (
-                "Verify payment"
-              ) : (
-                "Reject claim"
-              )}
-            </button>
-          </div>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant={mode === "verify" ? "default" : "destructive"}
+              disabled={saving}
+            >
+              {saving && <LoadingSpinner size="sm" />}
+              {saving
+                ? "Saving…"
+                : mode === "verify"
+                ? "Verify payment"
+                : "Reject claim"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

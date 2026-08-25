@@ -2,9 +2,43 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClock, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import {
+  Bell,
+  CircleAlert,
+  CircleCheck,
+  Clock,
+  Download,
+  Search,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+
 import LoadingState from "../../../components/LoadingState";
+import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
+import { cn } from "@/lib/utils";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PayOutCreditModal from "./PayOutCreditModal";
 import RemindModal from "./RemindModal";
 import MemberHistoryModal from "./MemberHistoryModal";
@@ -61,7 +95,7 @@ function money(cents: number) {
 }
 
 function dayLabel(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "Not set";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -124,211 +158,298 @@ export default function DuesRosterPage() {
 
   if (error || !data) {
     return (
-      <div className="container py-4">
-        <div className="alert alert-danger">{error || "Couldn't load the roster"}</div>
-        <button className="btn btn-outline-secondary" onClick={() => load()}>
+      <PageContainer className="max-w-7xl space-y-4">
+        <Alert variant="destructive" role="alert">
+          <CircleAlert aria-hidden="true" />
+          <AlertTitle>Couldn&apos;t load the roster</AlertTitle>
+          <AlertDescription>
+            {error || "Couldn't load the roster"}
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={() => load()}>
           Try again
-        </button>
-      </div>
+        </Button>
+      </PageContainer>
     );
   }
 
   const { totals } = data;
 
+  const tiles = [
+    { label: "Outstanding", value: money(totals.outstandingCents) },
+    { label: "Collected", value: money(totals.collectedCents) },
+    { label: "Still owing", value: `${totals.owingCount}` },
+    {
+      label: "Overdue",
+      value: `${totals.overdueCount}`,
+      danger: totals.overdueCount > 0,
+    },
+    // The chapter's own debt, shown as plainly as the members'.
+    { label: "Owed to members", value: money(totals.creditOwedCents ?? 0) },
+  ];
+
+  const FILTER_LABELS: Record<Filter, string> = {
+    owing: "Owing",
+    overdue: "Overdue",
+    credit: "We owe them",
+    all: "Everyone",
+  };
+
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
-        <h1 className="h4 mb-0">Dues</h1>
-        <div className="d-flex gap-2">
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => setReminding(true)}
-        >
-          Remind
-        </button>
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          disabled={exporting}
-          onClick={async () => {
-            setExporting(true);
-            try {
-              const res = await fetch("/api/dues/export");
-              const payload = await res.json();
-              if (!res.ok) throw new Error(payload?.error || "Couldn't build the export");
-              await exportAuditPdf(payload);
-            } catch (err: any) {
-              setFlash(err.message || "Couldn't build the export");
-            } finally {
-              setExporting(false);
-            }
-          }}
-        >
-          {exporting ? "Building…" : "Export"}
-        </button>
-        <Link href="/member/admin/dues/requests" className="btn btn-outline-primary btn-sm">
-          Requests
-          {totals.pendingReviewCount > 0 && (
-            <span className="badge bg-primary ms-2">
-              {totals.pendingReviewCount}
-            </span>
-          )}
-        </Link>
-        </div>
+    <PageContainer className="max-w-7xl space-y-6">
+      <PageHeader
+        title="Dues"
+        description="Who owes what."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setReminding(true)}>
+              <Bell aria-hidden="true" />
+              Remind
+            </Button>
+            <Button
+              variant="outline"
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  const res = await fetch("/api/dues/export");
+                  const payload = await res.json();
+                  if (!res.ok)
+                    throw new Error(
+                      payload?.error || "Couldn't build the export"
+                    );
+                  await exportAuditPdf(payload);
+                } catch (err: any) {
+                  setFlash(err.message || "Couldn't build the export");
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              <Download aria-hidden="true" />
+              {exporting ? "Building…" : "Export"}
+            </Button>
+            <Button asChild>
+              <Link href="/member/admin/dues/requests" className="no-underline">
+                Requests
+                {totals.pendingReviewCount > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {totals.pendingReviewCount}
+                  </Badge>
+                )}
+              </Link>
+            </Button>
+          </>
+        }
+      />
+
+      <div aria-live="polite" className="empty:hidden">
+        {flash && (
+          <Alert variant="success">
+            <CircleCheck aria-hidden="true" />
+            <AlertDescription>{flash}</AlertDescription>
+          </Alert>
+        )}
       </div>
-      <p className="text-muted">Who owes what.</p>
 
-      {flash && <div className="alert alert-success">{flash}</div>}
-
-      <div className="row g-3 mb-4">
-        {[
-          { label: "Outstanding", value: money(totals.outstandingCents) },
-          { label: "Collected", value: money(totals.collectedCents) },
-          { label: "Still owing", value: `${totals.owingCount}` },
-          {
-            label: "Overdue",
-            value: `${totals.overdueCount}`,
-            danger: totals.overdueCount > 0,
-          },
-          // The chapter's own debt, shown as plainly as the members'.
-          { label: "Owed to members", value: money(totals.creditOwedCents ?? 0) },
-        ].map((tile) => (
-          <div className="col-6 col-lg-3 col-xl-2" key={tile.label}>
-            <div className="card h-100">
-              <div className="card-body">
-                <div className="text-muted small text-uppercase">{tile.label}</div>
-                <div className={`fs-4 fw-semibold ${tile.danger ? "text-danger" : ""}`}>
-                  {tile.value}
-                </div>
-              </div>
-            </div>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {tiles.map((tile) => (
+          <div
+            key={tile.label}
+            className="rounded-lg border border-border bg-card p-4"
+          >
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {tile.label}
+            </dt>
+            <dd
+              className={cn(
+                "mt-1 text-xl font-semibold tabular-nums",
+                tile.danger ? "text-destructive" : "text-foreground"
+              )}
+            >
+              {tile.value}
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
 
-      <div className="d-flex gap-2 flex-wrap mb-3">
-        <div className="btn-group btn-group-sm">
-          {(["owing", "overdue", "credit", "all"] as Filter[]).map((option) => (
-            <button
-              key={option}
-              className={`btn btn-outline-secondary ${filter === option ? "active" : ""}`}
-              onClick={() => setFilter(option)}
+      <Card className="overflow-hidden">
+        <CardHeader className="gap-4 border-b lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1.5">
+            <CardTitle>Chapter roster</CardTitle>
+            <CardDescription>
+              {rows.length} member{rows.length === 1 ? "" : "s"} in this view.
+            </CardDescription>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Tabs
+              value={filter}
+              onValueChange={(value) => setFilter(value as Filter)}
             >
-              {option === "owing"
-                ? "Owing"
-                : option === "overdue"
-                ? "Overdue"
-                : option === "credit"
-                ? "We owe them"
-                : "Everyone"}
-            </button>
-          ))}
-        </div>
-        <input
-          className="form-control form-control-sm"
-          style={{ maxWidth: 280 }}
-          placeholder="Name or roll number"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </div>
+              <TabsList className="h-auto flex-wrap">
+                {(["owing", "overdue", "credit", "all"] as Filter[]).map(
+                  (option) => (
+                    <TabsTrigger key={option} value={option}>
+                      {FILTER_LABELS[option]}
+                    </TabsTrigger>
+                  )
+                )}
+              </TabsList>
+            </Tabs>
 
-      {rows.length === 0 ? (
-        <p className="text-muted py-4 text-center">Nobody matches that.</p>
-      ) : (
-        <div className="table-responsive">
-          <table className="table align-middle">
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th className="text-end">Assigned</th>
-                <th className="text-end">Paid</th>
-                <th className="text-end">Balance</th>
-                <th className="text-end">Credit</th>
-                <th>Next due</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.memberId}>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-link p-0 text-start text-decoration-none"
-                      onClick={() => setViewingHistory(row)}
-                    >
-                      <div className="fw-semibold">
-                        {row.fName} {row.lName}
-                      </div>
-                      <div className="small text-muted">#{row.rollNo}</div>
-                    </button>
-                  </td>
-                  <td className="text-end">{money(row.assignedCents)}</td>
-                  <td className="text-end text-muted">{money(row.paidCents)}</td>
-                  <td className="text-end fw-semibold">
-                    {row.balanceCents > 0 ? money(row.balanceCents) : "—"}
-                  </td>
-                  <td className="text-end">
-                    {row.creditCents > 0 ? (
-                      <button
-                        className="btn btn-sm btn-outline-success"
-                        onClick={() => setPayingOut(row)}
-                      >
-                        {money(row.creditCents)}
-                      </button>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    {row.plan ? (
-                      <>
-                        <div>{dayLabel(row.plan.dueNowDate)}</div>
-                        <div className="small text-muted">
-                          {money(row.plan.amountDueNowCents)} · installment{" "}
-                          {row.plan.currentSeq ?? row.plan.installmentCount} of{" "}
-                          {row.plan.installmentCount}
+            <div className="flex h-10 min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 sm:w-64">
+              <Search
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+              />
+              <input
+                type="search"
+                placeholder="Name or roll number"
+                aria-label="Search the dues roster"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="m-0 h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear dues search"
+                  className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Member</TableHead>
+                  <TableHead className="text-right">Assigned</TableHead>
+                  <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead className="text-right">Credit</TableHead>
+                  <TableHead>Next due</TableHead>
+                  <TableHead className="pr-6">
+                    <span className="sr-only">Status</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length ? (
+                  rows.map((row) => (
+                    <TableRow key={row.memberId}>
+                      <TableCell className="pl-6">
+                        <button
+                          type="button"
+                          onClick={() => setViewingHistory(row)}
+                          className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span className="block font-semibold text-foreground hover:underline">
+                            {row.fName} {row.lName}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            #{row.rollNo}
+                          </span>
+                          <span className="sr-only">, open finance history</span>
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {money(row.assignedCents)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {money(row.paidCents)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {row.balanceCents > 0 ? money(row.balanceCents) : money(0)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.creditCents > 0 ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPayingOut(row)}
+                            className="tabular-nums"
+                          >
+                            {money(row.creditCents)}
+                            <span className="sr-only">
+                              {`, pay out credit to ${row.fName} ${row.lName}`}
+                            </span>
+                          </Button>
+                        ) : (
+                          money(0)
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.plan ? (
+                          <>
+                            <span className="block text-sm">
+                              {dayLabel(row.plan.dueNowDate)}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {money(row.plan.amountDueNowCents)} · installment{" "}
+                              {row.plan.currentSeq ?? row.plan.installmentCount}{" "}
+                              of {row.plan.installmentCount}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-sm">
+                            {dayLabel(row.nextDueDate)}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="pr-6">
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.awaitingReview && (
+                            <Badge variant="muted">
+                              <Clock className="size-3" />
+                              In review
+                            </Badge>
+                          )}
+                          {row.plan && !row.plan.isBehind && (
+                            <Badge variant="secondary">
+                              {(row.plan.planCount ?? 1) > 1
+                                ? `On ${row.plan.planCount} plans`
+                                : "On a plan"}
+                            </Badge>
+                          )}
+                          {row.plan && row.plan.isBehind && (
+                            <Badge variant="destructive">
+                              {row.plan.missedCount} missed
+                            </Badge>
+                          )}
+                          {row.isOverdue && !row.plan && (
+                            <Badge variant="destructive">
+                              <TriangleAlert className="size-3" />
+                              Overdue
+                            </Badge>
+                          )}
                         </div>
-                      </>
-                    ) : (
-                      dayLabel(row.nextDueDate)
-                    )}
-                  </td>
-                  <td>
-                    {row.awaitingReview && (
-                      <span className="badge bg-info text-dark">
-                        <FontAwesomeIcon icon={faClock} className="me-1" />
-                        In review
-                      </span>
-                    )}
-                    {row.plan && !row.plan.isBehind && (
-                      <span className="badge bg-secondary">
-                        {(row.plan.planCount ?? 1) > 1
-                          ? `On ${row.plan.planCount} plans`
-                          : "On a plan"}
-                      </span>
-                    )}
-                    {row.plan && row.plan.isBehind && (
-                      <span className="badge bg-danger">
-                        {row.plan.missedCount} missed
-                      </span>
-                    )}
-                    {row.isOverdue && !row.plan && (
-                      <span className="badge bg-danger">
-                        <FontAwesomeIcon
-                          icon={faTriangleExclamation}
-                          className="me-1"
-                        />
-                        Overdue
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center">
+                      <p className="font-medium">Nobody matches that</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Try a different filter or search.
+                      </p>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       {viewingHistory && (
         <MemberHistoryModal
           rollNo={viewingHistory.rollNo}
@@ -362,6 +483,6 @@ export default function DuesRosterPage() {
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

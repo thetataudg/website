@@ -26,7 +26,7 @@ const expectations = [
 const timezone = "America/Phoenix";
 
 const formatArizona = (value: string | null) => {
-  if (!value) return "—";
+  if (!value) return "Not set";
   return new Date(value).toLocaleString("en-US", {
     timeZone: timezone,
     month: "short",

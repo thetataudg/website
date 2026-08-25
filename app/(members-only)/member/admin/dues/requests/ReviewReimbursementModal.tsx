@@ -1,9 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark, faReceipt } from "@fortawesome/free-solid-svg-icons";
+import { CircleAlert, Receipt, TriangleAlert } from "lucide-react";
+
 import { LoadingSpinner } from "../../../../components/LoadingState";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 export type QueuedReimbursement = {
   _id: string;
@@ -50,7 +64,7 @@ export default function ReviewReimbursementModal({
     event.preventDefault();
     if (saving) return;
     if (mode === "deny" && !reviewNote.trim()) {
-      setError("Give them a reason — they'll see it.");
+      setError("Give them a reason. They'll see it.");
       return;
     }
     setSaving(true);
@@ -89,172 +103,176 @@ export default function ReviewReimbursementModal({
   }
 
   return (
-    <div
-      className="modal d-block"
-      role="dialog"
-      style={{ background: "rgba(0,0,0,.5)" }}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !saving) onClose();
+      }}
     >
-      <div
-        className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-        onClick={(event) => event.stopPropagation()}
+      <DialogContent
+        className="grid max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+        /* No backdrop dismissal while reviewing a money claim. */
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <form className="modal-content" onSubmit={submit}>
-          <div className="modal-header">
-            <h5 className="modal-title">Review claim</h5>
-            <button
-              type="button"
-              className="btn btn-link text-body p-0 ms-auto"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
+        <DialogHeader className="border-b border-border px-6 py-5 pr-12 text-left">
+          <DialogTitle>Review reimbursement</DialogTitle>
+          <DialogDescription>
+            {reimbursement.description} &middot; {reimbursement.category}
+            {reimbursement.purchasedOn &&
+              ` · bought ${new Date(
+                reimbursement.purchasedOn
+              ).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                timeZone: "America/Phoenix",
+              })}`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          id="reimbursement-review-form"
+          onSubmit={submit}
+          className="space-y-4 overflow-y-auto px-6 py-5"
+        >
+          <div className="rounded-md border border-border p-3">
+            <p className="text-sm font-semibold text-foreground">
+              {name}{" "}
+              <span className="font-normal text-muted-foreground">
+                #{reimbursement.member?.rollNo ?? "Unknown"}
+              </span>
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Claimed {money(reimbursement.amountCents)} &middot; waiting{" "}
+              {reimbursement.ageDays}d
+            </p>
           </div>
 
-          <div className="modal-body">
-            <div className="mb-3">
-              <div className="fw-semibold">
-                {name}{" "}
-                <span className="text-muted fw-normal">
-                  #{reimbursement.member?.rollNo ?? "—"}
-                </span>
-              </div>
-              <div className="small text-muted">
-                {reimbursement.description} &middot; {reimbursement.category}
-                {reimbursement.purchasedOn &&
-                  ` · bought ${new Date(reimbursement.purchasedOn).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Phoenix" })}`}
-              </div>
-              <div className="small text-muted">
-                Claimed {money(reimbursement.amountCents)} &middot; waiting{" "}
-                {reimbursement.ageDays}d
-              </div>
-            </div>
-
-            {reimbursement.receiptUrls.length > 0 ? (
-              <div className="mb-3">
-                <div className="small text-uppercase text-muted mb-2">
-                  Receipts
-                </div>
-                <div className="d-flex flex-wrap gap-2">
-                  {reimbursement.receiptUrls.map((url, index) => (
+          {reimbursement.receiptUrls.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Receipts
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {reimbursement.receiptUrls.map((url, index) => (
+                  <Button key={url} variant="outline" size="sm" asChild>
                     <a
-                      key={url}
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-sm btn-outline-secondary"
+                      className="no-underline"
                     >
-                      <FontAwesomeIcon icon={faReceipt} className="me-1" />
+                      <Receipt aria-hidden="true" />
                       Receipt {index + 1}
+                      <span className="sr-only"> (opens in a new tab)</span>
                     </a>
-                  ))}
-                </div>
+                  </Button>
+                ))}
               </div>
-            ) : (
-              <div className="alert alert-warning py-2 small">
-                No receipt attached. Worth asking for one before approving.
-              </div>
-            )}
-
-            <ul className="nav nav-pills mb-3">
-              <li className="nav-item">
-                <button
-                  type="button"
-                  className={`nav-link ${mode === "approve" ? "active" : ""}`}
-                  onClick={() => setMode("approve")}
-                >
-                  Approve
-                </button>
-              </li>
-              <li className="nav-item">
-                <button
-                  type="button"
-                  className={`nav-link ${mode === "deny" ? "active" : ""}`}
-                  onClick={() => setMode("deny")}
-                >
-                  Deny
-                </button>
-              </li>
-            </ul>
-
-            {mode === "approve" && (
-              <div className="mb-3">
-                <label className="form-label" htmlFor="reimb-approve-amount">
-                  Amount to approve
-                </label>
-                <div className="input-group">
-                  <span className="input-group-text">$</span>
-                  <input
-                    id="reimb-approve-amount"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    className="form-control"
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-text">
-                  Comes off what they owe first. Anything left over is held as
-                  credit against their next dues, or you can pay it out from the
-                  roster.
-                </div>
-              </div>
-            )}
-
-            <div className="mb-1">
-              <label className="form-label" htmlFor="reimb-note">
-                {mode === "deny" ? "Why?" : "Note"}{" "}
-                {mode === "approve" && (
-                  <span className="text-muted">(optional)</span>
-                )}
-              </label>
-              <textarea
-                id="reimb-note"
-                className="form-control"
-                rows={2}
-                value={reviewNote}
-                onChange={(event) => setReviewNote(event.target.value)}
-                placeholder={
-                  mode === "deny"
-                    ? "This one needs a receipt before I can approve it."
-                    : ""
-                }
-              />
-              {mode === "deny" && (
-                <div className="form-text">
-                  They&apos;ll see this, and it stays in their history.
-                </div>
-              )}
             </div>
+          ) : (
+            <Alert variant="warning">
+              <TriangleAlert aria-hidden="true" />
+              <AlertDescription className="text-xs">
+                No receipt attached. Worth asking for one before approving.
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {error && (
-              <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>
+          {/* Was a Bootstrap nav-pills list of plain buttons with no tab
+            * semantics; Tabs gives roving focus and arrow-key navigation. */}
+          <Tabs
+            value={mode}
+            onValueChange={(value) => setMode(value as "approve" | "deny")}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="approve">Approve</TabsTrigger>
+              <TabsTrigger value="deny">Deny</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {mode === "approve" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="reimb-approve-amount">Amount to approve</Label>
+              <CurrencyInput
+                  id="reimb-approve-amount"
+                  step="0.01"
+                  min="0.01"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  required
+                  aria-describedby="reimb-approve-amount-hint"
+                />
+              <p
+                id="reimb-approve-amount-hint"
+                className="text-xs text-muted-foreground"
+              >
+                Comes off what they owe first. Anything left over is held as
+                credit against their next dues, or you can pay it out from the
+                roster.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="reimb-note">
+              {mode === "deny" ? "Why?" : "Note"}{" "}
+              {mode === "approve" && (
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              )}
+            </Label>
+            <Textarea
+              id="reimb-note"
+              rows={2}
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+              placeholder={
+                mode === "deny"
+                  ? "This one needs a receipt before I can approve it."
+                  : ""
+              }
+              aria-describedby={mode === "deny" ? "reimb-note-hint" : undefined}
+            />
+            {mode === "deny" && (
+              <p id="reimb-note-hint" className="text-xs text-muted-foreground">
+                They&apos;ll see this, and it stays in their history.
+              </p>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={`btn ${mode === "approve" ? "btn-success" : "btn-danger"}`}
-              disabled={saving}
-            >
-              {saving ? (
-                <LoadingSpinner size="sm" />
-              ) : mode === "approve" ? (
-                "Approve claim"
-              ) : (
-                "Deny claim"
-              )}
-            </button>
-          </div>
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </form>
-      </div>
-    </div>
+
+        <DialogFooter className="gap-2 border-t border-border px-6 py-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="reimbursement-review-form"
+            variant={mode === "approve" ? "default" : "destructive"}
+            disabled={saving}
+          >
+            {saving && <LoadingSpinner size="sm" />}
+            {saving
+              ? "Saving…"
+              : mode === "approve"
+              ? "Approve claim"
+              : "Deny claim"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
