@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Bungee } from "next/font/google";
+import { pageMetadata } from "@/lib/seo";
 import FamilyTreeContent from "./FamilyTreeContent";
 
 const bungee = Bungee({
@@ -8,10 +9,12 @@ const bungee = Bungee({
   weight: "400",
 });
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Family Tree",
-  description: "Explore Theta Tau big and little relationships.",
-};
+  description:
+    "Explore the big and little lineages of the Theta Tau Delta Gamma chapter at ASU.",
+  path: "/brothers/family-tree",
+});
 
 export default function FamilyTreePage() {
   return (

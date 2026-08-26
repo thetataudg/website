@@ -43,9 +43,18 @@ export default async function BrothersPage() {
   }
   const allMembers = (await res.json()) as any[];
 
-  // drop the super-admin and shape into your MemberData
+  // Drop the super-admin, anyone removed from the chapter, and anyone who has
+  // hidden their profile, then shape into MemberData.
+  //
+  // The public /brothers page already applied both exclusions; this one did
+  // not, so removed members and hidden profiles were still listed here.
   const members: MemberData[] = allMembers
-    .filter((m) => m.rollNo !== "000-ADMIN")
+    .filter(
+      (m) =>
+        m.rollNo !== "000-ADMIN" &&
+        m.status !== "Removed" &&
+        !m.isHidden
+    )
     .map((m) => ({
       rollNo: m.rollNo,
       fName: m.fName,

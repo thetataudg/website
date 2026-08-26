@@ -6,7 +6,12 @@ import logger from "@/lib/logger";
 import { connectDB } from "@/lib/db";
 import { emailToSlug } from "@/utils/email-to-slug";
 import Member from "@/lib/models/Member";
+import EmailDelivery from "@/lib/models/EmailDelivery";
 import { getRequestSource } from "@/lib/request-source";
+import {
+  invitationEmailConfigured,
+  sendInvitationEmail,
+} from "@/lib/notify/inviteEmail";
 
 export async function GET(req: Request) {
   await connectDB();
@@ -32,9 +37,16 @@ export async function GET(req: Request) {
   }
 
   try {
-    // 1. Fetch all pending invitations from Clerk
-    const allInvitations = await clerkClient.invitations.getInvitationList();
-    const pendingInvitations = allInvitations.filter((inv) => inv.status === "pending");
+    // 1. Fetch pending invitations from Clerk.
+    //
+    // Asking Clerk for status "pending" rather than pulling every invitation
+    // and filtering here: the unfiltered endpoint returns accepted ones too and
+    // is capped by a default page size, so once the chapter accumulated enough
+    // accepted invitations they would have crowded the genuinely pending ones
+    // out of the response and off this screen.
+    const pendingInvitations = await clerkClient.invitations.getInvitationList({
+      status: "pending",
+    });
 
     // 2. Fetch all Members' Clerk IDs
     const members = await Member.find({}, { clerkId: 1 }).lean();
@@ -65,11 +77,48 @@ export async function GET(req: Request) {
       }
     }
 
+    // Attach what we know about the invitation email itself. Clerk's REST API
+    // has no delivery field, so this comes from the `email.created` webhook
+    // recorded in app/api/clerk/webhook. An address with no row either predates
+    // the webhook being configured, or Clerk never created an email for it.
+    const addresses = filteredInvitations.map((inv) =>
+      inv.emailAddress.toLowerCase()
+    );
+    const deliveries = await EmailDelivery.find({
+      toEmailAddress: { $in: addresses },
+      slug: "invitation",
+    })
+      .sort({ occurredAt: -1 })
+      .lean();
+
+    const latestByAddress = new Map<string, any>();
+    for (const d of deliveries as any[]) {
+      // Sorted newest-first, so the first one seen for an address wins.
+      if (!latestByAddress.has(d.toEmailAddress)) {
+        latestByAddress.set(d.toEmailAddress, d);
+      }
+    }
+
+    const withDelivery = filteredInvitations.map((inv) => {
+      const d = latestByAddress.get(inv.emailAddress.toLowerCase());
+      return {
+        ...inv,
+        emailDelivery: d
+          ? {
+              status: d.status ?? null,
+              occurredAt: d.occurredAt ?? null,
+              deliveredByClerk: d.deliveredByClerk ?? null,
+            }
+          : null,
+      };
+    });
+
     logger.info({
       event: "Fetched filtered pending invitations",
-      count: filteredInvitations.length,
+      count: withDelivery.length,
+      withEmailRecord: latestByAddress.size,
     });
-    return NextResponse.json(filteredInvitations, { status: 200 });
+    return NextResponse.json(withDelivery, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to fetch invitations");
     return NextResponse.json(
@@ -77,6 +126,48 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
+}
+
+/// Creates a Clerk invitation through the REST API rather than the SDK.
+///
+/// Two reasons the SDK will not do. Its `Invitation` class is constructed from
+/// six fields and `url` is not one of them, so `createInvitation().url` is
+/// undefined at runtime, not merely untyped — and that ticket URL is the whole
+/// point when we mail the invitation ourselves. It also lets the caller read
+/// Clerk's error codes directly, which matter here: `duplicate_record` when any
+/// prior invitation exists (a revoked one counts, even though the message says
+/// "already pending") and `form_identifier_exists` when the address already has
+/// a Clerk user.
+async function createInvitation(params: {
+  email: string;
+  redirectUrl: string;
+  notify: boolean;
+}): Promise<{ ok: boolean; status: number; body: any }> {
+  const res = await fetch("https://api.clerk.com/v1/invitations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email_address: params.email,
+      redirect_url: params.redirectUrl,
+      notify: params.notify,
+      // Without this, every address that has ever been invited and rejected is
+      // permanently un-invitable: rejecting deletes the Clerk user, which
+      // revokes their invitation, and a revoked invitation still trips Clerk's
+      // duplicate check. There is no API to delete one.
+      ignore_existing: true,
+    }),
+  });
+  const text = await res.text();
+  let body: any;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = text;
+  }
+  return { ok: res.ok, status: res.status, body };
 }
 
 export async function POST(req: NextRequest) {
@@ -132,17 +223,63 @@ export async function POST(req: NextRequest) {
     `${process.env.NEXT_PUBLIC_APP_URL}` +
     `/member/onboard/${emailToSlug(email)}`;
 
+  // Who mails the invitation. Clerk's own copy cannot be restyled without the
+  // paid `app:custom_email_template` feature, so when Resend is available we
+  // create the invitation silently and send the branded version ourselves. If
+  // it is not, Clerk sends its plain one: an unbranded invitation beats an
+  // invitation nobody receives.
+  const weSendIt = invitationEmailConfigured();
+
   try {
-    const invitation = await clerkClient.invitations.createInvitation({
-      emailAddress: email,
-      redirectUrl,
-      notify: true,
-    });
+    const created = await createInvitation({ email, redirectUrl, notify: !weSendIt });
+
+    if (!created.ok) {
+      const friendly =
+        created.body?.errors?.[0]?.long_message ||
+        created.body?.errors?.[0]?.message ||
+        "Invite failed";
+      logger.error({ status: created.status, body: created.body }, "Failed to send invite");
+      return NextResponse.json({ error: friendly }, { status: created.status });
+    }
+
+    const invitation = created.body;
+
+    if (weSendIt) {
+      const result = await sendInvitationEmail({
+        email,
+        // Clerk's ticket URL, the same link its own email would have carried.
+        acceptUrl: invitation.url,
+      });
+
+      if (!result.sent) {
+        // Roll the invitation back. Leaving it pending would mean an address
+        // that received nothing yet cannot be re-invited without hitting
+        // Clerk's duplicate check, and would sit in the admin's pending list
+        // looking as though it had been delivered.
+        try {
+          await clerkClient.invitations.revokeInvitation(invitation.id);
+        } catch (revokeErr: any) {
+          logger.error(
+            { err: revokeErr, invitationId: invitation.id },
+            "Could not revoke an invitation whose email failed"
+          );
+        }
+        logger.error(
+          { reason: result.reason, email },
+          "Invitation created but the email could not be sent"
+        );
+        return NextResponse.json(
+          { error: "Could not send the invitation email. Nothing was sent; try again." },
+          { status: 502 }
+        );
+      }
+    }
 
     logger.info({
       event: "Invitation sent",
       invitationId: invitation.id,
       by: admin.clerkId,
+      sentVia: weSendIt ? "resend" : "clerk",
     });
     return NextResponse.json(invitation, { status: 201 });
   } catch (err: any) {

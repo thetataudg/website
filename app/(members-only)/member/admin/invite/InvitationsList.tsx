@@ -2,7 +2,15 @@
 "use client";
 
 import { useState } from "react";
-import { CircleCheck, Clock, MailX, Trash2 } from "lucide-react";
+import {
+  CircleCheck,
+  Clock,
+  MailCheck,
+  MailQuestion,
+  MailWarning,
+  MailX,
+  Trash2,
+} from "lucide-react";
 import type { Invitation } from "@clerk/clerk-sdk-node";
 
 import {
@@ -26,9 +34,61 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+export type EmailDelivery = {
+  /// Clerk's word for the email, e.g. "queued", "delivered", "failed".
+  status: string | null;
+  occurredAt: string | null;
+  deliveredByClerk: boolean | null;
+};
+
 interface Props {
-  invites: (Invitation & { status?: string })[];
+  invites: (Invitation & { status?: string; emailDelivery?: EmailDelivery | null })[];
   onRevoke: (id: string) => void;
+}
+
+/// Clerk reports only that it created and queued the message; whether it landed
+/// in an inbox is between Clerk's provider and the recipient's mail server. So
+/// the badge deliberately says "Sent", never "Delivered", unless Clerk itself
+/// used that word.
+function EmailStatusBadge({ delivery }: { delivery?: EmailDelivery | null }) {
+  if (!delivery) {
+    return (
+      <Badge variant="muted" title="No email.created webhook has been received for this address">
+        <MailQuestion className="size-3" />
+        No record
+      </Badge>
+    );
+  }
+
+  const status = (delivery.status ?? "").toLowerCase();
+  const when = delivery.occurredAt
+    ? new Date(delivery.occurredAt).toLocaleString()
+    : undefined;
+
+  if (status === "failed" || status === "bounced" || status === "undelivered") {
+    return (
+      <Badge variant="destructive" title={when}>
+        <MailWarning className="size-3" />
+        {status === "failed" ? "Failed" : "Bounced"}
+      </Badge>
+    );
+  }
+
+  if (status === "delivered") {
+    return (
+      <Badge variant="success" title={when}>
+        <MailCheck className="size-3" />
+        Delivered
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="muted" title={when ? `Clerk queued this at ${when}` : undefined}>
+      <MailCheck className="size-3" />
+      Sent
+    </Badge>
+  );
 }
 
 export default function InvitationsList({ invites, onRevoke }: Props) {
@@ -59,6 +119,7 @@ export default function InvitationsList({ invites, onRevoke }: Props) {
           <TableRow>
             <TableHead className="pl-6">Email</TableHead>
             <TableHead className="w-32">Status</TableHead>
+            <TableHead className="w-36">Email status</TableHead>
             <TableHead className="w-32 pr-6">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -84,6 +145,9 @@ export default function InvitationsList({ invites, onRevoke }: Props) {
                       Pending
                     </Badge>
                   )}
+                </TableCell>
+                <TableCell>
+                  <EmailStatusBadge delivery={inv.emailDelivery} />
                 </TableCell>
                 <TableCell className="pr-6 text-right">
                   {!accepted && (
