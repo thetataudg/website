@@ -26,7 +26,11 @@ const AvatarImage = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AvatarPrimitive.Image
     ref={ref}
-    className={cn("aspect-square h-full w-full", className)}
+    // `object-cover` is load-bearing: Radix renders a plain <img>, whose
+    // default object-fit is `fill`, so `aspect-square` was stretching every
+    // non-square profile photo sideways to fit the circle rather than cropping
+    // it. Portrait headshots came out visibly squashed.
+    className={cn("aspect-square h-full w-full object-cover", className)}
     {...props}
   />
 ))

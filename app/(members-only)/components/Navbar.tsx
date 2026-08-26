@@ -334,7 +334,10 @@ export default function MemberNavbar() {
           {
             key: "more-merch",
             label: "Merchandise",
-            href: "https://thetatau-dg.org/2dg4u",
+            // Relative on purpose: /2dg4u is a redirect this app owns (see
+            // next.config.mjs). Hardcoding the old apex sent members through an
+            // extra cross-domain hop after the move to ttdg.org.
+            href: "/2dg4u",
             external: true,
             separatorBefore: true,
           },

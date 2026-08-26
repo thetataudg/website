@@ -146,17 +146,28 @@ export default function MinuteDetailClient({ date }: { date: string }) {
 
   useEffect(() => {
     if (!canManageMinutes(member)) return;
-    fetch("/api/events?includePast=true")
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load events");
-        return response.json();
+    Promise.all([
+      fetch("/api/events?includePast=true"),
+      fetch("/api/committees"),
+    ])
+      .then(async ([eventsResponse, committeesResponse]) => {
+        if (!eventsResponse.ok || !committeesResponse.ok) {
+          throw new Error("Unable to load events");
+        }
+        return Promise.all([eventsResponse.json(), committeesResponse.json()]);
       })
-      .then((data: any[]) => {
+      .then(([eventData, committeeData]: [any[], any[]]) => {
+        const committeeNames = new Map(
+          committeeData.map((committee) => [String(committee._id), committee.name])
+        );
         setEvents(
-          data.map((event) => ({
+          eventData.map((event) => ({
             _id: event._id,
             name: event.name,
             startTime: event.startTime,
+            committeeName: event.committeeId
+              ? committeeNames.get(String(event.committeeId))
+              : "Chapter-wide",
           }))
         );
       })

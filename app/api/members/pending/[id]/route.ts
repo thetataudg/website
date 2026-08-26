@@ -187,6 +187,39 @@ export async function PATCH(
 
     return NextResponse.json({ status: "approved" }, { status: 200 });
   } else {
+    // Read the address off the Clerk user before deleting them: once the user
+    // is gone there is no way back to it, and it is what the outstanding
+    // invitation is keyed by.
+    let email: string | undefined;
+    try {
+      const user = await clerkClient.users.getUser(pending.clerkId);
+      email =
+        user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
+          ?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
+    } catch (err: any) {
+      logger.warn({ err, clerkId: pending.clerkId }, "Could not read Clerk user before rejection");
+    }
+
+    // Revoke the invitation that brought them here. Deleting the Clerk user
+    // revokes it anyway, but doing it explicitly keeps the admin's pending list
+    // honest even when the user delete below fails.
+    if (email) {
+      try {
+        const invites = await clerkClient.invitations.getInvitationList({
+          status: "pending",
+        });
+        const theirs = invites.filter(
+          (i) => i.emailAddress.toLowerCase() === email!.toLowerCase()
+        );
+        for (const inv of theirs) {
+          await clerkClient.invitations.revokeInvitation(inv.id);
+          logger.info({ event: "Invitation revoked on rejection", invitationId: inv.id });
+        }
+      } catch (err: any) {
+        logger.error({ err, email }, "Failed to revoke invitations during rejection");
+      }
+    }
+
     try {
       await clerkClient.users.deleteUser(pending.clerkId);
       logger.info({
@@ -198,14 +231,23 @@ export async function PATCH(
     }
 
     await PendingMember.findByIdAndDelete(params.id);
+
+    // Guarded: Mongoose strips undefined from a filter, so a missing clerkId
+    // would turn this into deleteOne({}) and remove an unrelated member.
+    let removedMembers = 0;
+    if (pending.clerkId) {
+      const res = await Member.deleteMany({ clerkId: pending.clerkId });
+      removedMembers = res.deletedCount ?? 0;
+    }
+
     logger.info({
       event: "Pending request rejected and deleted",
       pendingId: params.id,
       rejectedBy: admin.clerkId,
       comments: reviewComments,
+      email,
+      removedMembers,
     });
-
-    await Member.deleteOne({ clerkId: pending.clerkId });
 
     return NextResponse.json({ status: "rejected" }, { status: 200 });
   }

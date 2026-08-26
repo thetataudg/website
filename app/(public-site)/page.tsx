@@ -1,12 +1,77 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import TypingAnimation from "./components/TypingAnimation";
 import HomeRevealEffects from "./components/HomeRevealEffects";
 import HomeStats from "./components/HomeStats";
 import { bungee } from "../fonts";
+import { siteUrl, absoluteUrl } from "@/lib/siteUrl";
+
+const DESCRIPTION =
+  "Theta Tau, Delta Gamma chapter is a coed professional engineering fraternity at Arizona State University in Tempe, AZ.";
+
+// The homepage previously exported no metadata at all, so it had no canonical
+// and no og:url. `title.absolute` keeps the root layout's "%s | ..." template
+// from doubling the chapter name back onto itself here.
+export const metadata: Metadata = {
+  title: {
+    absolute: "ASU Theta Tau - Delta Gamma Chapter | Professional Engineering Fraternity",
+  },
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "ASU Theta Tau - Delta Gamma Chapter",
+    description: DESCRIPTION,
+    url: "/",
+    siteName: "ASU Theta Tau - Delta Gamma Chapter",
+    locale: "en_US",
+    type: "website",
+    images: [
+      {
+        url: absoluteUrl("/og-default.jpg"),
+        width: 1200,
+        height: 630,
+        alt: "Members of the Theta Tau Delta Gamma chapter at Arizona State University",
+      },
+    ],
+  },
+};
+
+// Organization markup, so the chapter can win a knowledge panel for its own
+// name and so the domain move is stated explicitly to crawlers rather than
+// inferred. `sameAs` is how Google reconciles the site with the socials it
+// already knows about.
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Theta Tau, Delta Gamma Chapter",
+  alternateName: "ASU Theta Tau",
+  description: DESCRIPTION,
+  url: siteUrl(),
+  logo: absoluteUrl("/crest-transparent.png"),
+  image: absoluteUrl("/og-default.jpg"),
+  foundingDate: "1904",
+  parentOrganization: {
+    "@type": "Organization",
+    name: "Theta Tau",
+    url: "https://thetatau.org",
+  },
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Tempe",
+    addressRegion: "AZ",
+    addressCountry: "US",
+  },
+  email: "general@thetatau-dg.org",
+  sameAs: ["https://www.instagram.com/thetataudg/"],
+};
 
 export default function Home() {
   return (
     <main className="bg-[#120a0a] pb-16 text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
       <HomeRevealEffects />
       <section className="relative min-h-[85vh] w-full">
         <Image

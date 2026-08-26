@@ -58,3 +58,6 @@ calendar.json
 .next.bak*
 /.build/
 .appstore-check.cjs
+
+# Rendered previews from npm run clerk:emails
+.clerk-email-preview/

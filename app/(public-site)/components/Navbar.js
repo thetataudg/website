@@ -198,6 +198,8 @@ const Navbar = () => {
             <SignedOut>
               <li>
                 <SignInButton
+                  signInForceRedirectUrl="/member"
+                  signInFallbackRedirectUrl="/member"
                   signUpForceRedirectUrl="/member/onboard"
                   signUpFallbackRedirectUrl="/member/onboard"
                 >
@@ -305,6 +307,8 @@ const Navbar = () => {
               <SignedOut>
                 <li>
                   <SignInButton
+                    signInForceRedirectUrl="/member"
+                    signInFallbackRedirectUrl="/member"
                     signUpForceRedirectUrl="/member/onboard"
                     signUpFallbackRedirectUrl="/member/onboard"
                   >

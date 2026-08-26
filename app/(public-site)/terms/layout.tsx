@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Rush",
+  title: "Terms of Use",
   description:
-    "Rush events and recruitment details for Theta Tau Delta Gamma.",
-  path: "/rush",
+    "The terms that govern your use of the Theta Tau Delta Gamma chapter website and its services.",
+  path: "/terms",
 });
 
-export default function RushLayout({
+export default function TermsLayout({
   children,
 }: {
   children: React.ReactNode;

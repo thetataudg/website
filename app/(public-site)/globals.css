@@ -163,6 +163,15 @@ p {
   color: #1a0f0f;
 }
 
+/* The /mobile page reuses the site's button shapes but not the uppercase,
+   letter-spaced treatment the rest of the site uses. Defined after the two
+   button rules above so it wins on equal specificity. */
+.tt-button-plain {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 16px;
+}
+
 .tt-button-rush {
   color: #ffffff;
   font-size: 20px;

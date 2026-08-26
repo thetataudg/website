@@ -47,7 +47,7 @@ const buildS3Client = async () => {
     return null;
   }
   const clockOffset = await resolveClockOffsetMs();
-  return new S3Client({
+  const client = new S3Client({
     region: garageSigningRegion,
     endpoint: resolvedEndpoint,
     credentials: {
@@ -57,6 +57,9 @@ const buildS3Client = async () => {
     forcePathStyle: true,
     systemClockOffset: clockOffset,
   });
+  // Handed back because an explicit `signingDate` overrides the client's own
+  // systemClockOffset, so the caller has to fold the offset in itself.
+  return { client, clockOffset };
 };
 
 const parseGarageUrl = (url: string) => {
@@ -74,6 +77,21 @@ const parseGarageUrl = (url: string) => {
   }
 };
 
+/// How long a presigned URL stays byte-for-byte identical.
+///
+/// Signing with `new Date()` produced a different X-Amz-Date and X-Amz-Signature
+/// on every single call, so the browser saw a brand new URL for the same photo
+/// on every page load and could never reuse its cache: 40-odd avatars were
+/// re-downloaded every time the roster rendered. Rounding the signing time down
+/// to a window makes every request inside that window produce the exact same
+/// string, which is all the HTTP cache needs.
+///
+/// It is also the ceiling on how long a replaced photo can keep showing the old
+/// image, because uploads overwrite a stable key (members/<roll>/photo.jpg) and
+/// so the URL itself never changes when the picture does.
+const PRESIGN_STABLE_WINDOW_SECONDS =
+  Number(process.env.GARAGE_PRESIGN_STABLE_WINDOW_SECONDS) || 15 * 60;
+
 export const maybePresignUrl = async (
   url?: string,
   expiresInSeconds = Number(process.env.GARAGE_PRESIGN_EXPIRES_SECONDS) || 3600
@@ -83,15 +101,35 @@ export const maybePresignUrl = async (
   if (!parsed) return url;
 
   try {
-    const client = await buildS3Client();
-    if (!client) return url;
+    const built = await buildS3Client();
+    if (!built) return url;
+    const { client, clockOffset } = built;
+
+    const windowMs = PRESIGN_STABLE_WINDOW_SECONDS * 1000;
+    const signingDate = new Date(
+      Math.floor((Date.now() + clockOffset) / windowMs) * windowMs
+    );
+
+    // The signature starts at the beginning of the stable window, not at the
+    // instant this function is called. Add that window to the requested TTL so
+    // a URL requested near the end of the window still remains valid for at
+    // least `expiresInSeconds` from now. This is especially important for
+    // short-lived server fetches such as Apple Wallet pass thumbnails.
+    const effectiveExpiresIn =
+      Math.max(1, expiresInSeconds) + PRESIGN_STABLE_WINDOW_SECONDS;
+
     return await getSignedUrl(
       client,
       new GetObjectCommand({
         Bucket: parsed.bucket,
         Key: parsed.key,
+        // A signed parameter, so it does not invalidate the signature the way a
+        // hand-appended query string would. It makes Garage return the caching
+        // headers the browser needs: serve from cache instantly, then
+        // revalidate quietly in the background and swap if the bytes changed.
+        ResponseCacheControl: `public, max-age=${PRESIGN_STABLE_WINDOW_SECONDS}, stale-while-revalidate=${PRESIGN_STABLE_WINDOW_SECONDS}`,
       }),
-      { expiresIn: expiresInSeconds }
+      { expiresIn: effectiveExpiresIn, signingDate }
     );
   } catch (err: any) {
     logger.warn({ err, url }, "Failed to presign Garage URL");
