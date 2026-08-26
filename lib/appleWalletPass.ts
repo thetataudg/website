@@ -616,7 +616,7 @@ async function loadProfilePhoto(profilePicUrl?: string) {
   if (!profilePicUrl) return null;
 
   try {
-    const presignedUrl = await maybePresignUrl(profilePicUrl, 300);
+    const presignedUrl = await maybePresignUrl(profilePicUrl);
     if (!presignedUrl) return null;
     const response = await fetch(presignedUrl);
     if (!response.ok) {

@@ -10,6 +10,7 @@ import {
   shouldEnableAppleWalletAppLinks,
   shouldEnableAppleWalletUpdates,
 } from "@/lib/appleWalletConfig";
+import { absoluteUrl } from "@/lib/siteUrl";
 
 export const runtime = "nodejs";
 
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
       serialNumber: passRecord.serialNumber,
       authenticationToken: updatesEnabled ? passRecord.authenticationToken : undefined,
       webServiceURL: updatesEnabled
-        ? new URL("/api/wallet/apple-pass/v1", req.url).toString()
+        ? absoluteUrl("/api/wallet/apple-pass/v1")
         : undefined,
       nfcMessage: nfcEncryptionPublicKey ? passRecord.nfcMessage : undefined,
       nfcEncryptionPublicKey,

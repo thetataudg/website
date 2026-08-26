@@ -110,6 +110,14 @@ export const maybePresignUrl = async (
       Math.floor((Date.now() + clockOffset) / windowMs) * windowMs
     );
 
+    // The signature starts at the beginning of the stable window, not at the
+    // instant this function is called. Add that window to the requested TTL so
+    // a URL requested near the end of the window still remains valid for at
+    // least `expiresInSeconds` from now. This is especially important for
+    // short-lived server fetches such as Apple Wallet pass thumbnails.
+    const effectiveExpiresIn =
+      Math.max(1, expiresInSeconds) + PRESIGN_STABLE_WINDOW_SECONDS;
+
     return await getSignedUrl(
       client,
       new GetObjectCommand({
@@ -121,7 +129,7 @@ export const maybePresignUrl = async (
         // revalidate quietly in the background and swap if the bytes changed.
         ResponseCacheControl: `public, max-age=${PRESIGN_STABLE_WINDOW_SECONDS}, stale-while-revalidate=${PRESIGN_STABLE_WINDOW_SECONDS}`,
       }),
-      { expiresIn: expiresInSeconds, signingDate }
+      { expiresIn: effectiveExpiresIn, signingDate }
     );
   } catch (err: any) {
     logger.warn({ err, url }, "Failed to presign Garage URL");

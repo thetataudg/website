@@ -1,11 +1,26 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
-import { FileText, Loader2 } from "lucide-react";
+import {
+  ChangeEvent,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Check, ChevronsUpDown, FileText, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   Dialog,
@@ -18,18 +33,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 export type EventOption = {
   _id: string;
   name: string;
   startTime: string;
+  committeeName?: string;
 };
 
 export type MinuteFormValues = {
@@ -63,7 +78,16 @@ const blankValues: MinuteFormValues = {
   executiveSummary: "",
 };
 
-const NO_EVENT = "__none";
+const RECENT_EVENT_COUNT = 5;
+const UPCOMING_EVENT_COUNT = 10;
+
+const eventDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "America/Phoenix",
+});
 
 const splitDateTime = (value: string) => {
   const [date = "", time = ""] = value.split("T");
@@ -142,6 +166,9 @@ export default function MinuteFormModal({
   const [selectedEventId, setSelectedEventId] = useState(
     initialValues?.eventId ?? ""
   );
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [eventSearch, setEventSearch] = useState("");
+  const [eventReferenceTime, setEventReferenceTime] = useState(Date.now());
   const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
@@ -149,8 +176,82 @@ export default function MinuteFormModal({
     setFile(null);
     setSelectedFileName("");
     setSelectedEventId(initialValues?.eventId ?? "");
+    setEventPickerOpen(false);
+    setEventSearch("");
+    if (open) setEventReferenceTime(Date.now());
     setValidationError("");
   }, [buildInitial, initialValues, open]);
+
+  const sortedEvents = useMemo(
+    () =>
+      [...(events ?? [])].sort(
+        (first, second) =>
+          new Date(first.startTime).getTime() -
+          new Date(second.startTime).getTime()
+      ),
+    [events]
+  );
+  const recentEvents = useMemo(
+    () =>
+      sortedEvents
+        .filter(
+          (event) => new Date(event.startTime).getTime() < eventReferenceTime
+        )
+        .slice(-RECENT_EVENT_COUNT)
+        .reverse(),
+    [eventReferenceTime, sortedEvents]
+  );
+  const upcomingEvents = useMemo(
+    () =>
+      sortedEvents
+        .filter(
+          (event) => new Date(event.startTime).getTime() >= eventReferenceTime
+        )
+        .slice(0, UPCOMING_EVENT_COUNT),
+    [eventReferenceTime, sortedEvents]
+  );
+  const normalizedEventSearch = eventSearch.trim().toLowerCase();
+  const searchedEvents = useMemo(() => {
+    if (!normalizedEventSearch) return [];
+    return sortedEvents.filter((event) =>
+      `${event.name} ${event.committeeName ?? ""}`
+        .toLowerCase()
+        .includes(normalizedEventSearch)
+    );
+  }, [normalizedEventSearch, sortedEvents]);
+  const selectedEvent = sortedEvents.find(
+    (event) => event._id === selectedEventId
+  );
+
+  const chooseEvent = (eventId: string) => {
+    setSelectedEventId(eventId);
+    setEventPickerOpen(false);
+    setEventSearch("");
+  };
+
+  const renderEventOption = (event: EventOption) => (
+    <CommandItem
+      key={event._id}
+      value={`${event.name} ${event.committeeName ?? ""} ${event._id}`}
+      onSelect={() => chooseEvent(event._id)}
+      className="items-start"
+    >
+      <Check
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5",
+          selectedEventId === event._id ? "opacity-100" : "opacity-0"
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{event.name}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {event.committeeName ? `${event.committeeName} · ` : ""}
+          {eventDateFormatter.format(new Date(event.startTime))}
+        </span>
+      </span>
+    </CommandItem>
+  );
 
   const handleChange = (
     field: keyof MinuteFormValues,
@@ -253,30 +354,90 @@ export default function MinuteFormModal({
             </div>
             <div className="space-y-2">
               <Label htmlFor="minute-event">Linked event</Label>
-              <Select
-                value={selectedEventId || NO_EVENT}
-                onValueChange={(value) =>
-                  setSelectedEventId(value === NO_EVENT ? "" : value)
-                }
-                disabled={disabled}
+              <Popover
+                open={eventPickerOpen}
+                onOpenChange={(nextOpen) => {
+                  setEventPickerOpen(nextOpen);
+                  if (!nextOpen) setEventSearch("");
+                }}
+                modal
               >
-                <SelectTrigger id="minute-event">
-                  <SelectValue placeholder="No linked event" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_EVENT}>No linked event</SelectItem>
-                  {events?.map((event) => (
-                    <SelectItem key={event._id} value={event._id}>
-                      {event.name} ·{" "}
-                      {new Intl.DateTimeFormat("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        timeZone: "America/Phoenix",
-                      }).format(new Date(event.startTime))}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="minute-event"
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={eventPickerOpen}
+                    disabled={disabled}
+                    className="w-full justify-between font-normal"
+                  >
+                    <span
+                      className={cn(
+                        "truncate",
+                        !selectedEvent && "text-muted-foreground"
+                      )}
+                    >
+                      {selectedEvent
+                        ? `${selectedEvent.name} · ${eventDateFormatter.format(
+                            new Date(selectedEvent.startTime)
+                          )}`
+                        : "No linked event"}
+                    </span>
+                    <ChevronsUpDown
+                      aria-hidden="true"
+                      className="shrink-0 opacity-50"
+                    />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                >
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      value={eventSearch}
+                      onValueChange={setEventSearch}
+                      placeholder="Search event or committee…"
+                    />
+                    <CommandList>
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      {normalizedEventSearch ? (
+                        <CommandGroup heading="Search results">
+                          {searchedEvents.map(renderEventOption)}
+                        </CommandGroup>
+                      ) : (
+                        <>
+                          <CommandGroup>
+                            <CommandItem
+                              value="No linked event"
+                              onSelect={() => chooseEvent("")}
+                            >
+                              <Check
+                                aria-hidden="true"
+                                className={cn(
+                                  selectedEventId ? "opacity-0" : "opacity-100"
+                                )}
+                              />
+                              No linked event
+                            </CommandItem>
+                          </CommandGroup>
+                          {recentEvents.length ? (
+                            <CommandGroup heading="Recent events">
+                              {recentEvents.map(renderEventOption)}
+                            </CommandGroup>
+                          ) : null}
+                          {upcomingEvents.length ? (
+                            <CommandGroup heading="Upcoming events">
+                              {upcomingEvents.map(renderEventOption)}
+                            </CommandGroup>
+                          ) : null}
+                        </>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 

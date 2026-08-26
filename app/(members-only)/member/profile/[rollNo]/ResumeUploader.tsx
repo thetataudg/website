@@ -85,41 +85,18 @@ export default function ResumeUploader({
     setUploading(true);
 
     try {
-      const presignRes = await fetch("/api/upload-file", {
+      // Keep the browser request on our own origin and let the API write to
+      // Garage. Direct browser PUTs depend on bucket CORS for every web origin.
+      const form = new FormData();
+      form.append("resume", file);
+      if (targetRollNo) form.append("targetRollNo", targetRollNo);
+
+      const uploadRes = await fetch("/api/upload-file", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "presign",
-          kind: "resume",
-          filename: file.name,
-          contentType: file.type,
-          size: file.size,
-          targetRollNo,
-        }),
-      });
-      if (!presignRes.ok) {
-        throw new Error(`Upload failed: ${await presignRes.text()}`);
-      }
-      const presignData = await presignRes.json();
-      const uploadRes = await fetch(presignData.uploadUrl, {
-        method: "PUT",
-        body: file,
+        body: form,
       });
       if (!uploadRes.ok) {
         throw new Error(`Upload failed: ${await uploadRes.text()}`);
-      }
-      const completeRes = await fetch("/api/upload-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "complete",
-          kind: "resume",
-          key: presignData.key,
-          targetRollNo,
-        }),
-      });
-      if (!completeRes.ok) {
-        throw new Error(`Upload failed: ${await completeRes.text()}`);
       }
       onClose();
       router.refresh();

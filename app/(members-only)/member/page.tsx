@@ -121,7 +121,7 @@ export default function Dashboard() {
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [lockdownState, setLockdownState] = useState<LockdownInfo | null>(null);
   const [lockdownLoading, setLockdownLoading] = useState(true);
-  const [homePanelsLoading, setHomePanelsLoading] = useState(false);
+  const [homePanelsLoading, setHomePanelsLoading] = useState(true);
   const [homePanelsError, setHomePanelsError] = useState<string | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [committeeMeetings, setCommitteeMeetings] = useState<DashboardEvent[]>(
@@ -132,6 +132,8 @@ export default function Dashboard() {
   );
   const [gemSnapshot, setGemSnapshot] = useState<GemMemberSnapshot | null>(null);
   const [dues, setDues] = useState<DuesSnapshot | null>(null);
+  const [duesLoading, setDuesLoading] = useState(true);
+  const [duesError, setDuesError] = useState<string | null>(null);
   const [walletPassStatus, setWalletPassStatus] = useState<
     "idle" | "loading" | "success"
   >("idle");
@@ -189,6 +191,14 @@ export default function Dashboard() {
     Boolean(userData?.memberId) &&
     !userData?.discordId &&
     !userData?.pending;
+  const normalizedMemberStatus = String(userData?.type || "").toLowerCase();
+  const hasDashboardAccess = Boolean(
+    userData?.memberId &&
+      userData?.userHasProfile &&
+      !userData?.pending &&
+      (normalizedMemberStatus === "active" ||
+        normalizedMemberStatus === "alumni")
+  );
 
   useEffect(() => {
     setShowLinkModal(needsDiscordLink);
@@ -350,7 +360,7 @@ export default function Dashboard() {
   }, [codeExpiresAt]);
 
   useEffect(() => {
-    if (!userData?.memberId || !userData?.userHasProfile) return;
+    if (!hasDashboardAccess || !userData?.memberId) return;
     let cancelled = false;
 
     const loadHomePanels = async () => {
@@ -361,13 +371,12 @@ export default function Dashboard() {
           userData.memberId
         )}`;
 
-        const [eventsRes, committeesRes, gemRes, duesRes] = await Promise.all([
+        const [eventsRes, committeesRes, gemRes] = await Promise.all([
           fetch("/api/events?status=scheduled,ongoing"),
           fetch(committeeUrl),
           // Scoped to this member: an officer's unscoped request comes back
           // with the whole chapter, and the card is about them.
           fetch(`/api/gem/status?memberId=${encodeURIComponent(userData.memberId)}`),
-          fetch("/api/dues/me"),
         ]);
 
         if (!eventsRes.ok) {
@@ -424,14 +433,7 @@ export default function Dashboard() {
             null;
         }
 
-        // Quiet when it fails: a member with no charges on record should get a
-        // dashboard, not an error about a card that would not have shown.
-        const duesSnapshot = duesRes.ok
-          ? ((await duesRes.json()) as DuesSnapshot)
-          : null;
-
         if (cancelled) return;
-        setDues(duesSnapshot);
         setCommitteeNames(nameLookup);
         setUpcomingEvents(chapterEvents);
         setCommitteeMeetings(myCommitteeEvents);
@@ -442,6 +444,8 @@ export default function Dashboard() {
         setHomePanelsError("We couldn't load homepage cards right now.");
         setUpcomingEvents([]);
         setCommitteeMeetings([]);
+        setCommitteeNames({});
+        setGemSnapshot(null);
       } finally {
         if (!cancelled) {
           setHomePanelsLoading(false);
@@ -454,11 +458,38 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [
+    hasDashboardAccess,
     userData?.memberId,
-    userData?.userHasProfile,
-    userData?.isAdmin,
-    userData?.isECouncil,
   ]);
+
+  useEffect(() => {
+    if (!hasDashboardAccess) return;
+    const controller = new AbortController();
+
+    const loadDues = async () => {
+      setDuesLoading(true);
+      setDuesError(null);
+      try {
+        const response = await fetch("/api/dues/me", {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Unable to load dues.");
+        const snapshot = (await response.json()) as DuesSnapshot;
+        setDues(snapshot);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Failed to load dashboard dues:", error);
+        setDues(null);
+        setDuesError("Dues couldn't be loaded right now.");
+      } finally {
+        if (!controller.signal.aborted) setDuesLoading(false);
+      }
+    };
+
+    loadDues();
+    return () => controller.abort();
+  }, [hasDashboardAccess]);
 
   if (!isLoaded || loadingUserData) {
     return <LoadingState message="Loading dashboard..." />;
@@ -482,7 +513,14 @@ export default function Dashboard() {
     );
   }
 
-  if (!userData || !userData.type) {
+  if (
+    normalizedMemberStatus === "removed" ||
+    normalizedMemberStatus === "deceased"
+  ) {
+    return <MembershipRevokedState />;
+  }
+
+  if (!hasDashboardAccess) {
     // All accesses are false for unapproved users
     const privileges = [
       { label: "Edit Profile", access: false },
@@ -503,7 +541,7 @@ export default function Dashboard() {
             <>
               <Badge variant="warning">
                 <Clock aria-hidden="true" />
-                Status: Pending
+                Status: {userData?.type || "Pending"}
               </Badge>
               <Badge variant="muted">Profile review in progress</Badge>
             </>
@@ -567,10 +605,6 @@ export default function Dashboard() {
     needsPermissionReview,
     needsProfileReview,
   } = userData;
-
-  if (userData.type === "Removed") {
-    return <MembershipRevokedState />;
-  }
 
   const userTypeDetails = [
     isAdmin && "Admin",
@@ -636,9 +670,6 @@ export default function Dashboard() {
     (event) => event._id !== nextEvent?._id
   );
 
-  const owes =
-    !!dues && (dues.amountDueNowCents > 0 || dues.balanceCents > 0 || dues.awaitingReview);
-
   return (
     <PageContainer className="space-y-8">
       {/* A vote runs for minutes and then it is gone, which is the one thing
@@ -701,21 +732,11 @@ export default function Dashboard() {
           formatTime={formatEventTime}
         />
 
-        {owes ? (
-          <DuesCard dues={dues!} />
-        ) : (
-          <QuietCard
-            icon={<CircleDollarSign className="size-5" aria-hidden="true" />}
-            title="Dues"
-            body={
-              dues && dues.creditCents > 0
-                ? `The chapter owes you ${formatMoney(dues.creditCents)}.`
-                : "Nothing outstanding. You're square with the chapter."
-            }
-            href="/member/dues"
-            action="Open dues"
-          />
-        )}
+        <DashboardDuesCard
+          dues={dues}
+          loading={duesLoading}
+          error={duesError}
+        />
 
         <GemCard
           snapshot={gemSnapshot}
@@ -1003,6 +1024,72 @@ function NextUpCard({
         </CardDescription>
       </CardHeader>
     </Card>
+  );
+}
+
+/**
+ * Dues owns its request state instead of borrowing the schedule/GEM state.
+ * A missing snapshot while loading is unknown, never a zero balance.
+ */
+function DashboardDuesCard({
+  dues,
+  loading,
+  error,
+}: {
+  dues: DuesSnapshot | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (loading) {
+    return (
+      <Card aria-busy="true" aria-label="Loading dues">
+        <CardHeader className="space-y-3">
+          <Skeleton className="h-3 w-16" />
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-5 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+        </CardHeader>
+        <CardFooter>
+          <Skeleton className="h-9 w-full" />
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  if (error || !dues) {
+    return (
+      <QuietCard
+        icon={<AlertTriangle className="size-5" aria-hidden="true" />}
+        title="Dues"
+        body={error || "Dues couldn't be loaded right now."}
+        href="/member/dues"
+        action="Open dues"
+      />
+    );
+  }
+
+  const owes =
+    dues.amountDueNowCents > 0 ||
+    dues.balanceCents > 0 ||
+    dues.awaitingReview;
+  if (owes) return <DuesCard dues={dues} />;
+
+  return (
+    <QuietCard
+      icon={<CircleDollarSign className="size-5" aria-hidden="true" />}
+      title="Dues"
+      body={
+        dues.creditCents > 0
+          ? `The chapter owes you ${formatMoney(dues.creditCents)}.`
+          : "Nothing outstanding. You're square with the chapter."
+      }
+      href="/member/dues"
+      action="Open dues"
+    />
   );
 }
 

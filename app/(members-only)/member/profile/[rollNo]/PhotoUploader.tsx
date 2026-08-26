@@ -219,41 +219,20 @@ export default function PhotoUploader({
     setUploading(true);
 
     try {
-      const presignRes = await fetch("/api/upload-file", {
+      // Send photos through our own API instead of uploading from the browser
+      // directly to Garage. The latter requires the photo bucket to allow every
+      // deployed web origin via CORS; the server-side path works consistently
+      // for production, previews, and localhost.
+      const form = new FormData();
+      form.append("photo", file);
+      if (targetRollNo) form.append("targetRollNo", targetRollNo);
+
+      const uploadRes = await fetch("/api/upload-file", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "presign",
-          kind: "photo",
-          filename: file.name,
-          contentType: file.type,
-          size: file.size,
-          targetRollNo,
-        }),
-      });
-      if (!presignRes.ok) {
-        throw new Error(`Upload failed: ${await presignRes.text()}`);
-      }
-      const presignData = await presignRes.json();
-      const uploadRes = await fetch(presignData.uploadUrl, {
-        method: "PUT",
-        body: file,
+        body: form,
       });
       if (!uploadRes.ok) {
         throw new Error(`Upload failed: ${await uploadRes.text()}`);
-      }
-      const completeRes = await fetch("/api/upload-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "complete",
-          kind: "photo",
-          key: presignData.key,
-          targetRollNo,
-        }),
-      });
-      if (!completeRes.ok) {
-        throw new Error(`Upload failed: ${await completeRes.text()}`);
       }
       onClose();
       router.refresh();
