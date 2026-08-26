@@ -21,7 +21,8 @@
     "check:apns": "node -r dotenv/config scripts/check-apns.mjs dotenv_config_path=.env",
     "seed:minutes": "node -r dotenv/config scripts/seed-minutes.mjs dotenv_config_path=.env",
     "check:plans": "esbuild scripts/check-plans-db.ts --bundle --platform=node --format=cjs --outfile=.plans-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .plans-check.cjs dotenv_config_path=.env; rc=$?; rm -f .plans-check.cjs; exit $rc",
-    "check:gem": "esbuild scripts/check-gem-logic.ts --bundle --platform=node --format=cjs --outfile=.gem-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .gem-check.cjs; rc=$?; rm -f .gem-check.cjs; exit $rc"
+    "check:gem": "esbuild scripts/check-gem-logic.ts --bundle --platform=node --format=cjs --outfile=.gem-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .gem-check.cjs; rc=$?; rm -f .gem-check.cjs; exit $rc",
+    "check:appstore": "esbuild scripts/check-appstore-webhook.ts --bundle --platform=node --format=cjs --outfile=.appstore-check.cjs --tsconfig=tsconfig.json --log-level=error --external:pino && node .appstore-check.cjs; rc=$?; rm -f .appstore-check.cjs; exit $rc"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
