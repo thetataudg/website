@@ -101,8 +101,8 @@ export default function VoteWorkspace() {
   /** Create, open, end, relocate, delete — and read a tally. */
   const canRunVotes =
     !!me && (isAdmin || position.includes("regent") || position.includes("scribe"));
-  /** Strike a ballot and sign off the roll. */
-  const canReviewBallots = !!me?.isECouncil;
+  /** Strike a ballot and sign off the roll. Admins retain the same oversight. */
+  const canReviewBallots = !!me && (isAdmin || !!me.isECouncil);
   const canSnapBid = position.includes("regent");
 
   React.useEffect(() => {

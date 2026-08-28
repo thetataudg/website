@@ -21,6 +21,8 @@ import {
   serializePlan,
 } from "@/lib/plans";
 import logger from "@/lib/logger";
+import OnlineDuesPayment from "@/lib/models/OnlineDuesPayment";
+import { serializeOnlinePayment } from "@/lib/onlineDuesPayments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +47,7 @@ export async function GET(req: Request) {
     const term = searchParams.get("term");
     if (term) filter.term = term;
 
-    const [charges, submissions, creditCents, plans] = await Promise.all([
+    const [charges, submissions, creditCents, plans, onlinePayments] = await Promise.all([
       DuesCharge.find(filter).lean(),
       PaymentSubmission.find({ memberId: member._id })
         .sort({ submittedAt: -1 })
@@ -56,6 +58,10 @@ export async function GET(req: Request) {
         .sort({ proposedAt: -1 })
         .limit(10)
         .lean<any[]>(),
+      OnlineDuesPayment.find({ memberId: member._id })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean<any[]>(),
     ]);
 
     const now = new Date();
@@ -63,6 +69,9 @@ export async function GET(req: Request) {
     // should mark them late while an officer gets to it.
     const pending = submissions.filter(
       (submission) => submission.status === "pending"
+    );
+    const onlineProcessing = onlinePayments.filter(
+      (payment) => payment.status === "processing"
     );
     // A member can run several plans at once — one per charge they asked to
     // spread out — so the screens get a list. Finished plans drop out of it
@@ -86,7 +95,7 @@ export async function GET(req: Request) {
     const summary = summarize(
       charges,
       now,
-      pending.length > 0 || awaitingPlan || inGrace
+      pending.length > 0 || onlineProcessing.length > 0 || awaitingPlan || inGrace
     );
     const chargesFor = (row: any) =>
       (charges as any[]).filter((charge) =>
@@ -146,6 +155,12 @@ export async function GET(req: Request) {
         ),
         submissions: submissions.map((submission) =>
           serializeSubmission(submission)
+        ),
+        onlinePayments: onlinePayments.map(serializeOnlinePayment),
+        awaitingOnlinePayment: onlineProcessing.length > 0,
+        onlineProcessingCents: onlineProcessing.reduce(
+          (sum, payment) => sum + (Number(payment.principalCents) || 0),
+          0
         ),
       },
       { status: 200 }

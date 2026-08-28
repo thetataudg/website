@@ -2,6 +2,7 @@
 // Turning a member's "I paid" claim into a ledger entry, and the pieces both
 // the website and the app need to render one.
 import PaymentSubmission from "@/lib/models/PaymentSubmission";
+import OnlineDuesPayment from "@/lib/models/OnlineDuesPayment";
 
 export interface PaymentSubmissionDTO {
   _id: string;
@@ -75,22 +76,32 @@ export async function membersAwaitingReview(
   memberIds: any[]
 ): Promise<Set<string>> {
   if (!memberIds.length) return new Set();
-  const pending = await PaymentSubmission.find({
-    memberId: { $in: memberIds },
-    status: "pending",
-  })
-    .select("memberId")
-    .lean<any[]>();
+  const [pending, online] = await Promise.all([
+    PaymentSubmission.find({
+      memberId: { $in: memberIds },
+      status: "pending",
+    })
+      .select("memberId")
+      .lean<any[]>(),
+    OnlineDuesPayment.find({
+      memberId: { $in: memberIds },
+      status: "processing",
+    })
+      .select("memberId")
+      .lean<any[]>(),
+  ]);
   return new Set(
-    pending.map((submission) => submission.memberId?.toString()).filter(Boolean)
+    [...pending, ...online]
+      .map((submission) => submission.memberId?.toString())
+      .filter(Boolean)
   );
 }
 
 /// True when this member has an unreviewed claim outstanding.
 export async function hasPendingSubmission(memberId: any): Promise<boolean> {
-  const count = await PaymentSubmission.countDocuments({
-    memberId,
-    status: "pending",
-  });
-  return count > 0;
+  const [claims, online] = await Promise.all([
+    PaymentSubmission.countDocuments({ memberId, status: "pending" }),
+    OnlineDuesPayment.countDocuments({ memberId, status: "processing" }),
+  ]);
+  return claims + online > 0;
 }

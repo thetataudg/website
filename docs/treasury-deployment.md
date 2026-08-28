@@ -30,9 +30,51 @@ moment their keys exist, with no code change and no redeploy logic.
 | `APNS_BUNDLE_ID` | Push | `org.thetatau.dg.ThetaTau` |
 | `DUES_CRON_SECRET` | Guards the **HTTP** cron route only — see below | — (route returns 500) |
 | `NEXT_PUBLIC_SITE_URL` or `NEXT_PUBLIC_APP_URL` | Absolute links in emails | — (links come out relative) |
+| `STRIPE_SECRET_KEY` | Server-created dues PaymentIntents | — (online checkout returns 503) |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe Elements and native iOS PaymentSheet | — (online checkout returns 503) |
+| `STRIPE_WEBHOOK_SECRET` | Verifies Stripe events before changing the ledger | — (webhook returns 503) |
+| `STRIPE_APPLE_MERCHANT_ID` | Apple Pay merchant identifier | `merchant.org.thetatau.dg.ThetaTau` |
+| `ONLINE_DUES_PAYMENTS_ENABLED` | Enables creation of online dues PaymentIntents | `false` (online payments remain unavailable) |
 
 Push requires **both** `APNS_KEY_ID` and `APNS_KEY_P8`; either one alone leaves
 the channel off.
+
+## Stripe dues payments
+
+Develop and verify in the Theta Tau Stripe sandbox. Put the sandbox `sk_test_`
+and `pk_test_` values in the local `.env` as `STRIPE_SECRET_KEY` and
+`STRIPE_PUBLISHABLE_KEY`; use the matching live keys only in Netlify after the
+test suite and live pilot pass. Neither secret key belongs in browser or iOS
+code. Both clients obtain only the publishable key from the authenticated API.
+
+Create a Stripe webhook endpoint for:
+
+```
+https://ttdg.org/api/stripe/webhook
+```
+
+Subscribe it to `payment_intent.processing`, `payment_intent.succeeded`,
+`payment_intent.payment_failed`, `payment_intent.canceled`, `charge.refunded`,
+`charge.dispute.created`, and `charge.dispute.closed`. Store that endpoint's
+`whsec_` signing secret as `STRIPE_WEBHOOK_SECRET`. Test and live endpoints
+have different secrets.
+
+The iOS app also needs Apple Developer merchant ID
+`merchant.org.thetatau.dg.ThetaTau`, the Apple Pay capability on its App ID,
+and that merchant ID registered under Stripe's Apple Pay settings. The
+entitlement and native PaymentSheet integration are already in this repo.
+Register `ttdg.org` as a Stripe payment-method domain as well; Apple Pay does
+not appear in the website Payment Element until the production domain is
+registered.
+
+For local webhook testing, run Stripe CLI forwarding to
+`http://localhost:3000/api/stripe/webhook` and use the temporary `whsec_`
+value it prints as `STRIPE_WEBHOOK_SECRET`.
+
+Online dues currently charge exactly the principal. Do not add a blanket
+processing percentage: ACH and debit cards cannot be treated as credit-card
+surcharges. Offline Zelle, Venmo, cash, and check payments continue through the
+treasurer verification queue.
 
 ## Resend
 

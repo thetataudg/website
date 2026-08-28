@@ -36,6 +36,7 @@ const CreditEntrySchema = new Schema(
     },
     refs: {
       reimbursementId: { type: Schema.Types.ObjectId, default: null },
+      onlinePaymentId: { type: Schema.Types.ObjectId, default: null },
     },
     actorId: { type: Schema.Types.ObjectId, ref: "Member", default: null },
     note: { type: String, default: "" },
@@ -44,6 +45,13 @@ const CreditEntrySchema = new Schema(
 );
 
 CreditEntrySchema.index({ memberId: 1, occurredAt: -1 });
+CreditEntrySchema.index(
+  { "refs.onlinePaymentId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: { "refs.onlinePaymentId": { $type: "objectId" } },
+  }
+);
 
 if (process.env.NODE_ENV === "development" && models.CreditEntry) {
   delete models.CreditEntry;

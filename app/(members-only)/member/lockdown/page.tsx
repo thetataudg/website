@@ -1,7 +1,32 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import {
+  CalendarClock,
+  Clock3,
+  Home,
+  Info,
+  LockKeyhole,
+  Radio,
+  Timer,
+} from "lucide-react";
+
+import LoadingState from "../../components/LoadingState";
+import { PageContainer } from "../../components/shell/PageShell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 const timezone = "America/Phoenix";
 
@@ -40,7 +65,7 @@ type LockdownState = {
 };
 
 const initialState: LockdownState = {
-  active: true,
+  active: false,
   reason: "",
   durationMinutes: 0,
   startedAt: null,
@@ -48,114 +73,149 @@ const initialState: LockdownState = {
 };
 
 export default function MemberLockdownPage() {
+  const router = useRouter();
   const [state, setState] = useState<LockdownState>(initialState);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
-  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const controller = new AbortController();
     const fetchState = async () => {
       try {
-        const res = await fetch("/api/lockdown", { signal: controller.signal });
+        const res = await fetch("/api/lockdown", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error("Unable to load lockdown status");
         const payload = await res.json();
+
+        if (!payload.active) {
+          router.replace("/member");
+          return;
+        }
+
         setState({
-          active: Boolean(payload.active),
+          active: true,
           reason: payload.reason || "",
           durationMinutes: Number(payload.durationMinutes || 0),
           startedAt: payload.startedAt || null,
           endsAt: payload.endsAt || null,
         });
-        window.localStorage.setItem("lockdown-active", payload.active ? "1" : "");
-        const initialTheme = document.body?.dataset?.theme;
-        setTheme(initialTheme === "dark" ? "dark" : "light");
-      } catch (err) {
-        console.error("Failed to fetch lockdown state", err);
-      } finally {
         setLoading(false);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        console.error("Failed to fetch lockdown state", err);
+        router.replace("/member");
       }
     };
     fetchState();
-    const observer = new MutationObserver(() => {
-      const current = document.body?.dataset?.theme;
-      setTheme(current === "dark" ? "dark" : "light");
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["data-theme"] });
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       controller.abort();
-      observer.disconnect();
       clearInterval(timer);
     };
-  }, []);
+  }, [router]);
 
   const countdown = useMemo(() => computeCountdown(state.endsAt, now), [state.endsAt, now]);
 
   if (loading) {
-    return (
-      <main
-        className={`min-h-screen flex items-center justify-center ${
-          theme === "dark" ? "bg-[#050611] text-white" : "bg-[#fdf4ec] text-[#2c1614]"
-        }`}
-      >
-        <p className="text-lg font-semibold">Checking lockdown status…</p>
-      </main>
-    );
+    return <LoadingState message="Checking lockdown status..." />;
   }
 
-  const containerClasses =
-    theme === "dark"
-      ? "bg-[#050611] text-[#f5dece] shadow-[0_20px_55px_rgba(0,0,0,0.75)] border border-[#222]"
-      : "bg-white text-[#2c1614] shadow-[0_30px_60px_rgba(0,0,0,0.15)] border border-[#f1d6ba]";
-
   return (
-    <main
-      className={`min-h-screen flex items-center justify-center px-4 py-10 ${
-        theme === "dark" ? "bg-[#03030a]" : "bg-gradient-to-b from-[#fef6ee] to-[#fff8ef]"
-      }`}
-    >
-      <div className={`w-full max-w-3xl rounded-[32px] ${containerClasses} px-12 py-10`}>
-        <section className="text-center">
-          <p className="text-xs uppercase tracking-[0.5em] text-[#d99c45]">Member services paused</p>
-          <h1 className="mt-3 text-4xl font-semibold">Site on Lockdown</h1>
-          <p className={`${theme === "dark" ? "text-white/80" : "text-[#2a1b16]"}`}>
-            Access to member-only areas is temporarily suspended while leadership performs updates. The site
-            will reopen when the maintenance window ends.
-          </p>
-        </section>
-        <section className="mt-8 space-y-6">
-          <div>
-            <p className="text-sm uppercase tracking-[0.4em] text-[#666] mb-1">Reason</p>
-            <p className="text-lg font-semibold">{state.reason || "(none provided)"}</p>
-          </div>
-          <div className="flex flex-wrap gap-10 text-left">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-[#666]">Started</p>
-              <p className="font-semibold">{formatArizona(state.startedAt)}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-[#666]">Scheduled end</p>
-              <p className="font-semibold">{formatArizona(state.endsAt)}</p>
-            </div>
-          </div>
-          <p className="text-base font-semibold text-[#d99c45]">Countdown: {countdown}</p>
-        </section>
-        <section className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <button
-            type="button"
-            className="tt-button-primary"
-            onClick={() => {
-              window.location.href = "/lockdown";
-            }}
-          >
-            Lockdown status
-          </button>
-          <Link href="/" className="tt-button-secondary">
-            Go to public home
-          </Link>
-        </section>
-      </div>
+    <main className="flex min-h-[calc(100vh-3.5rem)] items-center">
+      <PageContainer className="max-w-3xl py-10 sm:py-14">
+        <Card className="overflow-hidden">
+          <CardHeader className="items-center px-6 pb-6 pt-8 text-center sm:px-10 sm:pt-10">
+            <Badge variant="warning" className="mb-3">
+              <LockKeyhole aria-hidden="true" />
+              Member services paused
+            </Badge>
+            <CardTitle className="text-3xl tracking-tight sm:text-4xl">
+              Site on lockdown
+            </CardTitle>
+            <CardDescription className="max-w-2xl text-sm leading-6 sm:text-base">
+              Access to member-only areas is temporarily suspended while
+              leadership performs updates. The site will reopen when the
+              maintenance window ends.
+            </CardDescription>
+          </CardHeader>
+
+          <Separator />
+
+          <CardContent className="space-y-6 px-6 py-6 sm:px-10 sm:py-8">
+            <Alert variant="warning">
+              <Info aria-hidden="true" />
+              <AlertTitle>Reason</AlertTitle>
+              <AlertDescription>
+                {state.reason || "No reason was provided."}
+              </AlertDescription>
+            </Alert>
+
+            <dl className="grid gap-3 sm:grid-cols-3">
+              <StatusItem
+                icon={<Clock3 aria-hidden="true" />}
+                label="Started"
+                value={formatArizona(state.startedAt)}
+              />
+              <StatusItem
+                icon={<CalendarClock aria-hidden="true" />}
+                label="Scheduled end"
+                value={formatArizona(state.endsAt)}
+              />
+              <StatusItem
+                icon={<Timer aria-hidden="true" />}
+                label="Countdown"
+                value={countdown}
+                live
+              />
+            </dl>
+          </CardContent>
+
+          <CardFooter className="flex-col gap-3 border-t border-border bg-muted/30 px-6 py-6 sm:flex-row sm:justify-center sm:px-10">
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/lockdown">
+                <Radio aria-hidden="true" />
+                View lockdown status
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/">
+                <Home aria-hidden="true" />
+                Go to public home
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </PageContainer>
     </main>
+  );
+}
+
+function StatusItem({
+  icon,
+  label,
+  value,
+  live = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  live?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <dt className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground [&_svg]:size-4">
+        {icon}
+        {label}
+      </dt>
+      <dd
+        className="mt-2 text-sm font-semibold text-foreground"
+        aria-live={live ? "polite" : undefined}
+        aria-atomic={live || undefined}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }

@@ -54,6 +54,9 @@ check("paid in full -> never overdue", serializeCharge({ ...base, payments: [{ a
 check("waived -> never overdue", serializeCharge({ ...base, status: "waived" }, new Date("2026-12-01T00:00:00.000Z")).isOverdue, false);
 check("void -> balance zero", serializeCharge({ ...base, status: "void" }).balanceCents, 0);
 check("credit payment counts toward paid", serializeCharge({ ...base, payments: [{ amountCents: 4000, method: "credit" }] }).balanceCents, 21000);
+check("a partial Stripe refund reopens only the refunded amount", serializeCharge({ ...base, payments: [{ amountCents: 25000, reversedCents: 4000, method: "card" }] }).balanceCents, 4000);
+check("a fully disputed Stripe payment no longer settles the charge", serializeCharge({ ...base, payments: [{ amountCents: 25000, reversedCents: 25000, method: "card" }] }).balanceCents, 25000);
+check("a reversal can never make paid money negative", serializeCharge({ ...base, payments: [{ amountCents: 4000, reversedCents: 9000, method: "card" }] }).paidCents, 0);
 
 console.log("\nformatCents");
 check("whole dollars drop cents", formatCents(25000), "$250");
