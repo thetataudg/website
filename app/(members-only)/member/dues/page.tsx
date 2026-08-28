@@ -8,6 +8,7 @@ import {
   CircleCheck,
   Clock,
   History,
+  Landmark,
   Receipt,
   TriangleAlert,
 } from "lucide-react";
@@ -26,14 +27,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
 import MarkAsPaidModal, { PayableCharge } from "./MarkAsPaidModal";
@@ -126,6 +132,8 @@ type DuesResponse = {
   planEligibleChargeIds?: string[];
   awaitingPlanReview: boolean;
   nextDueDate: string | null;
+  awaitingOnlinePayment?: boolean;
+  onlineProcessingCents?: number;
 };
 
 function money(cents: number) {
@@ -170,8 +178,10 @@ export default function DuesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState<PayableCharge | null>(null);
+  const [onlinePaymentNoticeOpen, setOnlinePaymentNoticeOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
   /// A payment report the member is taking back. Only ever a pending one —
@@ -320,10 +330,20 @@ export default function DuesPage() {
     !data.awaitingReview;
 
   return (
-    <PageContainer className="max-w-3xl">
-      <PageHeader title="Dues" description="Your balance with the chapter." />
+    <PageContainer className="max-w-5xl space-y-6">
+      <PageHeader
+        className="mb-0"
+        title="Dues"
+        description="Your balance, payments, and chapter reimbursements in one place."
+        actions={
+          <Button variant="outline" onClick={() => setHistoryOpen(true)}>
+            <History aria-hidden="true" />
+            Transaction history
+          </Button>
+        }
+      />
 
-      <div aria-live="polite" className="mb-4 empty:hidden">
+      <div aria-live="polite" className="empty:hidden">
         {flash && (
           <Alert variant="success">
             <CircleCheck aria-hidden="true" />
@@ -332,85 +352,133 @@ export default function DuesPage() {
         )}
       </div>
 
-      <Card className="mb-4">
-        <CardContent className="pt-6">
-          {owes && (
-            <>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                You owe
-              </div>
-              <div className="text-4xl font-semibold tracking-tight text-foreground">
-                {money(data.amountDueNowCents)}
-              </div>
-              {data.dueNowDate && (
-                <div
-                  className={
-                    data.hasOverdue
-                      ? "mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive"
-                      : "mt-1 text-sm text-muted-foreground"
-                  }
-                >
-                  {data.hasOverdue && (
-                    <TriangleAlert aria-hidden="true" className="size-4" />
-                  )}
-                  {data.hasOverdue ? "Was due " : "Due "}
-                  {dayLabel(data.dueNowDate)}
+      <Card className="overflow-hidden">
+        <CardContent className="grid p-0 md:grid-cols-[minmax(0,1.6fr)_minmax(16rem,0.9fr)]">
+          <div className="p-6 sm:p-8">
+            {owes ? (
+              <>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Due now
                 </div>
-              )}
-              {/* On a plan the headline is this month, so the whole balance
-                  can't just disappear — it moves to secondary text. */}
-              {activePlans.length > 0 &&
-                data.balanceCents > data.amountDueNowCents && (
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {money(data.balanceCents)} owed in total, on{" "}
+                <div className="mt-1 text-4xl font-semibold tracking-tight text-foreground">
+                  {money(data.amountDueNowCents)}
+                </div>
+                {data.dueNowDate ? (
+                  <div
+                    className={
+                      data.hasOverdue
+                        ? "mt-2 flex items-center gap-1.5 text-sm font-medium text-destructive"
+                        : "mt-2 text-sm text-muted-foreground"
+                    }
+                  >
+                    {data.hasOverdue ? (
+                      <TriangleAlert aria-hidden="true" className="size-4" />
+                    ) : null}
+                    {data.hasOverdue ? "Was due " : "Due "}
+                    {dayLabel(data.dueNowDate)}
+                  </div>
+                ) : null}
+                {activePlans.length > 0 &&
+                data.balanceCents > data.amountDueNowCents ? (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {money(data.balanceCents)} owed in total across{" "}
                     {activePlans.length === 1
                       ? `a ${activePlans[0].installmentCount}-month plan`
                       : `${activePlans.length} payment plans`}
                   </div>
-                )}
-            </>
-          )}
+                ) : null}
+              </>
+            ) : holdsCredit ? (
+              <>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  The chapter owes you
+                </div>
+                <div className="mt-1 text-4xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
+                  {money(data.creditCents)}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  This credit is automatically applied to your next charge.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-emerald-500/10">
+                    <CircleCheck aria-hidden="true" className="size-6" />
+                  </span>
+                  All settled
+                </div>
+                <div className="mt-3 text-sm text-muted-foreground">
+                  You have no outstanding charges or payments awaiting action.
+                </div>
+              </>
+            )}
 
-          {holdsCredit && (
-            <>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                The chapter owes you
+            <dl className="mt-7 grid grid-cols-2 gap-4 border-t pt-5 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Current balance
+                </dt>
+                <dd className="mt-1 font-semibold tabular-nums text-foreground">
+                  {money(data.balanceCents)}
+                </dd>
               </div>
-              <div className="text-4xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
-                {money(data.creditCents)}
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Paid to date
+                </dt>
+                <dd className="mt-1 font-semibold tabular-nums text-foreground">
+                  {money(data.paidCents)}
+                </dd>
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                This comes off your next dues automatically.
+              <div className="col-span-2 sm:col-span-1">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Charges settled
+                </dt>
+                <dd className="mt-1 font-semibold tabular-nums text-foreground">
+                  {settled.length}
+                </dd>
               </div>
-            </>
-          )}
+            </dl>
+          </div>
 
-          {!owes && !holdsCredit && (
-            <>
-              <div className="flex items-center gap-2 text-3xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
-                <CircleCheck aria-hidden="true" className="size-7" />
-                All settled
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Nothing owed, nothing outstanding.
-              </div>
-            </>
-          )}
+          <div className="border-t bg-muted/30 p-6 md:border-l md:border-t-0 sm:p-8">
+            <h2 className="font-semibold text-foreground">Manage your account</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pay a balance, request a plan, or submit money the chapter owes you.
+            </p>
+            <div className="mt-5 grid gap-2">
+              {owes && !data.awaitingOnlinePayment ? (
+                <Button
+                  className="w-full justify-start"
+                  onClick={() => setOnlinePaymentNoticeOpen(true)}
+                >
+                  <Landmark aria-hidden="true" />
+                  Pay online
+                </Button>
+              ) : null}
+              {canRequestPlan ? (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => setPlanning(true)}
+                >
+                  <CalendarDays aria-hidden="true" />
+                  Ask to pay in installments
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setClaiming(true)}
+              >
+                <Receipt aria-hidden="true" />
+                Claim a reimbursement
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {canRequestPlan && (
-          <Button variant="outline" onClick={() => setPlanning(true)}>
-            <CalendarDays aria-hidden="true" />
-            Ask to pay in installments
-          </Button>
-        )}
-        <Button variant="outline" onClick={() => setClaiming(true)}>
-          <Receipt aria-hidden="true" />
-          Claim a reimbursement
-        </Button>
-      </div>
 
       {pendingPlans.map((plan) => (
         <Alert key={plan._id} variant="info" className="mb-4">
@@ -570,14 +638,32 @@ export default function DuesPage() {
         </Alert>
       )}
 
-      {outstanding.length > 0 && (
-        <section className="mb-4">
-          <SectionHeader className="mb-3" title="Outstanding" as="h2" />
-          <div className="divide-y divide-border rounded-lg border border-border">
+      {data.awaitingOnlinePayment ? (
+        <Alert variant="info" className="mb-4">
+          <Clock aria-hidden="true" />
+          <AlertTitle>
+            {money(data.onlineProcessingCents ?? 0)} bank payment processing.
+          </AlertTitle>
+          <AlertDescription>
+            Bank payments can take several business days. Your balance updates
+            automatically when Stripe confirms the payment.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {outstanding.length > 0 ? (
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b">
+            <CardTitle>Outstanding charges</CardTitle>
+            <CardDescription>
+              Items that still need payment or treasurer review.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border p-0">
             {outstanding.map((charge) => {
               const pending = pendingByCharge.get(charge._id);
               return (
-                <div key={charge._id} className="px-4 py-3">
+                <div key={charge._id} className="px-6 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-semibold text-foreground">
@@ -628,42 +714,57 @@ export default function DuesPage() {
                       <div className="text-lg font-semibold text-foreground">
                         {money(charge.balanceCents)}
                       </div>
-                      {!pending && (
-                        <Button
-                          size="sm"
-                          className="mt-1"
-                          onClick={() =>
-                            setPaying({
-                              _id: charge._id,
-                              description: charge.description,
-                              term: charge.term,
-                              balanceCents: charge.balanceCents,
-                            })
-                          }
-                        >
-                          I paid this
-                        </Button>
-                      )}
+                      {!pending && !data.awaitingOnlinePayment ? (
+                        <div className="mt-1 flex flex-col gap-1.5 sm:flex-row">
+                          <Button
+                            size="sm"
+                            onClick={() => setOnlinePaymentNoticeOpen(true)}
+                          >
+                            Pay online
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setPaying({
+                                _id: charge._id,
+                                description: charge.description,
+                                term: charge.term,
+                                balanceCents: charge.balanceCents,
+                              })
+                            }
+                          >
+                            Report offline payment
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
               );
             })}
-          </div>
-        </section>
-      )}
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {settled.length > 0 && (
-        <section>
-          <SectionHeader className="mb-3" title="Settled" as="h2" />
-          <div className="divide-y divide-border rounded-lg border border-border">
+      {settled.length > 0 ? (
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b">
+            <CardTitle>Settled charges</CardTitle>
+            <CardDescription>
+              {settled.length} completed charge{settled.length === 1 ? "" : "s"} on your account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border p-0">
             {settled.map((charge) => (
               <div
                 key={charge._id}
-                className="flex items-center justify-between gap-3 px-4 py-3"
+                className="flex items-center justify-between gap-4 px-6 py-4"
               >
                 <div className="min-w-0">
-                  <div className="text-foreground">{charge.description}</div>
+                  <div className="font-medium text-foreground">
+                    {charge.description}
+                  </div>
                   <div className="text-sm text-muted-foreground">
                     {charge.term}
                     {charge.status !== "open" && ` · ${charge.status}`}
@@ -675,16 +776,21 @@ export default function DuesPage() {
                 </span>
               </div>
             ))}
-          </div>
-        </section>
-      )}
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {reimbursements.length > 0 && (
-        <section className="mt-4">
-          <SectionHeader className="mb-3" title="Your claims" as="h2" />
-          <div className="divide-y divide-border rounded-lg border border-border">
+      {reimbursements.length > 0 ? (
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b">
+            <CardTitle>Reimbursement claims</CardTitle>
+            <CardDescription>
+              Purchases you submitted for the chapter to review.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border p-0">
             {reimbursements.map((claim) => (
-              <div key={claim._id} className="px-4 py-3">
+              <div key={claim._id} className="px-6 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold text-foreground">
@@ -720,33 +826,26 @@ export default function DuesPage() {
                 </div>
               </div>
             ))}
-          </div>
-        </section>
-      )}
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {/* Behind a button rather than laid out under the balance: the record is
-        * something a member goes looking for once in a while, and having every
-        * reminder and receipt on the page turned the thing they came for into
-        * the short bit at the top. The sheet also means it only loads when it
-        * is actually opened. */}
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="outline" className="w-full sm:w-auto">
-            <History aria-hidden="true" className="size-4" />
-            View your history
-          </Button>
-        </SheetTrigger>
+      {/* History stays in a sheet so the balance and current actions remain the
+          page's focus. It only loads when the member opens it. */}
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent
           side="right"
-          className="w-full overflow-y-auto sm:max-w-2xl"
+          className="grid w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-2xl"
         >
-          <SheetHeader className="mb-4">
+          <SheetHeader className="border-b border-border px-6 py-5 pr-12">
             <SheetTitle>Your history</SheetTitle>
             <SheetDescription>
               Every charge, payment, claim and reminder on your record.
             </SheetDescription>
           </SheetHeader>
-          <FinanceTimeline endpoint="/api/dues/history/me" bare />
+          <div className="overflow-y-auto px-6 py-5">
+            <FinanceTimeline endpoint="/api/dues/history/me" bare />
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -835,6 +934,29 @@ export default function DuesPage() {
           }}
         />
       )}
+
+      <AlertDialog
+        open={onlinePaymentNoticeOpen}
+        onOpenChange={setOnlinePaymentNoticeOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-2 flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Landmark aria-hidden="true" className="size-5" />
+            </div>
+            <AlertDialogTitle>Online payments are coming soon</AlertDialogTitle>
+            <AlertDialogDescription>
+              We&apos;re still finalizing this payment method. For now, please
+              use <span className="font-medium text-foreground">Report offline payment</span>{" "}
+              to record a payment made by Zelle, Venmo, cash, physical check,
+              or another offline method.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Got it</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 }

@@ -5,13 +5,18 @@ import Member from "@/lib/models/Member";
 import Vote from "@/lib/models/Vote";
 import logger from "@/lib/logger";
 
-// Helper to check E-Council
-async function requireECouncil(req: Request) {
+// Ballot review is available to E-Council and chapter administrators. This
+// matches the voting workspace: admins can run a vote and must be able to
+// verify its roll before the results they are allowed to read are unsealed.
+async function requireBallotReviewer(req: Request) {
   const clerkId = await requireAuth(req as any);
   await connectDB();
   const member = await Member.findOne({ clerkId }).lean();
-  if (!member || Array.isArray(member) || !member.isECouncil) {
-    throw new Error("Not authorized - E-Council only");
+  const isAdmin =
+    !Array.isArray(member) &&
+    (member?.role === "admin" || member?.role === "superadmin");
+  if (!member || Array.isArray(member) || (!isAdmin && !member.isECouncil)) {
+    throw new Error("Not authorized - E-Council or admin only");
   }
   return member;
 }
@@ -19,7 +24,7 @@ async function requireECouncil(req: Request) {
 // GET: Get list of all active members with their voting status
 export async function GET(req: Request) {
   try {
-    await requireECouncil(req);
+    await requireBallotReviewer(req);
     await connectDB();
     
     const { searchParams } = new URL(req.url);
@@ -84,7 +89,7 @@ export async function GET(req: Request) {
 // POST: Invalidate a ballot
 export async function POST(req: Request) {
   try {
-    await requireECouncil(req);
+    await requireBallotReviewer(req);
     const { clerkId, voteId } = await req.json();
     
     if (!clerkId || !voteId) {
@@ -127,7 +132,7 @@ export async function POST(req: Request) {
 // DELETE: Remove a ballot from invalidated list (restore it)
 export async function DELETE(req: Request) {
   try {
-    await requireECouncil(req);
+    await requireBallotReviewer(req);
     const { searchParams } = new URL(req.url);
     const clerkId = searchParams.get('clerkId');
     const voteId = searchParams.get('voteId');
@@ -164,7 +169,7 @@ export async function DELETE(req: Request) {
 // PUT: Verify the voter list
 export async function PUT(req: Request) {
   try {
-    await requireECouncil(req);
+    await requireBallotReviewer(req);
     const { voteId } = await req.json();
     
     if (!voteId) {

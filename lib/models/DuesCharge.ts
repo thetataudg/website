@@ -6,6 +6,9 @@ import mongoose, { Schema, model, models } from "mongoose";
 const DuesPaymentSchema = new Schema(
   {
     amountCents: { type: Number, required: true, min: 1 },
+    /// Refunds and disputes reduce what this payment settles without deleting
+    /// the original audit row.
+    reversedCents: { type: Number, default: 0, min: 0 },
     method: {
       type: String,
       // "credit" is an approved reimbursement being absorbed by this charge,
@@ -14,7 +17,7 @@ const DuesPaymentSchema = new Schema(
       // Both are money that settled the debt without money changing hands, so
       // they belong in the same array as a Venmo payment rather than editing
       // the charge amount down and erasing what was owed.
-      enum: ["cash", "venmo", "zelle", "check", "card", "credit", "writeoff", "other"],
+      enum: ["cash", "venmo", "zelle", "check", "card", "ach", "credit", "writeoff", "other"],
       default: "other",
     },
     reference: { type: String, default: "" },
@@ -76,7 +79,12 @@ DuesChargeSchema.index({ batchId: 1 });
 export function paidCentsFor(charge: any): number {
   if (!Array.isArray(charge?.payments)) return 0;
   return charge.payments.reduce(
-    (sum: number, payment: any) => sum + (Number(payment?.amountCents) || 0),
+    (sum: number, payment: any) =>
+      sum + Math.max(
+        0,
+        (Number(payment?.amountCents) || 0) -
+          (Number(payment?.reversedCents) || 0)
+      ),
     0
   );
 }

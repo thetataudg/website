@@ -8,6 +8,8 @@ import {
   CircleCheck,
   Clock,
   Download,
+  History,
+  Plus,
   Search,
   TriangleAlert,
   X,
@@ -41,7 +43,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PayOutCreditModal from "./PayOutCreditModal";
 import RemindModal from "./RemindModal";
-import MemberHistoryModal from "./MemberHistoryModal";
+import MemberHistorySheet from "./MemberHistoryModal";
+import NewChargeSheet from "./NewChargeSheet";
 import { exportAuditPdf } from "./exportAudit";
 
 type RosterRow = {
@@ -115,6 +118,7 @@ export default function DuesRosterPage() {
   const [flash, setFlash] = useState<string | null>(null);
   const [reminding, setReminding] = useState(false);
   const [viewingHistory, setViewingHistory] = useState<RosterRow | null>(null);
+  const [creatingCharge, setCreatingCharge] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
@@ -202,6 +206,10 @@ export default function DuesRosterPage() {
         description="Who owes what."
         actions={
           <>
+            <Button onClick={() => setCreatingCharge(true)}>
+              <Plus aria-hidden="true" />
+              New charge
+            </Button>
             <Button variant="outline" onClick={() => setReminding(true)}>
               <Bell aria-hidden="true" />
               Remind
@@ -229,7 +237,7 @@ export default function DuesRosterPage() {
               <Download aria-hidden="true" />
               {exporting ? "Building…" : "Export"}
             </Button>
-            <Button asChild>
+            <Button variant="outline" asChild>
               <Link href="/member/admin/dues/requests" className="no-underline">
                 Requests
                 {totals.pendingReviewCount > 0 && (
@@ -336,9 +344,8 @@ export default function DuesRosterPage() {
                   <TableHead className="text-right">Balance</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
                   <TableHead>Next due</TableHead>
-                  <TableHead className="pr-6">
-                    <span className="sr-only">Status</span>
-                  </TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="pr-6 text-right">History</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -346,19 +353,14 @@ export default function DuesRosterPage() {
                   rows.map((row) => (
                     <TableRow key={row.memberId}>
                       <TableCell className="pl-6">
-                        <button
-                          type="button"
-                          onClick={() => setViewingHistory(row)}
-                          className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          <span className="block font-semibold text-foreground hover:underline">
+                        <div>
+                          <span className="block font-semibold text-foreground">
                             {row.fName} {row.lName}
                           </span>
                           <span className="block text-xs text-muted-foreground">
                             #{row.rollNo}
                           </span>
-                          <span className="sr-only">, open finance history</span>
-                        </button>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {money(row.assignedCents)}
@@ -404,7 +406,7 @@ export default function DuesRosterPage() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="pr-6">
+                      <TableCell>
                         <div className="flex flex-wrap gap-1.5">
                           {row.awaitingReview && (
                             <Badge variant="muted">
@@ -432,11 +434,25 @@ export default function DuesRosterPage() {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="pr-6 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="whitespace-nowrap"
+                          onClick={() => setViewingHistory(row)}
+                        >
+                          <History aria-hidden="true" />
+                          View history
+                          <span className="sr-only">
+                            {` for ${row.fName} ${row.lName}`}
+                          </span>
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-40 text-center">
+                    <TableCell colSpan={8} className="h-40 text-center">
                       <p className="font-medium">Nobody matches that</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Try a different filter or search.
@@ -451,12 +467,23 @@ export default function DuesRosterPage() {
       </Card>
 
       {viewingHistory && (
-        <MemberHistoryModal
+        <MemberHistorySheet
           rollNo={viewingHistory.rollNo}
           name={`${viewingHistory.fName} ${viewingHistory.lName}`}
           onClose={() => setViewingHistory(null)}
         />
       )}
+      {creatingCharge ? (
+        <NewChargeSheet
+          members={data.members.filter((member) => member.status === "Active")}
+          onClose={() => setCreatingCharge(false)}
+          onCreated={(message) => {
+            setCreatingCharge(false);
+            setFlash(message);
+            void load();
+          }}
+        />
+      ) : null}
       {reminding && (
         <RemindModal
           onClose={() => setReminding(false)}

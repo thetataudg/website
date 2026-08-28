@@ -116,7 +116,7 @@ export default function MarkAsPaidModal({
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Report a payment</DialogTitle>
+          <DialogTitle>Report an offline payment</DialogTitle>
           <DialogDescription>
             {charge.description} &middot; {charge.term}
           </DialogDescription>
@@ -165,7 +165,7 @@ export default function MarkAsPaidModal({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="paid-method">How?</Label>
+            <Label htmlFor="paid-method">Offline method</Label>
             <Select value={method} onValueChange={setMethod}>
               <SelectTrigger id="paid-method">
                 <SelectValue />
@@ -215,7 +215,7 @@ export default function MarkAsPaidModal({
             </Button>
             <Button type="submit" disabled={invalid || saving}>
               {saving && <LoadingSpinner size="sm" />}
-              {saving ? "Sending…" : "Send to the treasurer"}
+              {saving ? "Sending…" : "Report to the treasurer"}
             </Button>
           </DialogFooter>
         </form>

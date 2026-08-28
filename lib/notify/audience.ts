@@ -1,20 +1,17 @@
 // lib/notify/audience.ts
 // Who hears about a movement on the chapter ledger.
 //
-// Two audiences, and they are asymmetric on purpose:
+// Three audiences, and they are asymmetric on purpose:
 //
 //   - The member the money belongs to, who hears when something is done *to*
 //     their ledger by somebody else.
-//   - E-Council and the admins, who hear about everything, because keeping the
-//     books straight is the job and a queue nobody knows about doesn't get
-//     worked.
-//
-// The privileged set is deliberately the same one `requireTreasury()` lets
-// write — anyone who can act on the ledger is told when the ledger moves.
-// If those two ever drift apart you get an officer who can approve a claim but
-// never learns one arrived.
+//   - The active Treasurer, who owns the finance queue. Their email copy goes
+//     to the shared treasury mailbox instead of a personal address.
+//   - The broader officer audience, reserved for non-financial chapter alerts
+//     such as proxy-vote requests.
 import Member from "@/lib/models/Member";
 import { ensureMemberEmails } from "@/lib/notify/emails";
+import { replyToFor } from "@/lib/notify/from";
 import logger from "@/lib/logger";
 import type { Recipient } from "@/lib/notify/channels/types";
 
@@ -22,7 +19,8 @@ import type { Recipient } from "@/lib/notify/channels/types";
 /// everyone" click resolves this audience once per member otherwise. Short
 /// enough that adding someone to E-Council takes effect within a minute.
 const CACHE_TTL_MS = 60_000;
-let cache: { at: number; recipients: Recipient[] } | null = null;
+let officerCache: { at: number; recipients: Recipient[] } | null = null;
+let treasuryCache: { at: number; recipients: Recipient[] } | null = null;
 
 function toRecipient(member: any): Recipient {
   return {
@@ -41,7 +39,9 @@ function toRecipient(member: any): Recipient {
 /// until somebody remembers to turn it off, and should not still be getting
 /// pushes about this year's dues.
 export async function officerRecipients(now = Date.now()): Promise<Recipient[]> {
-  if (cache && now - cache.at < CACHE_TTL_MS) return cache.recipients;
+  if (officerCache && now - officerCache.at < CACHE_TTL_MS) {
+    return officerCache.recipients;
+  }
 
   const officers = await Member.find({
     status: "Active",
@@ -70,14 +70,54 @@ export async function officerRecipients(now = Date.now()): Promise<Recipient[]> 
   }
 
   const recipients = officers.map(toRecipient);
-  cache = { at: now, recipients };
+  officerCache = { at: now, recipients };
+  return recipients;
+}
+
+/// The one internal recipient for dues, plans, reimbursements, and credits.
+///
+/// In-app and push delivery follow the member currently holding the Treasurer
+/// position. Email always targets the shared mailbox, so elections and officer
+/// turnover never require changing notification code or exposing a personal
+/// address as the chapter's financial point of contact.
+export async function treasuryRecipients(
+  now = Date.now()
+): Promise<Recipient[]> {
+  if (treasuryCache && now - treasuryCache.at < CACHE_TTL_MS) {
+    return treasuryCache.recipients;
+  }
+
+  const treasurer = await Member.findOne({
+    status: "Active",
+    isECouncil: true,
+    ecouncilPosition: /^Treasurer$/i,
+  })
+    .sort({ updatedAt: -1 })
+    .select("_id rollNo fName lName")
+    .lean<any>();
+
+  const recipients = treasurer
+    ? [
+        {
+          ...toRecipient(treasurer),
+          email: replyToFor("dues"),
+        },
+      ]
+    : [];
+
+  if (!treasurer) {
+    logger.warn("No active Treasurer found for treasury notifications");
+  }
+
+  treasuryCache = { at: now, recipients };
   return recipients;
 }
 
 /// Drop the cache. Called when E-Council membership changes so the next send
 /// doesn't spend a minute talking to last term's officers.
 export function invalidateOfficerCache(): void {
-  cache = null;
+  officerCache = null;
+  treasuryCache = null;
 }
 
 /// The member a ledger movement is about, as a recipient.

@@ -17,7 +17,11 @@ import Member from "@/lib/models/Member";
 import Notification from "@/lib/models/Notification";
 import FinanceEvent from "@/lib/models/FinanceEvent";
 import { announce, announceBulk } from "@/lib/notify/announce";
-import { invalidateOfficerCache, officerRecipients } from "@/lib/notify/audience";
+import {
+  invalidateOfficerCache,
+  officerRecipients,
+  treasuryRecipients,
+} from "@/lib/notify/audience";
 import { renderOfficerMessage } from "@/lib/notify/templates";
 
 const TAG = "ZZTEST-ANN";
@@ -58,7 +62,7 @@ async function main() {
     });
     officerMember = await Member.create({
       rollNo: `${TAG}-2`, fName: "Testy", lName: "Officer",
-      isECouncil: true, role: "member", status: "Active",
+      isECouncil: true, ecouncilPosition: "Treasurer", role: "member", status: "Active",
       needsProfileReview: false, needsPermissionReview: false,
     });
     invalidateOfficerCache();
@@ -68,6 +72,11 @@ async function main() {
     console.log(`\n${officers.length} officer(s) in the audience\n`);
     check("the test officer is in the audience", officerIds.includes(String(officerMember._id)), true);
     check("a plain member is not", officerIds.includes(String(plainMember._id)), false);
+
+    const treasury = await treasuryRecipients();
+    check("finance has one internal recipient", treasury.length, 1);
+    check("that recipient is the Treasurer", String(treasury[0]?.memberId), String(officerMember._id));
+    check("treasury email uses the shared mailbox", treasury[0]?.email, "treasurer@thetatau-dg.org");
 
     // --- 1. a member acts: officers hear, the member does not ---
     console.log("\nA member files a payment claim");

@@ -6,6 +6,10 @@ const LOCKDOWN_KEY = "global";
 const SECRET = process.env.LOCKDOWN_API_SECRET;
 const FORCE_LOCKDOWN_OFF = true;
 
+// Lockdown is operational state and must never be served from Next's route
+// cache after leadership changes it.
+export const dynamic = "force-dynamic";
+
 const defaultState = {
   active: false,
   reason: "",
@@ -47,10 +51,14 @@ async function getState() {
 export async function GET() {
   try {
     if (FORCE_LOCKDOWN_OFF) {
-      return NextResponse.json(defaultState);
+      return NextResponse.json(defaultState, {
+        headers: { "Cache-Control": "no-store" },
+      });
     }
     const result = await getState();
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (err: any) {
     console.error("GET /api/lockdown error", err);
     return new NextResponse("Failed to fetch lockdown state", { status: 500 });

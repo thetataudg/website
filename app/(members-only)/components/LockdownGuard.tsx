@@ -12,33 +12,45 @@ export default function LockdownGuard() {
 
   useEffect(() => {
     let canceled = false;
+    const controller = new AbortController();
+
     const guard = async () => {
       try {
-        const lockRes = await fetch("/api/lockdown");
-        if (!lockRes.ok) return;
+        const lockRes = await fetch("/api/lockdown", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!lockRes.ok || canceled) return;
+
         const lock = await lockRes.json();
-        if (!lock.active) return;
+        if (!lock.active || canceled) return;
         if (EXEMPT_PATHS.some((path) => pathname.startsWith(path))) return;
-        const meRes = await fetch("/api/members/me");
-        if (!meRes.ok) {
-          router.replace("/member/lockdown");
-          return;
-        }
+
+        const meRes = await fetch("/api/members/me", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        // A session can be briefly unavailable immediately after sign-in.
+        // Unknown identity is not proof that this member should be locked out.
+        if (!meRes.ok || canceled) return;
+
         const me = await meRes.json();
         const role = (me.role || "").toLowerCase();
-        if (ADMIN_ROLES.has(role)) return;
+        if (ADMIN_ROLES.has(role) || me.isECouncil) return;
         if (canceled) return;
+
         router.replace("/member/lockdown");
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Lockdown guard failed", err);
-        if (!canceled && !pathname.startsWith("/member/lockdown")) {
-          router.replace("/member/lockdown");
-        }
       }
     };
-    guard();
+
+    void guard();
+
     return () => {
       canceled = true;
+      controller.abort();
     };
   }, [pathname, router]);
 

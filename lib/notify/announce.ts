@@ -4,7 +4,8 @@
 //
 // The routing rule, in one place so it can't drift between twenty routes:
 //
-//   - E-Council and the admins hear about **everything**, whoever caused it.
+//   - The active Treasurer hears about **everything**, whoever caused it.
+//     Their email copy goes to treasurer@thetatau-dg.org.
 //   - The member hears when somebody **else** moved their ledger. They don't
 //     get told about their own submission — they just made it, and the screen
 //     already said so.
@@ -18,7 +19,7 @@ import {
   displayName,
   memberName,
   memberRecipient,
-  officerRecipients,
+  treasuryRecipients,
 } from "@/lib/notify/audience";
 import {
   officerTemplateFor,
@@ -68,9 +69,9 @@ export interface AnnounceInput {
 /// Tell everyone who needs to know about one movement on one member's ledger.
 export async function announce(input: AnnounceInput): Promise<void> {
   try {
-    const [concerned, officers, actorName] = await Promise.all([
+    const [concerned, treasury, actorName] = await Promise.all([
       memberRecipient(input.memberId),
-      officerRecipients(),
+      treasuryRecipients(),
       input.actorId ? memberName(input.actorId) : Promise.resolve(""),
     ]);
 
@@ -98,7 +99,7 @@ export async function announce(input: AnnounceInput): Promise<void> {
       );
     }
 
-    // --- the officers, always ---
+    // --- the Treasurer, always ---
     const message = renderOfficerMessage({
       event: input.event,
       memberName: displayName(concerned),
@@ -108,7 +109,7 @@ export async function announce(input: AnnounceInput): Promise<void> {
     const template = officerTemplateFor(input.event);
     const suppressActor = !includeActor();
 
-    for (const officer of officers) {
+    for (const officer of treasury) {
       const id = String(officer.memberId);
       // One notification per person per event. An officer who is also the
       // member in question already got the version written for them, which is
@@ -169,8 +170,8 @@ export interface AnnounceBulkInput {
 /// before; it's only the officer feed that collapses.
 export async function announceBulk(input: AnnounceBulkInput): Promise<void> {
   try {
-    const [officers, actorName] = await Promise.all([
-      officerRecipients(),
+    const [treasury, actorName] = await Promise.all([
+      treasuryRecipients(),
       input.actorId ? memberName(input.actorId) : Promise.resolve(""),
     ]);
 
@@ -183,7 +184,7 @@ export async function announceBulk(input: AnnounceBulkInput): Promise<void> {
     const template = officerTemplateFor(input.event);
     const suppressActor = !includeActor();
 
-    const sends = officers
+    const sends = treasury
       .filter(
         (officer) =>
           !(suppressActor && input.actorId &&
