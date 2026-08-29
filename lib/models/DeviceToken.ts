@@ -20,7 +20,13 @@ const DeviceTokenSchema = new Schema(
     /// "development" or "production" — an APNs token minted against the sandbox
     /// is rejected by the production gateway and vice versa, which is the most
     /// common reason push "just doesn't work".
-    environment: { type: String, default: "development" },
+    ///
+    /// A hint, not a verdict. The push channel tries this gateway first and
+    /// falls back to the other one when the token is refused, then writes back
+    /// whichever actually worked. Production is the default because that is
+    /// what every shipped build is; a sandbox device costs one corrected send
+    /// and is then recorded properly.
+    environment: { type: String, default: "production" },
     appVersion: { type: String, default: "" },
     lastSeenAt: { type: Date, default: () => new Date() },
     disabledAt: { type: Date, default: null },

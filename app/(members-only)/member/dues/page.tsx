@@ -45,6 +45,7 @@ import { Progress } from "@/components/ui/progress";
 import MarkAsPaidModal, { PayableCharge } from "./MarkAsPaidModal";
 import SubmitReimbursementModal from "./SubmitReimbursementModal";
 import RequestPlanModal from "./RequestPlanModal";
+import OnlinePaymentModal from "./OnlinePaymentModal";
 import FinanceTimeline from "./FinanceTimeline";
 import { maxInstallmentsFor } from "@/lib/planMath";
 
@@ -134,6 +135,10 @@ type DuesResponse = {
   nextDueDate: string | null;
   awaitingOnlinePayment?: boolean;
   onlineProcessingCents?: number;
+  payableBalanceCents?: number;
+  payableDueNowCents?: number;
+  onlinePaymentIsBankTransfer?: boolean;
+  onlinePaymentsEnabled?: boolean;
 };
 
 function money(cents: number) {
@@ -167,6 +172,14 @@ const INSTALLMENT_BADGES: Record<
   upcoming: { variant: "outline", label: "Upcoming" },
 };
 
+// Match the iOS debug build: local development can exercise the Stripe UI
+// even while the chapter-level switch is off. A preview can opt into the same
+// behavior with NEXT_PUBLIC_FORCE_ONLINE_PAYMENTS=true; production otherwise
+// continues to respect the value returned by the server.
+const FORCE_ONLINE_PAYMENTS_FOR_TESTING =
+  process.env.NODE_ENV === "development" ||
+  process.env.NEXT_PUBLIC_FORCE_ONLINE_PAYMENTS === "true";
+
 function InstallmentBadge({ status }: { status: string }) {
   const badge = INSTALLMENT_BADGES[status] ?? INSTALLMENT_BADGES.upcoming;
   return <Badge variant={badge.variant}>{badge.label}</Badge>;
@@ -178,7 +191,7 @@ export default function DuesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState<PayableCharge | null>(null);
-  const [onlinePaymentNoticeOpen, setOnlinePaymentNoticeOpen] = useState(false);
+  const [payingOnline, setPayingOnline] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -276,6 +289,16 @@ export default function DuesPage() {
   // owing money and holding credit can't both be the case.
   const owes = data.amountDueNowCents > 0;
   const holdsCredit = !owes && data.creditCents > 0;
+  const onlinePaymentsAvailable =
+    FORCE_ONLINE_PAYMENTS_FOR_TESTING || Boolean(data.onlinePaymentsEnabled);
+  const processingCents = Math.max(0, data.onlineProcessingCents ?? 0);
+  // The ceiling is what is owed. Money already in flight is shown to the
+  // member but does not reduce what they may pay: a webhook that never lands
+  // would otherwise reserve the balance forever and take the Pay button away
+  // with no explanation. See `onlinePaymentAvailability`.
+  const payableBalanceCents = data.payableBalanceCents ?? data.balanceCents;
+  const payableDueNowCents =
+    data.payableDueNowCents ?? Math.min(payableBalanceCents, data.amountDueNowCents);
 
   // `plans` is the plural field; `plan` is what older responses carried. Fall
   // back so a cached payload still renders.
@@ -448,10 +471,10 @@ export default function DuesPage() {
               Pay a balance, request a plan, or submit money the chapter owes you.
             </p>
             <div className="mt-5 grid gap-2">
-              {owes && !data.awaitingOnlinePayment ? (
+              {onlinePaymentsAvailable && payableBalanceCents > 0 ? (
                 <Button
                   className="w-full justify-start"
-                  onClick={() => setOnlinePaymentNoticeOpen(true)}
+                  onClick={() => setPayingOnline(true)}
                 >
                   <Landmark aria-hidden="true" />
                   Pay online
@@ -642,11 +665,12 @@ export default function DuesPage() {
         <Alert variant="info" className="mb-4">
           <Clock aria-hidden="true" />
           <AlertTitle>
-            {money(data.onlineProcessingCents ?? 0)} bank payment processing.
+            {money(data.onlineProcessingCents ?? 0)} pending.
           </AlertTitle>
           <AlertDescription>
-            Bank payments can take several business days. Your balance updates
-            automatically when Stripe confirms the payment.
+            {data.onlinePaymentIsBankTransfer
+              ? "Your payment went through and your bank is still moving the money, which can take several business days. It comes off your balance once it clears, and you won't be marked late or reminded in the meantime."
+              : "Your payment went through and is being confirmed. It comes off your balance as soon as it clears, usually within a minute. You won't be marked late or reminded in the meantime."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -714,14 +738,13 @@ export default function DuesPage() {
                       <div className="text-lg font-semibold text-foreground">
                         {money(charge.balanceCents)}
                       </div>
-                      {!pending && !data.awaitingOnlinePayment ? (
+                      {!pending ? (
                         <div className="mt-1 flex flex-col gap-1.5 sm:flex-row">
-                          <Button
-                            size="sm"
-                            onClick={() => setOnlinePaymentNoticeOpen(true)}
-                          >
-                            Pay online
-                          </Button>
+                          {onlinePaymentsAvailable && payableBalanceCents > 0 ? (
+                            <Button size="sm" onClick={() => setPayingOnline(true)}>
+                              Pay online
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="outline"
@@ -935,28 +958,22 @@ export default function DuesPage() {
         />
       )}
 
-      <AlertDialog
-        open={onlinePaymentNoticeOpen}
-        onOpenChange={setOnlinePaymentNoticeOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="mb-2 flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Landmark aria-hidden="true" className="size-5" />
-            </div>
-            <AlertDialogTitle>Online payments are coming soon</AlertDialogTitle>
-            <AlertDialogDescription>
-              We&apos;re still finalizing this payment method. For now, please
-              use <span className="font-medium text-foreground">Report offline payment</span>{" "}
-              to record a payment made by Zelle, Venmo, cash, physical check,
-              or another offline method.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Got it</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {payingOnline && (
+        <OnlinePaymentModal
+          amountDueNowCents={payableDueNowCents}
+          balanceCents={payableBalanceCents}
+          processingCents={processingCents}
+          onClose={() => setPayingOnline(false)}
+          onSubmitted={() => {
+            setPayingOnline(false);
+            setFlash(
+              "Payment received. It shows as pending until it clears, then it comes off your balance."
+            );
+            load();
+          }}
+        />
+      )}
+
     </PageContainer>
   );
 }

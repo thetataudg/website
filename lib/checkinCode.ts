@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, randomBytes } from "crypto";
 
 const WINDOW_SECONDS = 60;
 const DEFAULT_SECRET = "default-checkin-secret";
@@ -93,4 +93,32 @@ export function verifyAnyCheckInToken(code: string) {
   }
 
   return verifyWalletPassToken(code);
+}
+
+/**
+ * A token for one physical NFC check-in tag.
+ *
+ * Deliberately opaque and stored, rather than signed like the codes above. A
+ * signature can only be revoked by rotating the secret, which would kill every
+ * member's QR at the same time; a stored token dies the instant the tag is
+ * rewritten, which is exactly the lifetime an officer expects when they point
+ * a tag at tomorrow's event.
+ *
+ * 18 bytes so the whole URL — https://ttdg.org/c/<token> — stays around 45
+ * bytes, well inside the 144 bytes of user memory on the NTAG213s these tags
+ * usually are.
+ */
+export function generateBoothToken() {
+  return base64UrlEncode(randomBytes(18));
+}
+
+/**
+ * Where a check-in tag points.
+ *
+ * Short on purpose: this whole string has to fit in tag memory, and "/c/" is
+ * two characters that a tag doesn't have to spend on "/check-in/".
+ */
+export function boothUrl(token: string) {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://ttdg.org";
+  return `${base.replace(/\/$/, "")}/c/${token}`;
 }

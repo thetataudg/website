@@ -20,9 +20,83 @@ export function serializeOnlinePayment(row: any) {
     paymentMethod: row?.paymentMethod ?? "unknown",
     status: row?.status ?? "creating",
     failureMessage: row?.failureMessage ?? "",
+    note: row?.note ?? "",
     paidAt: row?.paidAt ? new Date(row.paidAt).toISOString() : null,
+    confirmedAt: row?.confirmedAt ? new Date(row.confirmedAt).toISOString() : null,
+    postedAt: row?.ledgerPostedAt ? new Date(row.ledgerPostedAt).toISOString() : null,
     createdAt: row?.createdAt ? new Date(row.createdAt).toISOString() : null,
     refundedCents: Number(row?.refundedCents) || 0,
+    /// True while the member has authorized money that has not yet reduced
+    /// their balance. Clients show this as "pending" and must not subtract it.
+    pending: isOnlinePaymentPending(row),
+  };
+}
+
+/// Money the member has committed that the chapter cannot yet count.
+///
+/// The gap this closes is small in wall-clock time and large in trust: between
+/// the member tapping Pay and the webhook posting the ledger row, the old
+/// summary showed neither a reduced balance nor any sign the payment existed,
+/// so a member who had just paid saw a screen that said they had not. It is
+/// deliberately keyed on `ledgerPostedAt` rather than on status alone, because
+/// the honest question is "has this money reached the ledger yet", and a card
+/// can read `succeeded` at Stripe for several seconds before it has.
+export function isOnlinePaymentPending(row: any): boolean {
+  if (!row) return false;
+  if (row.ledgerPostedAt) return false;
+  const status = String(row.status || "");
+  if (status === "failed" || status === "canceled") return false;
+  if (status === "processing" || status === "succeeded") return true;
+  // Confirmed in the Stripe sheet, but no webhook or sync has answered yet.
+  return Boolean(row.confirmedAt);
+}
+
+export function pendingOnlinePrincipalCents(rows: any[]): number {
+  return rows
+    .filter(isOnlinePaymentPending)
+    .reduce((sum, row) => sum + Math.max(0, Number(row?.principalCents) || 0), 0);
+}
+
+/// What a member is allowed to submit.
+///
+/// **The ceiling is what they owe, not what they owe minus money in flight.**
+///
+/// This used to reserve every processing payment out of the payable balance,
+/// on the reasoning that money already committed should not be committed
+/// twice. That is a sound instinct and it was the wrong trade. A payment only
+/// stops being "processing" when a webhook posts it to the ledger, and a
+/// webhook that never arrives — a tunnel that was closed, a failed delivery,
+/// a test intent nobody completed — reserved the balance permanently. A member
+/// owing $20 with a stale $200 intent against their name could not pay the $20
+/// at all, and nothing on the screen explained why: the Pay button simply was
+/// not there.
+///
+/// Removing the reservation cannot lose anybody money. `applyOnlinePayment`
+/// allocates against open charges and turns anything left over into a
+/// `CreditEntry`, which auto-applies to the next charge. So the worst case for
+/// a member who pays twice is that they hold a credit, not that they are out
+/// of pocket. Weighed against being locked out of paying at all, that is the
+/// better failure.
+///
+/// What is still enforced is the ceiling: pay $400 against a $200 balance and
+/// the route refuses and says the balance is $200. Partial payments are the
+/// point — pay $200 of $400, then $150, then $50, until it is gone.
+///
+/// `processingCents` is still returned so the screen can say what is in
+/// flight. Telling somebody a payment is on its way is the right way to stop a
+/// double payment; taking the button away is not.
+export function onlinePaymentAvailability(
+  balanceCents: number,
+  amountDueNowCents: number,
+  processingCents: number
+) {
+  const pending = Math.max(0, processingCents);
+  const balance = Math.max(0, balanceCents);
+  const dueNow = Math.min(balance, Math.max(0, amountDueNowCents));
+  return {
+    payableBalanceCents: balance,
+    payableDueNowCents: dueNow,
+    processingCents: pending,
   };
 }
 
@@ -134,7 +208,9 @@ export async function fulfillOnlineDuesPayment(intent: Stripe.PaymentIntent) {
       amountCents: applied,
       reversedCents: 0,
       method: row.paymentMethod === "us_bank_account" ? "ach" : "card",
-      reference: `Stripe ${intent.id}`,
+      reference: row.note
+        ? `Stripe ${intent.id} · ${row.note}`.slice(0, 300)
+        : `Stripe ${intent.id}`,
       paidOn: row.paidAt,
       recordedAt: new Date(),
       recordedBy: null,
@@ -176,12 +252,13 @@ export async function fulfillOnlineDuesPayment(intent: Stripe.PaymentIntent) {
       type: "payment_online_succeeded",
       amountCents: row.principalCents,
       occurredAt: row.paidAt,
-      summary: `${formatCents(row.principalCents)} paid online${remaining > 0 ? `; ${formatCents(remaining)} held as credit` : ""}.`,
+      summary: `${formatCents(row.principalCents)} paid online${remaining > 0 ? `; ${formatCents(remaining)} held as credit` : ""}.${row.note ? ` Member's note: ${row.note}` : ""}`,
       refs: { paymentId: row._id },
       meta: {
         paymentMethod: row.paymentMethod,
         stripePaymentIntentId: intent.id,
         feeCents: row.feeCents,
+        note: row.note || "",
       },
     });
   }

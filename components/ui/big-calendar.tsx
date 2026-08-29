@@ -495,7 +495,10 @@ function Grid({
            * ended and left the bottom of a quiet week undrawn.
            */
           const templateRows = [
-            "1.75rem",
+            // The date badge is 1.5rem tall and sits below 0.375rem of cell
+            // padding. Reserve a little extra space so today's circular badge
+            // never touches the first event bar.
+            "2.25rem",
             ...Array.from({ length: laneCount }, () => "1.5rem"),
             ...(hasMore ? ["1.25rem"] : []),
             "1fr",

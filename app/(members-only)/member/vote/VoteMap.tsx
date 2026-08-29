@@ -6,7 +6,7 @@ import { Loader2, MapPin, MapPinOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "../../components/ThemeProvider";
 
-import { useMapKit } from "./useMapKit";
+import { useMapKit } from "@/lib/useMapKit";
 import type { BallotPoint, VotingAnchor } from "./types";
 
 /**

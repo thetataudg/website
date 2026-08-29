@@ -471,6 +471,7 @@ export default function DuesRosterPage() {
           rollNo={viewingHistory.rollNo}
           name={`${viewingHistory.fName} ${viewingHistory.lName}`}
           onClose={() => setViewingHistory(null)}
+          onChanged={() => void load()}
         />
       )}
       {creatingCharge ? (

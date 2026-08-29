@@ -1,33 +1,19 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { requireAuth } from "@/lib/clerk";
-import { connectDB } from "@/lib/db";
-import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { canManageCheckIn, getMemberByClerk } from "@/lib/checkinAuth";
 import { verifyAnyCheckInToken } from "@/lib/checkinCode";
-
-async function getMemberByClerk(req: Request) {
-  const clerkId = await requireAuth(req as any);
-  await connectDB();
-  const member = await Member.findOne({ clerkId }).lean();
-  if (!member || Array.isArray(member)) {
-    throw new Error("Not authorized");
-  }
-  return member;
-}
+import { canonicalCheckInSource } from "@/lib/checkinSource";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const actor = await getMemberByClerk(req);
-    const { code, source, scannerMemberId } = await req.json();
+    const { code, scannerMemberId } = await req.json();
 
     if (!code || typeof code !== "string") {
       return NextResponse.json({ error: "code is required" }, { status: 400 });
-    }
-    if (!source || typeof source !== "string") {
-      return NextResponse.json({ error: "source is required" }, { status: 400 });
     }
 
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
@@ -45,15 +31,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    const isAdmin = actor.role === "admin" || actor.role === "superadmin";
-    const isPrivileged = isAdmin || actor.isECouncil;
-    if (!isPrivileged) {
-      const committee = await Committee.findById(event.committeeId);
-      const isHead =
-        committee?.committeeHeadId?.toString() === actor._id?.toString();
-      if (!isHead) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    if (!(await canManageCheckIn(actor, event))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const decoded = verifyAnyCheckInToken(code);
@@ -85,6 +64,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
+    // The code itself says which path this was: a rotating code came off a
+    // phone screen, a wallet token off a pass. Clients may still send a
+    // `source` of their own; it is ignored rather than stored.
+    const checkInSource = canonicalCheckInSource(
+      decoded.type === "wallet" ? "wallet" : "qr"
+    );
+
     const targetId = new mongoose.Types.ObjectId(decoded.memberId);
     let scannerObjectId = null;
     if (scannerMemberId && mongoose.Types.ObjectId.isValid(scannerMemberId)) {
@@ -101,7 +87,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           attendees: {
             memberId: targetId,
             checkedInAt: new Date(),
-            source,
+            source: checkInSource,
             scannerMemberId: scannerObjectId,
           },
         },
@@ -119,7 +105,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       {
         eventId,
         memberId: decoded.memberId,
-        source,
+        source: checkInSource,
         scannerMemberId,
         tokenType: decoded.type,
       },
@@ -129,7 +115,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       {
         status: "checked-in",
         memberId: decoded.memberId,
-        source,
+        source: checkInSource,
         scannerMemberId,
       },
       { status: 200 }

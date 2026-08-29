@@ -1,6 +1,7 @@
 "use client";
 
 import FinanceTimeline from "../../dues/FinanceTimeline";
+import MemberChargesPanel from "./MemberChargesPanel";
 
 import {
   Sheet,
@@ -19,10 +20,13 @@ export default function MemberHistorySheet({
   rollNo,
   name,
   onClose,
+  onChanged,
 }: {
   rollNo: string;
   name: string;
   onClose: () => void;
+  /// Lets the roster behind this refresh when a charge is taken back.
+  onChanged?: () => void;
 }) {
   return (
     <Sheet
@@ -43,6 +47,7 @@ export default function MemberHistorySheet({
           </SheetDescription>
         </SheetHeader>
         <div className="overflow-y-auto px-6 py-5">
+          <MemberChargesPanel rollNo={rollNo} onChanged={onChanged} />
           <FinanceTimeline
             endpoint={`/api/dues/history/${encodeURIComponent(rollNo)}`}
             bare

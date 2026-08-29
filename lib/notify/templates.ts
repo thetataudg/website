@@ -7,6 +7,7 @@
 // copies of "you owe $250" drift, and the member notices when the email and the
 // notification disagree.
 import { formatCents } from "@/lib/financeEvents";
+import type { EmailOverrides } from "@/lib/notify/emailTemplate";
 
 /// Chased at somebody who hasn't acted. Subject to the 24-hour cooldown.
 export const REMINDER_TEMPLATES = [
@@ -91,6 +92,11 @@ export interface RenderedMessage {
   /// promise somewhere it does not go. Set it only when the action deserves
   /// its own verb, like a proxy request an officer has to decide.
   ctaLabel?: string;
+  /// Per-message email layout, for the handful of messages that are not a
+  /// receipt. A newsletter is an article and wants a picture, a headline and a
+  /// left-aligned column; a dues notice wants a centred amount. Undefined
+  /// everywhere else, which is the receipt.
+  email?: EmailOverrides;
 }
 
 /// What to write on the button, worked out from where the button lands.
@@ -182,7 +188,9 @@ export function renderTemplate(
     case "assigned":
       return {
         title: "Your semester dues",
-        body: `Your ${context.description || "chapter dues"} came out to ${amount}, due ${when}. Take a look when you get a chance.`,
+        body: context.description
+          ? `A ${amount} charge was added to your account, due ${when}. Description: ${context.description}.`
+          : `Your chapter dues came out to ${amount}, due ${when}. Take a look when you get a chance.`,
         push: `Your semester dues are ${amount}, due ${when}.`,
         emailSubject: "Your semester dues",
         link: "/member/dues",
@@ -452,6 +460,22 @@ export function officerTemplateFor(event: string): OfficerTemplate {
 export function isOfficerTemplate(value: string): value is OfficerTemplate {
   return value.startsWith("officer_");
 }
+
+/// Something the chapter is told as a body, not something one member is being
+/// chased about.
+///
+/// Namespaced like the officer feed and for the same reason: `template` is
+/// also the cooldown key, and a broadcast must never collide with a reminder
+/// on it. Broadcasts are not reminder templates, so the 24-hour cooldown does
+/// not apply — the caller decides who hears about a thing that happens once.
+export type BroadcastTemplate = `broadcast_${string}`;
+
+export function isBroadcastTemplate(value: string): value is BroadcastTemplate {
+  return value.startsWith("broadcast_");
+}
+
+/// Every template key the pipeline accepts.
+export type AnyTemplate = NotifyTemplate | OfficerTemplate | BroadcastTemplate;
 
 interface OfficerHeadline {
   title: string;

@@ -4,17 +4,12 @@ import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { createHmac } from "node:crypto";
 import { requireAuth } from "@/lib/clerk";
+import { normalizeDiscordRedirect } from "@/lib/discordLink";
 
 const DISCORD_LINK_CLIENT_ID = process.env.DISCORD_LINK_CLIENT_ID;
 const DISCORD_LINK_REDIRECT_URI = process.env.DISCORD_LINK_REDIRECT_URI;
 const DISCORD_LINK_STATE_SECRET = process.env.DISCORD_LINK_STATE_SECRET;
 const STATE_TTL_MS = 5 * 60 * 1000;
-
-function normalizeRedirectTo(value: string | null) {
-  if (!value) return "/member";
-  if (value.startsWith("/")) return value;
-  return "/member";
-}
 
 function encodeState(payload: string) {
   const secret = DISCORD_LINK_STATE_SECRET;
@@ -51,7 +46,7 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const redirectTo = normalizeRedirectTo(url.searchParams.get("redirectTo"));
+  const redirectTo = normalizeDiscordRedirect(url.searchParams.get("redirectTo"));
   const payload = JSON.stringify({
     clerkId,
     memberId: member._id?.toString() || "",
@@ -71,6 +66,15 @@ export async function GET(req: Request) {
   authorizeUrl.searchParams.set("prompt", "consent");
   authorizeUrl.searchParams.set("redirect_uri", DISCORD_LINK_REDIRECT_URI);
   authorizeUrl.searchParams.set("state", state);
+
+  // The iOS app cannot follow a 302 into Discord inside an authentication
+  // session it has not opened yet, so it asks for the URL and opens it itself.
+  // Everything about the flow after this point is identical: the callback
+  // identifies the member from the signed state, not from a browser session,
+  // which is what makes a session-less client work at all.
+  if (url.searchParams.get("mode") === "json") {
+    return NextResponse.json({ authorizeUrl: authorizeUrl.toString() });
+  }
 
   return NextResponse.redirect(authorizeUrl.toString());
 }

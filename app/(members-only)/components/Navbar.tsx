@@ -319,6 +319,12 @@ export default function MemberNavbar() {
         active: isActive("/member/minutes"),
       },
       {
+        key: "newsletters",
+        label: "Newsletters",
+        href: "/member/newsletters",
+        active: isActive("/member/newsletters"),
+      },
+      {
         key: "dues",
         label: "Dues",
         href: "/member/dues",

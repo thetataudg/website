@@ -1,9 +1,5 @@
 // lib/notify/channels/types.ts
-import type {
-  RenderedMessage,
-  NotifyTemplate,
-  OfficerTemplate,
-} from "@/lib/notify/templates";
+import type { AnyTemplate, RenderedMessage } from "@/lib/notify/templates";
 
 export interface Recipient {
   memberId: any;
@@ -17,8 +13,9 @@ export interface Recipient {
 
 export interface DeliveryRequest {
   recipient: Recipient;
-  /// Either a member template or one of the namespaced officer-feed ones.
-  template: NotifyTemplate | OfficerTemplate;
+  /// A member template, or one of the namespaced officer-feed or broadcast
+  /// ones.
+  template: AnyTemplate;
   message: RenderedMessage;
   amountCents: number | null;
   refs: Record<string, any>;

@@ -22,7 +22,13 @@ import {
 } from "@/lib/plans";
 import logger from "@/lib/logger";
 import OnlineDuesPayment from "@/lib/models/OnlineDuesPayment";
-import { serializeOnlinePayment } from "@/lib/onlineDuesPayments";
+import {
+  isOnlinePaymentPending,
+  onlinePaymentAvailability,
+  pendingOnlinePrincipalCents,
+  serializeOnlinePayment,
+} from "@/lib/onlineDuesPayments";
+import { onlineDuesPaymentsEnabled, stripeIsConfigured } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,9 +76,11 @@ export async function GET(req: Request) {
     const pending = submissions.filter(
       (submission) => submission.status === "pending"
     );
-    const onlineProcessing = onlinePayments.filter(
-      (payment) => payment.status === "processing"
-    );
+    // Money the member has already committed but that hasn't reached the
+    // ledger yet. Card or bank, this is the window where their balance is
+    // still the old number and saying nothing would read as the payment never
+    // having happened.
+    const onlineProcessing = onlinePayments.filter(isOnlinePaymentPending);
     // A member can run several plans at once — one per charge they asked to
     // spread out — so the screens get a list. Finished plans drop out of it
     // here rather than waiting for the nightly cron to stamp them `completed`,
@@ -108,6 +116,12 @@ export async function GET(req: Request) {
       charges as any[],
       summary.nextDueDate,
       now
+    );
+    const onlineProcessingCents = pendingOnlinePrincipalCents(onlinePayments);
+    const onlineAvailability = onlinePaymentAvailability(
+      summary.balanceCents,
+      due.amountDueNowCents,
+      onlineProcessingCents
     );
 
     return NextResponse.json(
@@ -158,10 +172,18 @@ export async function GET(req: Request) {
         ),
         onlinePayments: onlinePayments.map(serializeOnlinePayment),
         awaitingOnlinePayment: onlineProcessing.length > 0,
-        onlineProcessingCents: onlineProcessing.reduce(
-          (sum, payment) => sum + (Number(payment.principalCents) || 0),
-          0
+        /// True only when a bank transfer is in flight, so the screens can say
+        /// "several business days" rather than promising that to a card
+        /// payment that will settle in seconds.
+        onlinePaymentIsBankTransfer: onlineProcessing.some(
+          (payment) => payment.paymentMethod === "us_bank_account"
         ),
+        /// Whether the Pay online button should be offered at all. Clients
+        /// read this instead of assuming, so turning Stripe off is one env var
+        /// and not a release on two platforms.
+        onlinePaymentsEnabled: onlineDuesPaymentsEnabled() && stripeIsConfigured(),
+        onlineProcessingCents,
+        ...onlineAvailability,
       },
       { status: 200 }
     );

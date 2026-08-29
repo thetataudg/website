@@ -1,8 +1,11 @@
 // app/(members-only)/member/committees/CommitteesClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { EventFormDialog } from "../events/EventFormDialog";
+import CommitteeAttendance from "./CommitteeAttendance";
 import {
+  CalendarPlus,
   Crown,
   FileDown,
   LayoutGrid,
@@ -71,6 +74,53 @@ export default function CommitteesClient({
   const [view, setView] = useState<"cards" | "list">("cards");
   const [selected, setSelected] = useState<Committee | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
+  const [scheduling, setScheduling] = useState<Committee | null>(null);
+  const [viewer, setViewer] = useState<{
+    memberId?: string;
+    role?: string;
+    isECouncil?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/members/me");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setViewer(data);
+      } catch {
+        // Not knowing who is looking means not offering to schedule, which is
+        // the safe direction: the API refuses anybody who should not.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /// Who may put something on a given committee's calendar.
+  ///
+  /// Any officer, or the head of that committee. Matched to what the events
+  /// API accepts and to `canScheduleHere` in the iOS app, so the button is
+  /// offered in exactly the same cases on both.
+  const canScheduleFor = useCallback(
+    (committee: Committee) => {
+      if (!viewer) return false;
+      if (
+        viewer.role === "admin" ||
+        viewer.role === "superadmin" ||
+        viewer.isECouncil
+      ) {
+        return true;
+      }
+      const head = committee.committeeHeadId;
+      const headId =
+        typeof head === "string" ? head : (head as any)?._id?.toString?.();
+      return Boolean(headId && viewer.memberId && headId === viewer.memberId);
+    },
+    [viewer]
+  );
 
   const sortedCommittees = useMemo(() => {
     return [...committees].sort((a, b) => a.name.localeCompare(b.name));
@@ -461,7 +511,27 @@ export default function CommitteesClient({
               )}
             </div>
 
+            {/* Renders nothing for anybody the endpoint refuses, so it can sit
+                here unconditionally rather than duplicating the permission
+                rule a second time in the client. */}
+            <CommitteeAttendance committeeId={selected._id} />
+
             <DialogFooter>
+              {canScheduleFor(selected) ? (
+                <Button
+                  onClick={() => {
+                    // The detail dialog closes first: two stacked dialogs
+                    // trap focus in the wrong one and the date pickers inside
+                    // the form end up unreachable.
+                    const committee = selected;
+                    setSelected(null);
+                    setScheduling(committee);
+                  }}
+                >
+                  <CalendarPlus className="mr-2 size-4" aria-hidden="true" />
+                  Schedule a meeting
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={() => setSelected(null)}>
                 Close
               </Button>
@@ -469,6 +539,23 @@ export default function CommitteesClient({
           </DialogContent>
         )}
       </Dialog>
+
+      <EventFormDialog
+        open={scheduling !== null}
+        onOpenChange={(open) => {
+          if (!open) setScheduling(null);
+        }}
+        event={null}
+        committees={committees}
+        fixedCommitteeId={scheduling?._id ?? null}
+        // Pinned to this committee: the point of starting here is not having
+        // to say which one, and a chair may not schedule chapter-wide anyway.
+        allowChapterWide={false}
+        canChangeCommittee={false}
+        onSaved={async () => {
+          setScheduling(null);
+        }}
+      />
     </PageContainer>
   );
 }

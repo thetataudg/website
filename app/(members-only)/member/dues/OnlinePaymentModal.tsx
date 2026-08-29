@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { Appearance } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { CircleAlert, LockKeyhole } from "lucide-react";
 
+import { useTheme } from "../../components/ThemeProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -17,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type PaymentKind = "installment" | "custom" | "full";
 
@@ -39,9 +42,11 @@ function money(cents: number) {
 }
 
 function CheckoutForm({
+  paymentId,
   totalCents,
   onComplete,
 }: {
+  paymentId: string;
   totalCents: number;
   onComplete: (status: string) => void;
 }) {
@@ -65,6 +70,13 @@ function CheckoutForm({
       setSubmitting(false);
       return;
     }
+    // Tell our own server before handing back, so the ledger shows the
+    // payment as pending the instant the page reloads rather than whenever
+    // Stripe's webhook happens to arrive. Failure here is not the member's
+    // problem: the webhook still settles it, so we carry on either way.
+    await fetch(`/api/dues/payments/${paymentId}`, { method: "POST" }).catch(
+      () => null
+    );
     onComplete(result.paymentIntent?.status ?? "processing");
   }
 
@@ -90,23 +102,101 @@ function CheckoutForm({
   );
 }
 
+/// Stripe's own styling for the embedded payment form.
+///
+/// The Payment Element renders inside Stripe's iframe, so none of this app's
+/// CSS reaches it: left alone it draws a white form with dark labels, which
+/// inside a dark modal came out as white input boxes and labels that were
+/// almost unreadable against the panel behind them.
+///
+/// `theme: "night"` is Stripe's dark base. The variables on top of it are the
+/// members-area tokens, resolved to literals because an iframe cannot read a
+/// CSS custom property from its parent document.
+function appearanceFor(dark: boolean): Appearance {
+  if (!dark) {
+    return {
+      theme: "stripe",
+      variables: {
+        colorPrimary: "#7a0104",
+        borderRadius: "8px",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+      },
+    };
+  }
+  return {
+    theme: "night",
+    variables: {
+      colorPrimary: "#e2ab16",
+      // Matched to the dialog it sits in rather than to Stripe's default
+      // near-black, so the form does not read as a panel inside a panel.
+      colorBackground: "#1c1c1f",
+      colorText: "#f5f5f5",
+      // Stripe's night default for secondary text fails contrast on this
+      // ground; the labels are the part that was unreadable.
+      colorTextSecondary: "#b9b9c0",
+      colorTextPlaceholder: "#8a8a93",
+      colorDanger: "#e04351",
+      borderRadius: "8px",
+      fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+    },
+    rules: {
+      // The tab row is the part that stayed white: it is a separate surface
+      // from the inputs and Stripe does not tint it from `colorBackground`.
+      ".Tab": {
+        backgroundColor: "#242427",
+        borderColor: "#3a3a3f",
+      },
+      ".Tab--selected": {
+        backgroundColor: "#2e2e32",
+        borderColor: "#e2ab16",
+      },
+      ".Input": {
+        backgroundColor: "#242427",
+        borderColor: "#3a3a3f",
+      },
+      ".Label": {
+        color: "#b9b9c0",
+      },
+      // The "another step will appear" panel on wallet tabs, which rendered
+      // as a white block.
+      ".Block": {
+        backgroundColor: "#242427",
+        borderColor: "#3a3a3f",
+      },
+    },
+  };
+}
+
 export default function OnlinePaymentModal({
   amountDueNowCents,
   balanceCents,
+  processingCents,
   onClose,
   onSubmitted,
 }: {
   amountDueNowCents: number;
   balanceCents: number;
+  processingCents: number;
   onClose: () => void;
   onSubmitted: (status: string) => void;
 }) {
-  const [kind, setKind] = useState<PaymentKind>("installment");
+  const [kind, setKind] = useState<PaymentKind>(() =>
+    amountDueNowCents > 0 ? "installment" : "full"
+  );
   const [customAmount, setCustomAmount] = useState(
     (amountDueNowCents / 100).toFixed(2)
   );
+  const [note, setNote] = useState("");
   const [intent, setIntent] = useState<IntentResponse | null>(null);
   const [starting, setStarting] = useState(false);
+  const { resolvedTheme } = useTheme();
+  // Recomputed when the theme flips, and `Elements` forwards a changed
+  // appearance to the iframe, so toggling dark mode restyles the open form
+  // rather than needing it closed and reopened.
+  const stripeAppearance = useMemo(
+    () => appearanceFor(resolvedTheme === "dark"),
+    [resolvedTheme]
+  );
   const [error, setError] = useState<string | null>(null);
 
   const customCents = Math.round(Number(customAmount) * 100);
@@ -138,6 +228,7 @@ export default function OnlinePaymentModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind,
+          note: note.trim(),
           ...(kind === "custom" ? { amountCents: customCents } : {}),
         }),
       });
@@ -166,24 +257,32 @@ export default function OnlinePaymentModal({
 
         {!intent ? (
           <div className="space-y-4">
+            {processingCents > 0 ? (
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                {money(processingCents)} is already processing. You can submit up
+                to {money(balanceCents)} more.
+              </div>
+            ) : null}
             <fieldset className="space-y-2">
               <legend className="mb-2 text-sm font-medium">How much?</legend>
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
-                <input
-                  type="radio"
-                  name="payment-kind"
-                  value="installment"
-                  checked={kind === "installment"}
-                  onChange={() => setKind("installment")}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block font-medium">Current amount due</span>
-                  <span className="text-sm text-muted-foreground">
-                    {money(amountDueNowCents)}
+              {amountDueNowCents > 0 ? (
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                  <input
+                    type="radio"
+                    name="payment-kind"
+                    value="installment"
+                    checked={kind === "installment"}
+                    onChange={() => setKind("installment")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium">Current amount due</span>
+                    <span className="text-sm text-muted-foreground">
+                      {money(amountDueNowCents)}
+                    </span>
                   </span>
-                </span>
-              </label>
+                </label>
+              ) : null}
               {balanceCents !== amountDueNowCents ? (
                 <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
                   <input
@@ -195,7 +294,7 @@ export default function OnlinePaymentModal({
                     className="mt-1"
                   />
                   <span>
-                    <span className="block font-medium">Full balance</span>
+                    <span className="block font-medium">Remaining available balance</span>
                     <span className="text-sm text-muted-foreground">
                       {money(balanceCents)}
                     </span>
@@ -231,6 +330,23 @@ export default function OnlinePaymentModal({
               </label>
             </fieldset>
 
+            <div className="space-y-1.5">
+              <Label htmlFor="online-payment-note">
+                Note for the treasurer{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </Label>
+              <Textarea
+                id="online-payment-note"
+                value={note}
+                onChange={(event) => setNote(event.target.value.slice(0, 500))}
+                rows={2}
+                maxLength={500}
+                placeholder="Anything the treasurer should know about this payment"
+              />
+            </div>
+
             {error ? (
               <Alert variant="destructive" role="alert">
                 <CircleAlert aria-hidden="true" />
@@ -256,10 +372,14 @@ export default function OnlinePaymentModal({
             stripe={stripePromise}
             options={{
               clientSecret: intent.clientSecret,
-              appearance: { theme: "stripe" },
+              appearance: stripeAppearance,
             }}
           >
-            <CheckoutForm totalCents={intent.payment.totalCents} onComplete={onSubmitted} />
+            <CheckoutForm
+              paymentId={intent.payment._id}
+              totalCents={intent.payment.totalCents}
+              onComplete={onSubmitted}
+            />
           </Elements>
         ) : null}
       </DialogContent>

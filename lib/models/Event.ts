@@ -69,11 +69,44 @@ const EventSchema = new Schema(
           ref: "Member",
           default: null,
         },
+        // Which NFC tag they tapped, when that's how they got here. Null for
+        // every other path, which is how a roster tells them apart.
+        //
+        // The label is copied rather than looked up through the token: a tag
+        // gets rewritten for the next event, and last week's roster should
+        // still say "Front door" instead of resolving to whatever that token
+        // points at now.
+        boothToken: { type: String, default: null },
+        boothLabel: { type: String, default: null },
+      },
+    ],
+    // Armed NFC check-in tags. One entry per physical tag, because a front
+    // door and a side entrance are different booths and an officer wants to
+    // know which one somebody came through.
+    //
+    // Writing a tag mints a new token, so the previous event's token stops
+    // resolving the moment the tag is rewritten — revocation without an
+    // expiry to get wrong.
+    checkInBooths: [
+      {
+        token: { type: String, required: true },
+        label: { type: String, default: "" },
+        armedAt: { type: Date, default: () => new Date() },
+        armedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "Member",
+          default: null,
+        },
       },
     ],
   },
   { timestamps: true }
 );
+
+// A member taps a tag and the server has only the token — no event id — so
+// this is the lookup that has to be fast. Sparse because most events never
+// arm a booth at all.
+EventSchema.index({ "checkInBooths.token": 1 }, { sparse: true });
 
 // Next's dev server re-evaluates this module on hot reload but `models` lives
 // on the global mongoose instance, so a schema registered before an edit

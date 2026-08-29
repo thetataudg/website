@@ -1,32 +1,23 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { requireAuth } from "@/lib/clerk";
-import { connectDB } from "@/lib/db";
-import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
-
-async function getMemberByClerk(req: Request) {
-  const clerkId = await requireAuth(req as any);
-  await connectDB();
-  const member = await Member.findOne({ clerkId }).lean();
-  if (!member || Array.isArray(member)) {
-    throw new Error("Not authorized");
-  }
-  return member;
-}
+import { canManageCheckIn, getMemberByClerk } from "@/lib/checkinAuth";
+import { canonicalCheckInSource } from "@/lib/checkinSource";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const actor = await getMemberByClerk(req);
-    const { memberId, source } = await req.json();
+    const { memberId } = await req.json();
 
     if (!memberId || !mongoose.Types.ObjectId.isValid(memberId)) {
       return NextResponse.json({ error: "memberId is required" }, { status: 400 });
     }
 
-    const checkInSource = source && typeof source === "string" ? source : "Manual";
+    // Decided here, not by the caller. The website used to post "Phone" for a
+    // hand-added member, which put them on the roster as a scan.
+    const checkInSource = canonicalCheckInSource("manual");
 
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -37,15 +28,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const isAdmin = actor.role === "admin" || actor.role === "superadmin";
-    const isPrivileged = isAdmin || actor.isECouncil;
-    if (!isPrivileged) {
-      const committee = await Committee.findById(event.committeeId);
-      const isHead =
-        committee?.committeeHeadId?.toString() === actor._id?.toString();
-      if (!isHead) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    if (!(await canManageCheckIn(actor, event))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const targetMember = await Member.findById(memberId).lean();
@@ -123,15 +107,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const isAdmin = actor.role === "admin" || actor.role === "superadmin";
-    const isPrivileged = isAdmin || actor.isECouncil;
-    if (!isPrivileged) {
-      const committee = await Committee.findById(event.committeeId);
-      const isHead =
-        committee?.committeeHeadId?.toString() === actor._id?.toString();
-      if (!isHead) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    if (!(await canManageCheckIn(actor, event))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const targetId = new mongoose.Types.ObjectId(memberId);

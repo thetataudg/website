@@ -273,7 +273,7 @@ export default function NewChargeSheet({
                         >
                           {selectedMember ? (
                             <span className="truncate">
-                              {memberName(selectedMember)} · #{selectedMember.rollNo}
+                              {memberName(selectedMember)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">
@@ -288,7 +288,7 @@ export default function NewChargeSheet({
                       </PopoverTrigger>
                       <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
                         <Command>
-                          <CommandInput placeholder="Search by name or roll number…" />
+                          <CommandInput placeholder="Search by member name…" />
                           <CommandList>
                             <CommandEmpty>No active member found.</CommandEmpty>
                             <CommandGroup>

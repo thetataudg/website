@@ -82,6 +82,10 @@ async function buildSummary(event: any, viewerId: string) {
           checkedInAt: entry?.checkedInAt
             ? new Date(entry.checkedInAt).toISOString()
             : null,
+          // How they got on the list, so the door roster can say which tag
+          // somebody tapped rather than just that they appeared.
+          source: entry?.source ?? null,
+          boothLabel: entry?.boothLabel ?? null,
         })
       )
     )

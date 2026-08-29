@@ -4,8 +4,8 @@
 // Email is not the web. Gmail strips <style> blocks in some contexts, Outlook
 // renders through Word's HTML engine and ignores flexbox, grid, float and
 // most of `background`, and roughly half of recipients read it on a phone with
-// images off by default. So: tables for layout, every style inline, a fixed
-// 600px shell, no external assets of any kind — the wordmark is type on a
+// images off by default. So: tables for layout, every style inline, a fluid
+// shell capped at 600px, no external assets of any kind — the wordmark is type on a
 // coloured band rather than an image, which means it survives image blocking
 // instead of leaving a grey box where the chapter's name should be.
 //
@@ -41,10 +41,43 @@ export interface EmailMetaRow {
   tone?: "positive" | "negative";
 }
 
+/// What a message may override about its own email.
+///
+/// Carried on `RenderedMessage.email` so a broadcast can be an editorial
+/// layout while every dues notice stays the centred receipt it should be. The
+/// alternative was a second template file, and two layouts drift.
+export interface EmailOverrides {
+  /// Replaces the H1. The in-app row wants "New newsletter"; the email wants
+  /// the headline of the actual issue, which is the thing worth reading.
+  title?: string;
+  eyebrow?: string;
+  heroImageUrl?: string;
+  heroImageAlt?: string;
+  /// Replaces the message body paragraph. The greeting is still supplied by
+  /// the channel, because only it knows the recipient's name.
+  paragraphs?: string[];
+  align?: "left" | "center";
+  footnote?: string;
+  /// Inbox preview text. Defaults to the push copy, which for a broadcast is
+  /// the headline and therefore a duplicate of the subject line.
+  preheader?: string;
+}
+
 export interface EmailContent {
   /// Sits under the title, big. The one number the reader came for.
   heroAmount?: string;
   heroLabel?: string;
+  /// A picture above the headline. Must be a URL that is still fetchable days
+  /// from now: mail clients load images when the reader opens the message, not
+  /// when it is sent, so anything presigned and short-lived arrives as a
+  /// broken box.
+  heroImageUrl?: string;
+  heroImageAlt?: string;
+  /// Small caps above the title.
+  eyebrow?: string;
+  /// Centred reads as an announcement, left reads as something to be read.
+  /// Money is an announcement; an article is not.
+  align?: "left" | "center";
   title: string;
   /// One or two short paragraphs. Kept as an array so the template controls
   /// spacing rather than callers embedding <br> and hoping.
@@ -79,11 +112,15 @@ function escapeHtml(value: string): string {
 /// would show a bare underlined link where the button should be. The VML block
 /// draws a real rectangle for them and is hidden from every other client by the
 /// conditional comment.
-function button(label: string, href: string): string {
+function button(label: string, href: string, align: "left" | "center" = "center"): string {
   const safeHref = escapeHtml(href);
   const safeLabel = escapeHtml(label);
+  // `align` on the table and the matching margin, because Outlook honours the
+  // attribute and everything else honours the margin.
+  const table = align === "left" ? "left" : "center";
+  const margin = align === "left" ? "26px 0 0" : "26px auto 0";
   return `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:26px auto 0">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${table}" width="100%" style="width:100%;max-width:260px;margin:${margin}">
   <tr><td align="center" bgcolor="${BRAND.red}" style="border-radius:6px">
     <!--[if mso]>
     <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -95,7 +132,7 @@ function button(label: string, href: string): string {
     <![endif]-->
     <!--[if !mso]><!-- -->
     <a href="${safeHref}"
-       style="display:inline-block;padding:13px 30px;font-family:${FONT};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;background:${BRAND.red}">${safeLabel}</a>
+       style="display:block;padding:13px 20px;font-family:${FONT};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;text-align:center;border-radius:6px;background:${BRAND.red}">${safeLabel}</a>
     <!--<![endif]-->
   </td></tr>
 </table>`;
@@ -105,9 +142,34 @@ function button(label: string, href: string): string {
 export function renderEmailHtml(content: EmailContent): string {
   const preheader = content.preheader ?? content.paragraphs[0] ?? "";
 
+  const align = content.align ?? "center";
+  const textAlign = align === "left" ? "left" : "center";
+
+  // A picture above the fold, full-bleed inside the card.
+  //
+  // Width and height are set as attributes as well as styles: Outlook ignores
+  // CSS sizing on images, and without the attributes it renders the file at its
+  // natural pixel size and blows the 600px shell apart. `max-width:100%` then
+  // lets every other client scale it down on a phone.
+  const heroImage = content.heroImageUrl
+    ? `
+<tr><td style="font-size:0;line-height:0">
+  <a href="${escapeHtml(content.ctaHref ?? "#")}" style="display:block;text-decoration:none">
+    <img src="${escapeHtml(content.heroImageUrl)}"
+         alt="${escapeHtml(content.heroImageAlt ?? "")}"
+         width="600"
+         style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none">
+  </a>
+</td></tr>`
+    : "";
+
+  const eyebrow = content.eyebrow
+    ? `<div style="font-family:${FONT};font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${BRAND.red};padding-bottom:10px;text-align:${textAlign}">${escapeHtml(content.eyebrow)}</div>`
+    : "";
+
   const hero = content.heroAmount
     ? `
-<tr><td style="padding:0 40px">
+<tr><td style="padding:0 24px">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
          style="background:${BRAND.wash};border:1px solid ${BRAND.line};border-radius:8px">
     <tr><td style="padding:22px 26px;text-align:center">
@@ -120,7 +182,7 @@ export function renderEmailHtml(content: EmailContent): string {
 
   const meta = content.meta?.length
     ? `
-<tr><td style="padding:26px 40px 0">
+<tr><td style="padding:26px 24px 0">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
          style="border-top:1px solid ${BRAND.line}">
     ${content.meta
@@ -143,7 +205,7 @@ export function renderEmailHtml(content: EmailContent): string {
   const paragraphs = content.paragraphs
     .map(
       (text) =>
-        `<p style="margin:0 0 14px;font-family:${FONT};font-size:15.5px;line-height:1.65;color:${BRAND.inkSoft};text-align:center">${escapeHtml(text)}</p>`
+        `<p style="margin:0 0 14px;font-family:${FONT};font-size:15.5px;line-height:1.65;color:${BRAND.inkSoft};text-align:${textAlign}">${escapeHtml(text)}</p>`
     )
     .join("");
 
@@ -158,7 +220,7 @@ export function renderEmailHtml(content: EmailContent): string {
 <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
 <title>${escapeHtml(content.title)}</title>
 </head>
-<body style="margin:0;padding:0;background:${BRAND.paper};-webkit-font-smoothing:antialiased">
+<body style="width:100%;margin:0;padding:0;background:${BRAND.paper};-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">
 
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;height:0;width:0">${escapeHtml(preheader)}</div>
 <!-- Padding characters stop clients pulling the body text into the preview
@@ -166,36 +228,43 @@ export function renderEmailHtml(content: EmailContent): string {
 <div style="display:none;max-height:0;overflow:hidden">${"&#847;&zwnj;&nbsp;".repeat(60)}</div>
 
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${BRAND.paper}">
-<tr><td align="center" style="padding:28px 12px">
+<tr><td align="center" style="padding:24px 10px">
 
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"
-         style="width:600px;max-width:100%;background:${BRAND.card};border:1px solid ${BRAND.line};border-radius:10px;overflow:hidden">
+  <!-- Outlook ignores max-width, so it gets a fixed wrapper while every
+       mobile client gets a genuinely fluid table instead of scaling a 600px
+       desktop canvas down until the type is tiny. -->
+  <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"><tr><td><![endif]-->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+         style="width:100%;max-width:600px;background:${BRAND.card};border:1px solid ${BRAND.line};border-radius:10px;overflow:hidden">
 
-    <tr><td style="background:${BRAND.redDeep};padding:20px 40px;text-align:center">
+    <tr><td style="background:${BRAND.redDeep};padding:20px 24px;text-align:center">
       <div style="font-family:${FONT};font-size:17px;font-weight:700;letter-spacing:4px;color:#ffffff">THETA TAU</div>
       <div style="font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:2.2px;text-transform:uppercase;color:${BRAND.gold};padding-top:4px">Delta Gamma</div>
     </td></tr>
     <tr><td style="height:3px;background:${BRAND.gold};font-size:0;line-height:0">&nbsp;</td></tr>
 
-    <tr><td align="center" style="padding:34px 40px 18px;text-align:center">
-      <h1 style="margin:0;font-family:${FONT};font-size:22px;line-height:1.3;font-weight:700;color:${BRAND.ink}">${escapeHtml(content.title)}</h1>
+    ${heroImage}
+
+    <tr><td align="${textAlign}" style="padding:${content.heroImageUrl ? "28px" : "32px"} 24px 18px;text-align:${textAlign}">
+      ${eyebrow}
+      <h1 style="margin:0;font-family:${FONT};font-size:${content.heroImageUrl ? "26px" : "22px"};line-height:1.28;font-weight:700;color:${BRAND.ink};text-align:${textAlign}">${escapeHtml(content.title)}</h1>
     </td></tr>
 
     ${hero}
 
-    <tr><td align="center" style="padding:${content.heroAmount ? "22px" : "0"} 40px 0;text-align:center">
+    <tr><td align="${textAlign}" style="padding:${content.heroAmount ? "22px" : "0"} 24px 0;text-align:${textAlign}">
       ${paragraphs}
-      ${content.ctaLabel && content.ctaHref ? button(content.ctaLabel, content.ctaHref) : ""}
+      ${content.ctaLabel && content.ctaHref ? button(content.ctaLabel, content.ctaHref, align) : ""}
     </td></tr>
 
     ${meta}
 
     ${content.footnote ? `
-    <tr><td align="center" style="padding:24px 40px 0;text-align:center">
-      <p style="margin:0;font-family:${FONT};font-size:13px;line-height:1.6;color:${BRAND.muted};text-align:center">${escapeHtml(content.footnote)}</p>
+    <tr><td align="${textAlign}" style="padding:24px 24px 0;text-align:${textAlign}">
+      <p style="margin:0;font-family:${FONT};font-size:13px;line-height:1.6;color:${BRAND.muted};text-align:${textAlign}">${escapeHtml(content.footnote)}</p>
     </td></tr>` : ""}
 
-    <tr><td align="center" style="padding:30px 40px 34px;text-align:center">
+    <tr><td align="center" style="padding:30px 24px 32px;text-align:center">
       <div style="border-top:1px solid ${BRAND.line};padding-top:18px">
         <p style="margin:0 0 6px;font-family:${FONT};font-size:12.5px;line-height:1.6;color:${BRAND.muted};text-align:center">
           Theta Tau &middot; Delta Gamma Chapter &middot; Arizona State University
@@ -207,6 +276,7 @@ export function renderEmailHtml(content: EmailContent): string {
     </td></tr>
 
   </table>
+  <!--[if mso]></td></tr></table><![endif]-->
 
 </td></tr>
 </table>
@@ -220,7 +290,15 @@ export function renderEmailHtml(content: EmailContent): string {
 /// it's the version that gets read by screen readers, smartwatches and anyone
 /// whose client refuses HTML.
 export function renderEmailText(content: EmailContent): string {
-  const lines: string[] = ["THETA TAU / DELTA GAMMA", "", content.title.toUpperCase(), ""];
+  const lines: string[] = ["THETA TAU / DELTA GAMMA", ""];
+  // Shouting the title is the plain-text way of marking a heading, and every
+  // finance email has relied on it. A message with its own eyebrow already has
+  // the shouted line, so its title stays sentence case.
+  if (content.eyebrow) {
+    lines.push(content.eyebrow.toUpperCase(), "", content.title, "");
+  } else {
+    lines.push(content.title.toUpperCase(), "");
+  }
   if (content.heroAmount) {
     lines.push(
       content.heroLabel ? `${content.heroLabel}: ${content.heroAmount}` : content.heroAmount,

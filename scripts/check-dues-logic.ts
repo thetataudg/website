@@ -1,4 +1,11 @@
 import { serializeCharge, isPastDueInArizona, arizonaDueDeadline, normalizeDueDate } from "@/lib/dues";
+import { memberPaidCentsFor, paidCentsFor } from "@/lib/models/DuesCharge";
+import {
+  isOnlinePaymentPending,
+  initialAllocations,
+  onlinePaymentAvailability,
+  pendingOnlinePrincipalCents,
+} from "@/lib/onlineDuesPayments";
 import { formatCents } from "@/lib/financeEvents";
 import { fromAddressFor, alertsDomain, replyToFor } from "@/lib/notify/from";
 import { renderTemplate, renderOfficerMessage, ctaLabelFor } from "@/lib/notify/templates";
@@ -371,7 +378,9 @@ const sample = renderEmailHtml({
 check("no flexbox or grid", /display\s*:\s*(flex|grid)/.test(sample), false);
 check("VML button for Outlook", sample.includes("v:roundrect") && sample.includes("w:anchorlock"), true);
 check("tables carry the layout", sample.split("<table").length - 1 >= 4, true);
-check("fixed 600px shell", sample.includes('width="600"'), true);
+check("fluid shell for phones", sample.includes('width="100%"') && sample.includes("max-width:600px"), true);
+check("fixed 600px Outlook wrapper", sample.includes('width="600"><tr><td><![endif]'), true);
+check("mobile clients do not receive a fixed 600px content table", sample.includes('border="0" width="600"\n         style="width:600px'), false);
 check("no external assets to be blocked", /(src=|url\()https?:\/\//.test(sample), false);
 check("no <style> block for Gmail to strip", sample.toLowerCase().includes("<style"), false);
 check("a preheader, so previews aren't all identical", sample.includes("display:none;max-height:0"), true);
@@ -381,6 +390,92 @@ check("well under Gmail's clipping limit", Buffer.byteLength(sample) < 102400, t
 const text = renderEmailText({ title: "T", paragraphs: ["p"], ctaLabel: "Go", ctaHref: "https://x.org" });
 check("plain text carries the link", text.includes("https://x.org"), true);
 check("and has no markup in it", /<[a-z]/i.test(text), false);
+
+console.log("\nonline payments show as pending until the ledger moves");
+// The window this closes: the member has paid, Stripe agrees, and the webhook
+// that posts the ledger row hasn't landed. Showing nothing here reads to the
+// member as the payment never having happened.
+check("brand new, nothing authorized yet", isOnlinePaymentPending({ status: "requires_payment_method" }), false);
+check("confirmed in the sheet, no webhook yet", isOnlinePaymentPending({ status: "requires_payment_method", confirmedAt: new Date() }), true);
+check("bank transfer in flight", isOnlinePaymentPending({ status: "processing" }), true);
+check("succeeded at Stripe, not yet posted", isOnlinePaymentPending({ status: "succeeded" }), true);
+check("succeeded and posted -> the balance already moved", isOnlinePaymentPending({ status: "succeeded", ledgerPostedAt: new Date() }), false);
+// The whole reason the ledger waits: a declined card must not have reduced
+// anybody's balance on the way past.
+check("declined", isOnlinePaymentPending({ status: "failed", confirmedAt: new Date() }), false);
+check("canceled", isOnlinePaymentPending({ status: "canceled", confirmedAt: new Date() }), false);
+check("refunded is posted money, not pending", isOnlinePaymentPending({ status: "refunded", ledgerPostedAt: new Date() }), false);
+check("nothing at all", isOnlinePaymentPending(null), false);
+
+console.log("\na charge can be taken back until real money lands on it");
+const removable = { status: "open", amountCents: 25000, payments: [] as any[] };
+check("nothing paid", memberPaidCentsFor(removable), 0);
+check("a card payment counts", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 5000, method: "card" }] }), 5000);
+check("so does venmo", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 5000, method: "venmo" }] }), 5000);
+// Credit is the chapter's own debt being absorbed and a write-off is an
+// officer giving up on a balance. Neither is the member handing over money, and
+// voiding a credit-settled charge is what hands that credit back — so both are
+// excluded, and such a charge stays removable.
+check("credit is not the member paying", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 25000, method: "credit" }] }), 0);
+check("nor is a write-off", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 25000, method: "writeoff" }] }), 0);
+check("but paidCents still counts both", paidCentsFor({ ...removable, payments: [{ amountCents: 25000, method: "credit" }] }), 25000);
+check("mixed: only the real money blocks removal", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 20000, method: "credit" }, { amountCents: 5000, method: "zelle" }] }), 5000);
+// A refunded payment leaves the charge removable again, which is the sequence
+// a treasurer actually walks: refund the member, then take the charge back.
+check("a fully refunded payment stops blocking", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 5000, reversedCents: 5000, method: "card" }] }), 0);
+check("a partial refund still blocks", memberPaidCentsFor({ ...removable, payments: [{ amountCents: 5000, reversedCents: 2000, method: "card" }] }), 3000);
+
+console.log("\nonline payments settle the oldest charge first");
+const older = { _id: "old", dueDate: new Date("2026-09-01"), createdAt: new Date("2026-08-01"), status: "open", amountCents: 10000, payments: [] };
+const newer = { _id: "new", dueDate: new Date("2026-10-01"), createdAt: new Date("2026-08-01"), status: "open", amountCents: 10000, payments: [] };
+check("part payment lands entirely on the older charge", initialAllocations([newer, older], 4000).map((a: any) => [a.chargeId, a.amountCents]), [["old", 4000]]);
+check("overflow spills onto the next one", initialAllocations([newer, older], 15000).map((a: any) => [a.chargeId, a.amountCents]), [["old", 10000], ["new", 5000]]);
+check("more than is owed allocates only what exists", initialAllocations([older], 99999).map((a: any) => a.amountCents), [10000]);
+
+console.log("\nwhat a member is allowed to pay");
+// The ceiling is the balance itself. Money in flight is reported so the screen
+// can say so, but it no longer reserves anything: a webhook that never arrives
+// used to lock a member out of paying entirely.
+check("you may pay the whole balance", onlinePaymentAvailability(40000, 40000, 0), {
+  payableBalanceCents: 40000,
+  payableDueNowCents: 40000,
+  processingCents: 0,
+});
+check("a payment in flight does not reduce the ceiling", onlinePaymentAvailability(40000, 40000, 20000), {
+  payableBalanceCents: 40000,
+  payableDueNowCents: 40000,
+  processingCents: 20000,
+});
+// The case that was actually biting: $20 owed with a stale $200 intent. The
+// old rule made this 0 and the Pay button vanished with no explanation.
+check("a stale intent larger than the balance still leaves it payable", onlinePaymentAvailability(2000, 2000, 20000), {
+  payableBalanceCents: 2000,
+  payableDueNowCents: 2000,
+  processingCents: 20000,
+});
+check("due now is never more than the balance", onlinePaymentAvailability(40000, 90000, 0), {
+  payableBalanceCents: 40000,
+  payableDueNowCents: 40000,
+  processingCents: 0,
+});
+check("nothing owed means nothing payable", onlinePaymentAvailability(0, 0, 5000), {
+  payableBalanceCents: 0,
+  payableDueNowCents: 0,
+  processingCents: 5000,
+});
+// Paying it off in instalments, which is the whole point of a ceiling rather
+// than a fixed amount: $400, then $200 left, then $50.
+check("partial payments walk the balance down", [
+  onlinePaymentAvailability(40000, 40000, 0).payableBalanceCents,
+  onlinePaymentAvailability(20000, 20000, 0).payableBalanceCents,
+  onlinePaymentAvailability(5000, 5000, 0).payableBalanceCents,
+  onlinePaymentAvailability(0, 0, 0).payableBalanceCents,
+], [40000, 20000, 5000, 0]);
+check("only genuinely pending rows reserve balance", pendingOnlinePrincipalCents([
+  { principalCents: 20000, status: "processing" },
+  { principalCents: 5000, status: "failed" },
+  { principalCents: 10000, status: "requires_payment_method", confirmedAt: new Date() },
+]), 30000);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
