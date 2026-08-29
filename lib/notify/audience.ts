@@ -113,6 +113,39 @@ export async function treasuryRecipients(
   return recipients;
 }
 
+/// Everyone the chapter can address as a body.
+///
+/// Active members only, and only those with a Clerk account behind them: a
+/// placeholder profile created so somebody appears on the roster has no bell
+/// to ring and no device to push to, and writing a notification row for one
+/// leaves an unread badge nobody can ever clear.
+///
+/// Not cached. Broadcasts are rare and a stale roster on one is worse than the
+/// query it saves.
+export async function chapterRecipients(): Promise<Recipient[]> {
+  const members = await Member.find({
+    status: "Active",
+    clerkId: { $nin: [null, ""] },
+  })
+    .select("_id rollNo fName lName email clerkId")
+    .lean<any[]>();
+
+  try {
+    await ensureMemberEmails(members.map((member) => member._id));
+    const fresh = await Member.find({ _id: { $in: members.map((m) => m._id) } })
+      .select("_id email")
+      .lean<any[]>();
+    const emailById = new Map(fresh.map((m) => [String(m._id), m.email ?? null]));
+    members.forEach((member) => {
+      member.email = emailById.get(String(member._id)) ?? member.email ?? null;
+    });
+  } catch (err: any) {
+    logger.warn({ err }, "Could not refresh chapter emails, sending with what we have");
+  }
+
+  return members.map(toRecipient);
+}
+
 /// Drop the cache. Called when E-Council membership changes so the next send
 /// doesn't spend a minute talking to last term's officers.
 export function invalidateOfficerCache(): void {

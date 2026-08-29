@@ -3,7 +3,14 @@ import Stripe from "stripe";
 let client: Stripe | null = null;
 
 export function onlineDuesPaymentsEnabled() {
-  return process.env.ONLINE_DUES_PAYMENTS_ENABLED === "true";
+  // Local development is allowed through the complete Stripe flow even when
+  // the chapter switch is off. Preview deployments can opt in explicitly;
+  // ordinary production builds still require the chapter setting.
+  return (
+    process.env.ONLINE_DUES_PAYMENTS_ENABLED === "true" ||
+    process.env.NODE_ENV === "development" ||
+    process.env.NEXT_PUBLIC_FORCE_ONLINE_PAYMENTS === "true"
+  );
 }
 
 export function stripeIsConfigured() {

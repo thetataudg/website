@@ -15,8 +15,8 @@ import { ensureMemberEmails } from "@/lib/notify/emails";
 import { recordFinanceEvent } from "@/lib/financeEvents";
 import logger from "@/lib/logger";
 import {
+  AnyTemplate,
   NotifyTemplate,
-  OfficerTemplate,
   RenderedMessage,
   TemplateContext,
   isReminderTemplate,
@@ -33,7 +33,7 @@ const EXTERNAL_CHANNELS: Channel[] = [emailChannel, pushChannel];
 
 export interface NotifyInput {
   recipient: Recipient;
-  template: NotifyTemplate | OfficerTemplate;
+  template: AnyTemplate;
   context: TemplateContext;
   /// Already-rendered wording, for messages that don't come from the member
   /// template table — the officer feed builds its own from the audit summary.
@@ -81,7 +81,7 @@ export interface NotifyResult {
 /// laptop, and for a retried request, none of which a disabled button reaches.
 export async function isInCooldown(
   memberId: any,
-  template: NotifyTemplate | OfficerTemplate,
+  template: AnyTemplate,
   now = new Date()
 ): Promise<boolean> {
   if (!isReminderTemplate(template)) return false;
@@ -97,7 +97,7 @@ export async function isInCooldown(
 /// Batch version, so a sixty-person send costs one query rather than sixty.
 export async function membersInCooldown(
   memberIds: any[],
-  template: NotifyTemplate | OfficerTemplate,
+  template: AnyTemplate,
   now = new Date()
 ): Promise<Set<string>> {
   if (!memberIds.length || !isReminderTemplate(template)) return new Set();

@@ -112,8 +112,8 @@ export type MapKitStatus = "loading" | "ready" | "error";
 /**
  * Loads MapKit JS on demand.
  *
- * `enabled` is what keeps the script off pages that never open a map — most
- * visits to the voting page never do.
+ * `enabled` is what keeps the script off pages that never need it — most
+ * visits to the events list never open a map or type a location.
  */
 export function useMapKit(enabled = true): {
   mapkit: any;

@@ -38,8 +38,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid device token" }, { status: 400 });
     }
 
+    // Production unless the build explicitly says otherwise. This is only the
+    // first gateway the push channel tries: it falls back to the other one and
+    // writes back whichever accepted the token, so a wrong hint here costs one
+    // extra round trip once rather than silently killing push for the device.
     const environment =
-      body?.environment === "production" ? "production" : "development";
+      body?.environment === "development" ? "development" : "production";
 
     await DeviceToken.findOneAndUpdate(
       { token },

@@ -1,6 +1,10 @@
 // lib/dues.ts
 import { DateTime } from "luxon";
-import { balanceCentsFor, paidCentsFor } from "@/lib/models/DuesCharge";
+import {
+  balanceCentsFor,
+  memberPaidCentsFor,
+  paidCentsFor,
+} from "@/lib/models/DuesCharge";
 import { ARIZONA_ZONE } from "@/lib/recurrence";
 
 export const DUES_CURRENCY = "USD";
@@ -88,6 +92,10 @@ export interface DuesChargeDTO {
   category: string;
   amountCents: number;
   paidCents: number;
+  /// Of `paidCents`, the part that was real money rather than credit or a
+  /// write-off. This is what decides whether a charge can still be taken back:
+  /// see `memberPaidCentsFor`.
+  memberPaidCents: number;
   balanceCents: number;
   dueDate: string | null;
   status: string;
@@ -132,6 +140,7 @@ export function serializeCharge(
     category: charge?.category ?? "dues",
     amountCents: Number(charge?.amountCents) || 0,
     paidCents: paidCentsFor(charge),
+    memberPaidCents: memberPaidCentsFor(charge),
     balanceCents,
     dueDate: dueDate ? dueDate.toISOString() : null,
     status: charge?.status ?? "open",

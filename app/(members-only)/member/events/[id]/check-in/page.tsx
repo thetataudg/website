@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { QrCode, Search, TriangleAlert, X } from "lucide-react";
+import { QrCode, Search, TriangleAlert, Undo2, X } from "lucide-react";
 
 import LoadingState from "../../../../components/LoadingState";
 import {
@@ -10,18 +10,9 @@ import {
   PageHeader,
 } from "../../../../components/shell/PageShell";
 import { EmptyState } from "../../../../components/shell/States";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { describeCheckInSource } from "@/lib/checkinSource";
 import {
   Card,
   CardContent,
@@ -53,7 +44,12 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string>("");
-  const [pendingCheckIn, setPendingCheckIn] = useState<Member | null>(null);
+  // The row that can still be taken back: whoever went on the list last.
+  // Faster than a confirm on every check-in, and it is the wrong ones that
+  // are rare — not the right ones. Undo is offered on the person's own row
+  // rather than in a banner, so it is next to the name it would remove.
+  const [undoableId, setUndoableId] = useState<string | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const [endingEvent, setEndingEvent] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -130,40 +126,56 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
     const errorMessage =
       data?.error === "Invalid code" ? "Invalid or expired code." : data?.error;
     if (res.ok) {
-      setStatus(
-        data.status === "already-checked-in"
-          ? "Already checked in."
-          : "Checked in successfully."
-      );
+      const already = data.status === "already-checked-in";
+      setStatus(already ? "Already checked in." : "Checked in successfully.");
+      if (!already && data.memberId) setUndoableId(String(data.memberId));
       await refreshEvent();
     } else {
       setStatus(errorMessage || "Check-in failed.");
     }
   }
 
-  async function manualCheckIn(memberId: string) {
-    const payload: Record<string, any> = {
-      memberId,
-      source: "Phone",
-    };
-    if (me?.memberId) {
-      payload.scannerMemberId = me.memberId;
-    }
+  async function manualCheckIn(member: Member) {
     const res = await fetch(`/api/events/${params.id}/manual-check-in`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ memberId: member._id }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
+      const already = data.status === "already-checked-in";
       setStatus(
-        data.status === "already-checked-in"
-          ? "Already checked in."
-          : "Checked in successfully."
+        already
+          ? `${member.fName} ${member.lName} was already checked in.`
+          : `${member.fName} ${member.lName} checked in.`
       );
+      setUndoableId(already ? null : member._id);
+      setQuery("");
       await refreshEvent();
     } else {
+      setUndoableId(null);
       setStatus(data.error || "Manual check-in failed.");
+    }
+  }
+
+  async function undoCheckIn(memberId: string, name: string) {
+    setUndoing(true);
+    try {
+      const res = await fetch(`/api/events/${params.id}/manual-check-in`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId }),
+      });
+      if (res.ok) {
+        setStatus(`${name} taken back off.`);
+        setUndoableId(null);
+        await refreshEvent();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setStatus(data?.error || "Unable to undo that check-in.");
+      }
+    } finally {
+      setUndoing(false);
     }
   }
 
@@ -476,7 +488,7 @@ function stopScanner() {
                       type="button"
                       className="w-full px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                       onClick={() => {
-                        setPendingCheckIn(m);
+                        void manualCheckIn(m);
                       }}
                     >
                       {m.fName} {m.lName} (#{m.rollNo})
@@ -503,8 +515,12 @@ function stopScanner() {
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">Name</TableHead>
+                    <TableHead scope="col">How</TableHead>
                     <TableHead scope="col" className="text-right">
                       Checked In At
+                    </TableHead>
+                    <TableHead scope="col" className="w-px">
+                      <span className="sr-only">Undo</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -549,10 +565,31 @@ function stopScanner() {
                           ? `Member ${key}`
                           : "Unknown member"}
                       </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {describeCheckInSource(entry)}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {entry?.checkedInAt
                           ? formatMstDateTime(entry.checkedInAt)
                           : ""}
+                      </TableCell>
+                      <TableCell className="py-1 pl-2 text-right">
+                        {key && key === undoableId ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={undoing}
+                            onClick={() =>
+                              void undoCheckIn(
+                                key,
+                                `${fName} ${lName}`.trim() || "That member"
+                              )
+                            }
+                          >
+                            <Undo2 aria-hidden="true" className="size-4" />
+                            Undo
+                          </Button>
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   );
@@ -569,35 +606,6 @@ function stopScanner() {
         </CardContent>
       </Card>
 
-      <AlertDialog
-        open={!!pendingCheckIn}
-        onOpenChange={(next) => {
-          if (!next) setPendingCheckIn(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Check-In</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingCheckIn
-                ? `Check in ${pendingCheckIn.fName} ${pendingCheckIn.lName} (#${pendingCheckIn.rollNo})?`
-                : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!pendingCheckIn) return;
-                await manualCheckIn(pendingCheckIn._id);
-                setPendingCheckIn(null);
-              }}
-            >
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </PageContainer>
   );
 }

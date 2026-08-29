@@ -3,7 +3,10 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
-import DuesCharge, { balanceCentsFor } from "@/lib/models/DuesCharge";
+import DuesCharge, {
+  balanceCentsFor,
+  memberPaidCentsFor,
+} from "@/lib/models/DuesCharge";
 import { normalizeDueDate, readAmountCents, serializeCharge } from "@/lib/dues";
 import { requireTreasury } from "@/lib/duesAuth";
 import { formatCents, recordFinanceEvent } from "@/lib/financeEvents";
@@ -20,6 +23,21 @@ const PHOENIX_DATE: Intl.DateTimeFormatOptions = {
   year: "numeric",
   timeZone: "America/Phoenix",
 };
+
+/// A charge with money against it is history, not a mistake.
+///
+/// Raising a charge in error and taking it back is an everyday correction, so
+/// voiding stays deliberately easy — right up to the moment the member pays.
+/// After that, voiding would zero the balance (`balanceCentsFor` returns 0 for
+/// anything not "open") while their payment stays recorded against a charge
+/// that no longer claims to be owed, and the chapter would be holding money it
+/// has no line item for. The fix in that case is a refund or a credit, both of
+/// which leave a trail; this returns the officer to one.
+function voidBlockedReason(charge: any): string | null {
+  const paid = memberPaidCentsFor(charge);
+  if (paid <= 0) return null;
+  return `This charge has ${formatCents(paid)} paid against it, so it can't be removed. Refund the payment first, or waive the remaining balance instead.`;
+}
 
 export async function PATCH(
   req: Request,
@@ -151,6 +169,10 @@ export async function PATCH(
       if (!["open", "waived", "void"].includes(body.status)) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
       }
+      if (body.status === "void" && statusBefore !== "void") {
+        const blocked = voidBlockedReason(charge);
+        if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
+      }
       charge.status = body.status;
     }
 
@@ -267,6 +289,11 @@ export async function DELETE(
 
     if (charge.status === "void") {
       return NextResponse.json(serializeCharge(charge.toObject()), { status: 200 });
+    }
+
+    const blocked = voidBlockedReason(charge);
+    if (blocked) {
+      return NextResponse.json({ error: blocked }, { status: 409 });
     }
 
     let reason = "";

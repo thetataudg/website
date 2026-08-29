@@ -1,3 +1,4 @@
+import { formatCents } from "@/lib/financeEvents";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -6,7 +7,12 @@ import DuesCharge, { balanceCentsFor } from "@/lib/models/DuesCharge";
 import PaymentPlan from "@/lib/models/PaymentPlan";
 import OnlineDuesPayment from "@/lib/models/OnlineDuesPayment";
 import { currentDueAcross, partitionPlans } from "@/lib/plans";
-import { initialAllocations, serializeOnlinePayment } from "@/lib/onlineDuesPayments";
+import {
+  initialAllocations,
+  onlinePaymentAvailability,
+  pendingOnlinePrincipalCents,
+  serializeOnlinePayment,
+} from "@/lib/onlineDuesPayments";
 import {
   getStripe,
   onlineDuesPaymentsEnabled,
@@ -51,12 +57,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const [charges, plans] = await Promise.all([
+    const [charges, plans, onlinePayments] = await Promise.all([
       DuesCharge.find({ memberId: member._id }).lean<any[]>(),
       PaymentPlan.find({
         memberId: member._id,
         status: { $in: ["active", "pending"] },
       }).lean<any[]>(),
+      OnlineDuesPayment.find({
+        memberId: member._id,
+        ledgerPostedAt: null,
+      })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean<any[]>(),
     ]);
     const openCharges = charges.filter(
       (charge) => charge.status === "open" && balanceCentsFor(charge) > 0
@@ -72,23 +85,56 @@ export async function POST(req: Request) {
     const now = new Date();
     const { live } = partitionPlans(plans, charges, now);
     const due = currentDueAcross(live, charges, null, now);
+    const availability = onlinePaymentAvailability(
+      balanceCents,
+      due.amountDueNowCents,
+      pendingOnlinePrincipalCents(onlinePayments)
+    );
+    // Nothing owed is the only reason to refuse outright now. Money already
+    // in flight no longer blocks a payment; see `onlinePaymentAvailability`.
+    if (availability.payableBalanceCents <= 0) {
+      return NextResponse.json(
+        {
+          error: "You don't have a balance to pay right now",
+          ...availability,
+        },
+        { status: 409 }
+      );
+    }
     let principalCents: number;
     if (requestedKind === "full") {
-      principalCents = balanceCents;
+      principalCents = availability.payableBalanceCents;
     } else if (requestedKind === "installment") {
-      principalCents = Math.min(balanceCents, due.amountDueNowCents || balanceCents);
+      principalCents = availability.payableDueNowCents;
     } else {
       principalCents = Math.round(Number(body?.amountCents));
     }
     if (!Number.isFinite(principalCents) || principalCents <= 0) {
-      return NextResponse.json({ error: "Payment amount must be greater than zero" }, { status: 400 });
-    }
-    if (principalCents > balanceCents) {
       return NextResponse.json(
-        { error: "Payment amount is greater than your remaining balance", balanceCents },
+        {
+          error: requestedKind === "installment"
+            ? "Nothing is due right now. Choose the remaining balance or another amount."
+            : "Payment amount must be greater than zero",
+          ...availability,
+        },
+        { status: 400 }
+      );
+    }
+    if (principalCents > availability.payableBalanceCents) {
+      return NextResponse.json(
+        {
+          // The one ceiling that survives: you cannot pay more than you owe.
+          error: `That's more than the ${formatCents(availability.payableBalanceCents)} left on your balance.`,
+          ...availability,
+        },
         { status: 409 }
       );
     }
+
+    // The member's own words about this money, kept verbatim and shown to
+    // the treasurer. Capped because it also rides along in Stripe metadata,
+    // where values are limited to 500 characters.
+    const note = String(body?.note ?? "").trim().slice(0, 500);
 
     // Fee pass-through is deliberately zero until the chapter adopts a
     // compliant credit-only surcharge policy. ACH and debit cannot be treated
@@ -102,6 +148,7 @@ export async function POST(req: Request) {
       feeCents,
       totalCents,
       currency: "usd",
+      note,
       allocations: initialAllocations(openCharges, principalCents),
       status: "creating",
     });
@@ -116,6 +163,7 @@ export async function POST(req: Request) {
         receipt_email: member.email || undefined,
         metadata: {
           onlineDuesPaymentId: String(localPayment._id),
+          note,
           memberId: String(member._id),
           rollNo: String(member.rollNo || ""),
           principalCents: String(principalCents),

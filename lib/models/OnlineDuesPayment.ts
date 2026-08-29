@@ -41,6 +41,10 @@ const OnlineDuesPaymentSchema = new Schema(
     feeCents: { type: Number, required: true, default: 0, min: 0 },
     totalCents: { type: Number, required: true, min: 1 },
     currency: { type: String, default: "usd" },
+    /// Whatever the member wants the treasurer to see next to the money —
+    /// "this is for the spring trip deposit, not dues". Free text, theirs,
+    /// and never interpreted by the allocator.
+    note: { type: String, default: "", maxlength: 500 },
     allocations: { type: [AllocationSchema], default: [] },
 
     stripePaymentIntentId: { type: String, default: null },
@@ -57,6 +61,11 @@ const OnlineDuesPaymentSchema = new Schema(
       index: true,
     },
     failureMessage: { type: String, default: "" },
+    /// Stamped the moment the member finishes the Stripe sheet, before any
+    /// webhook lands. This is what makes the payment show as pending on
+    /// their ledger during the seconds — or, for ACH, the days — between
+    /// authorizing the money and the chapter being able to post it.
+    confirmedAt: { type: Date, default: null },
     paidAt: { type: Date, default: null },
     ledgerPostedAt: { type: Date, default: null },
     refundedCents: { type: Number, default: 0, min: 0 },

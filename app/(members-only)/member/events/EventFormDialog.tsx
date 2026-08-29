@@ -28,6 +28,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocationInput } from "@/components/ui/location-input";
 import {
   Select,
   SelectContent,
@@ -160,15 +161,26 @@ export function EventFormDialog({
     if (!open) return;
     setError(null);
     setSeriesPrompt(false);
+    // A form opened from a committee already knows three of its own answers,
+    // so it starts with them filled in rather than asking. Mirrors
+    // `EventPrefill.committeeMeeting` in the iOS app; the two have to agree or
+    // the same action produces different events depending on where it was
+    // started. All of it stays editable: a committee might schedule a service
+    // project rather than a meeting.
+    const pinned = fixedCommitteeId
+      ? committees.find((committee) => committee._id === fixedCommitteeId)
+      : null;
     setForm(
       event
         ? formFor(event, fixedCommitteeId ? { committeeId: fixedCommitteeId } : undefined)
         : blankForm({
             committeeId: fixedCommitteeId ?? "",
             eventType: fixedCommitteeId ? "meeting" : "event",
+            gemCategory: fixedCommitteeId ? "committee-meeting" : "",
+            name: pinned ? `${pinned.name} meeting` : "",
           })
     );
-  }, [open, event, fixedCommitteeId]);
+  }, [open, event, fixedCommitteeId, committees]);
 
   const set = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -385,10 +397,10 @@ export function EventFormDialog({
 
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="event-location">Location</Label>
-                <Input
+                <LocationInput
                   id="event-location"
                   value={form.location}
-                  onChange={(change) => set("location", change.target.value)}
+                  onValueChange={(next) => set("location", next)}
                   placeholder="Discovery Hall 250"
                 />
               </div>

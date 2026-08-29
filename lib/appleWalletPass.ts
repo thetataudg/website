@@ -5,7 +5,7 @@ import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
 import logger from "@/lib/logger";
-import { maybePresignUrl } from "@/lib/garage";
+import { fetchGarageObject, maybePresignUrl } from "@/lib/garage";
 import { generateWalletPassToken } from "@/lib/checkinCode";
 import type { MemberPassProfile } from "@/lib/memberPassProfile";
 
@@ -612,8 +612,19 @@ async function extractSignerSubject(certPaths: WalletCertPaths, password: string
   );
 }
 
+/// The member's photo, as bytes.
+///
+/// Reads the object directly with the bucket credentials first. The old path
+/// signed a public URL and then fetched it over the internet, which is why the
+/// pass came out with the crest on it in production and the member's face in
+/// development: the deployed container could sign a URL it could not itself
+/// reach. The HTTP path is kept as a fallback for a photo stored somewhere
+/// that is not Garage at all.
 async function loadProfilePhoto(profilePicUrl?: string) {
   if (!profilePicUrl) return null;
+
+  const direct = await fetchGarageObject(profilePicUrl);
+  if (direct?.length) return direct;
 
   try {
     const presignedUrl = await maybePresignUrl(profilePicUrl);
@@ -663,8 +674,17 @@ async function createWalletPassThumbnails(input: {
 }) {
   try {
     if (input.primarySource) {
-      return await createThumbnailSet(input.primarySource);
+      const fromPhoto = await createThumbnailSet(input.primarySource);
+      logger.info(
+        { rollNo: input.rollNo },
+        "Wallet pass thumbnail built from the member photo"
+      );
+      return fromPhoto;
     }
+    logger.warn(
+      { rollNo: input.rollNo },
+      "No member photo available for the wallet pass, using the crest"
+    );
   } catch (err: any) {
     logger.warn(
       { err, rollNo: input.rollNo },

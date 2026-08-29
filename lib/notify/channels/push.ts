@@ -67,10 +67,42 @@ function providerToken(): string | null {
   }
 }
 
+const PRODUCTION_GATEWAY = "https://api.push.apple.com";
+const SANDBOX_GATEWAY = "https://api.sandbox.push.apple.com";
+
+/// Production unless the device explicitly said sandbox.
+///
+/// Production is the default rather than "development" because that is what
+/// every shipped build is, and an unrecognised or missing value should fail
+/// toward the case that covers the chapter rather than toward the one that
+/// covers a laptop.
 function gatewayFor(environment: string): string {
-  return environment === "production"
-    ? "https://api.push.apple.com"
-    : "https://api.sandbox.push.apple.com";
+  return environment === "development" ? SANDBOX_GATEWAY : PRODUCTION_GATEWAY;
+}
+
+function otherGateway(gateway: string): string {
+  return gateway === PRODUCTION_GATEWAY ? SANDBOX_GATEWAY : PRODUCTION_GATEWAY;
+}
+
+function environmentFor(gateway: string): string {
+  return gateway === PRODUCTION_GATEWAY ? "production" : "development";
+}
+
+/// Whether APNs is saying "wrong gateway" rather than "dead device".
+///
+/// It says both with the same words. A token minted against the sandbox and
+/// presented to the production gateway comes back `BadDeviceToken`, and so
+/// does a token that has genuinely been revoked; `Unregistered`/410 likewise
+/// means "not valid *here*", not "not valid anywhere". The two are only
+/// distinguishable by trying the other gateway, which is exactly what the
+/// caller now does before writing the device off.
+function looksLikeWrongGateway(attempt: ApnsAttempt): boolean {
+  return (
+    attempt.status === 400 ||
+    attempt.status === 410 ||
+    attempt.reason === "BadDeviceToken" ||
+    attempt.reason === "Unregistered"
+  );
 }
 
 interface ApnsAttempt {
@@ -176,33 +208,69 @@ export const pushChannel: Channel = {
 
     let anyDelivered = false;
     for (const device of devices) {
-      const attempt = await sendOne(
-        gatewayFor(device.environment),
-        device.token,
-        jwt,
-        payload
-      );
+      // Try what the device told us at registration, then the other gateway if
+      // that is refused.
+      //
+      // This is what makes push work without anyone having to keep the build
+      // configuration and the database in agreement. A token is minted against
+      // exactly one gateway, and which one is decided by the *provisioning
+      // profile the app was signed with* — not by the APS_ENVIRONMENT build
+      // setting, which automatic signing overwrites. So a locally installed
+      // Release build carries a sandbox token while reporting "production",
+      // and a TestFlight build of the same commit carries a production one.
+      //
+      // Before this, either mismatch came back `BadDeviceToken` and the device
+      // was permanently disabled — one bad send and that phone never received
+      // another push until somebody reinstalled the app. Now the wrong guess
+      // costs one extra round trip, once, and corrects itself.
+      const preferred = gatewayFor(device.environment);
+      let attempt = await sendOne(preferred, device.token, jwt, payload);
+      let usedGateway = preferred;
+
+      if (attempt.status !== 200 && looksLikeWrongGateway(attempt)) {
+        const fallback = otherGateway(preferred);
+        const retry = await sendOne(fallback, device.token, jwt, payload);
+        if (retry.status === 200) {
+          attempt = retry;
+          usedGateway = fallback;
+          logger.info(
+            { rollNo: request.recipient.rollNo, environment: environmentFor(fallback) },
+            "Device was registered against the wrong APNs gateway, corrected"
+          );
+        } else {
+          // Refused by both. Only now is it a dead token rather than a
+          // misfiled one, and the reason recorded is the first gateway's,
+          // which is the one the device claimed to belong to.
+          await DeviceToken.updateOne(
+            { _id: device._id },
+            {
+              $set: {
+                disabledAt: new Date(),
+                disabledReason: attempt.reason || String(attempt.status || "unknown"),
+              },
+            }
+          );
+          continue;
+        }
+      }
+
       if (attempt.status === 200) {
         anyDelivered = true;
         await DeviceToken.updateOne(
           { _id: device._id },
-          { $set: { lastSeenAt: new Date() } }
+          {
+            $set: {
+              lastSeenAt: new Date(),
+              // Written back so the next send goes straight to the gateway that
+              // worked. The correction above is a one-off, not a permanent
+              // doubling of every push to this device.
+              environment: environmentFor(usedGateway),
+            },
+          }
         );
         continue;
       }
-      // A dead token is a fact about the device, not a failure of the send.
-      // Recording it stops us retrying it nightly forever.
-      if (
-        attempt.status === 410 ||
-        attempt.reason === "BadDeviceToken" ||
-        attempt.reason === "Unregistered"
-      ) {
-        await DeviceToken.updateOne(
-          { _id: device._id },
-          { $set: { disabledAt: new Date(), disabledReason: attempt.reason || "410" } }
-        );
-        continue;
-      }
+
       logger.warn(
         { status: attempt.status, reason: attempt.reason, rollNo: request.recipient.rollNo },
         "APNs rejected a push"

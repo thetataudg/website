@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeDiscordRedirect } from "@/lib/discordLink";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
@@ -47,12 +48,6 @@ function decodeState(encoded: string | null) {
   }
 }
 
-function normalizeRedirectTo(value: string | undefined) {
-  if (!value) return "/member";
-  if (value.startsWith("/")) return value;
-  return "/member";
-}
-
 function buildRedirectUrl(req: Request, target: string) {
   const base =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
@@ -64,7 +59,10 @@ function buildRedirectUrl(req: Request, target: string) {
         return "";
       }
     })();
-  const destination = normalizeRedirectTo(target);
+  const destination = normalizeDiscordRedirect(target);
+  // An app-scheme callback is already absolute. Prefixing the site origin
+  // would produce https://ttdg.orgorg.thetatau.dg...
+  if (destination.includes("://")) return destination;
   return base ? `${base}${destination}` : destination;
 }
 

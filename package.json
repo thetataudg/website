@@ -23,7 +23,10 @@
     "check:plans": "esbuild scripts/check-plans-db.ts --bundle --platform=node --format=cjs --outfile=.plans-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .plans-check.cjs dotenv_config_path=.env; rc=$?; rm -f .plans-check.cjs; exit $rc",
     "check:gem": "esbuild scripts/check-gem-logic.ts --bundle --platform=node --format=cjs --outfile=.gem-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .gem-check.cjs; rc=$?; rm -f .gem-check.cjs; exit $rc",
     "check:appstore": "esbuild scripts/check-appstore-webhook.ts --bundle --platform=node --format=cjs --outfile=.appstore-check.cjs --tsconfig=tsconfig.json --log-level=error --external:pino && node .appstore-check.cjs; rc=$?; rm -f .appstore-check.cjs; exit $rc",
-    "clerk:emails": "esbuild scripts/push-clerk-email-templates.ts --bundle --platform=node --format=cjs --outfile=.clerk-emails.cjs --tsconfig=tsconfig.json --log-level=error && node -r dotenv/config .clerk-emails.cjs dotenv_config_path=.env; rc=$?; rm -f .clerk-emails.cjs; exit $rc"
+    "clerk:emails": "esbuild scripts/push-clerk-email-templates.ts --bundle --platform=node --format=cjs --outfile=.clerk-emails.cjs --tsconfig=tsconfig.json --log-level=error && node -r dotenv/config .clerk-emails.cjs dotenv_config_path=.env; rc=$?; rm -f .clerk-emails.cjs; exit $rc",
+    "check:payments": "esbuild scripts/check-online-payments-db.ts --bundle --platform=node --format=cjs --outfile=.payments-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .payments-check.cjs dotenv_config_path=.env; rc=$?; rm -f .payments-check.cjs; exit $rc",
+    "seed:newsletter": "esbuild scripts/seed-newsletter.ts --bundle --platform=node --format=cjs --outfile=.seed-newsletter.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose --external:sharp && node -r dotenv/config .seed-newsletter.cjs dotenv_config_path=.env; rc=$?; rm -f .seed-newsletter.cjs; exit $rc",
+    "check:newsletters": "esbuild scripts/check-newsletters.ts --bundle --platform=node --format=cjs --outfile=.newsletters-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .newsletters-check.cjs; rc=$?; rm -f .newsletters-check.cjs; exit $rc"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

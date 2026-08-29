@@ -1,18 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { MapPin, Pencil, UserPlus, Users } from "lucide-react";
+import { MapPin, Pencil, Undo2, UserPlus, Users } from "lucide-react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { describeCheckInSource } from "@/lib/checkinSource";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,11 +63,17 @@ export function EventRollDialog({
   onEdit?: (eventId: string) => void;
 }) {
   const [query, setQuery] = React.useState("");
-  const [pending, setPending] = React.useState<RollMember | null>(null);
+  // The row that can still be taken back. A confirm on every add costs
+  // everyone a click to protect against the rare wrong one; undo sits on the
+  // person's own row, next to the name it would remove.
+  const [undoableId, setUndoableId] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
-    if (!event) setQuery("");
+    if (!event) {
+      setQuery("");
+      setUndoableId(null);
+    }
   }, [event]);
 
   const matches = React.useMemo(() => {
@@ -104,12 +101,31 @@ export function EventRollDialog({
         body: JSON.stringify({ memberId: member._id }),
       });
       if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setUndoableId(data?.status === "already-checked-in" ? null : member._id);
         await onRefresh(event._id);
         setQuery("");
       }
     } finally {
       setBusy(false);
-      setPending(null);
+    }
+  }
+
+  async function undo(memberId: string) {
+    if (!event?._id) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/events/${event._id}/manual-check-in`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId }),
+      });
+      if (response.ok) {
+        setUndoableId(null);
+        await onRefresh(event._id);
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -185,7 +201,8 @@ export function EventRollDialog({
                       <button
                         key={member._id}
                         type="button"
-                        onClick={() => setPending(member)}
+                        disabled={busy}
+                        onClick={() => void checkIn(member)}
                         className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                       >
                         <span className="min-w-0 truncate">
@@ -202,6 +219,7 @@ export function EventRollDialog({
                     Nobody left to add under that name.
                   </p>
                 ) : null}
+
               </div>
 
               <div className="space-y-2">
@@ -225,8 +243,25 @@ export function EventRollDialog({
                             #{entry.memberId?.rollNo}
                           </span>
                         </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {entry.checkedInAt ? formatDateTime(entry.checkedInAt) : ""}
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="text-right text-xs text-muted-foreground">
+                            {entry.checkedInAt ? formatDateTime(entry.checkedInAt) : ""}
+                            {describeCheckInSource(entry) ? (
+                              <span className="block">{describeCheckInSource(entry)}</span>
+                            ) : null}
+                          </span>
+                          {entry.memberId?._id && entry.memberId._id === undoableId ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void undo(entry.memberId._id)}
+                            >
+                              <Undo2 className="size-4" aria-hidden="true" />
+                              Undo
+                            </Button>
+                          ) : null}
                         </span>
                       </div>
                     ))}
@@ -242,30 +277,6 @@ export function EventRollDialog({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!pending} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Check this member in?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending
-                ? `${pending.fName} ${pending.lName} (#${pending.rollNo}) will be added to this event's roll.`
-                : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={busy}
-              onClick={(click) => {
-                click.preventDefault();
-                if (pending) void checkIn(pending);
-              }}
-            >
-              Check in
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

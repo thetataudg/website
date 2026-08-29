@@ -50,20 +50,30 @@ function contentFor(request: DeliveryRequest): EmailContent {
     meta.push({ label: "Paid to you", value: amount, tone: "positive" });
   }
 
+  const overrides = message.email;
+
   return {
-    title: message.title,
+    // The override wins on the headline: the bell wants "New newsletter", the
+    // inbox wants the headline of the issue itself.
+    title: overrides?.title ?? message.title,
+    eyebrow: overrides?.eyebrow,
+    heroImageUrl: overrides?.heroImageUrl,
+    heroImageAlt: overrides?.heroImageAlt,
+    align: overrides?.align,
     heroAmount: isBill && amount ? amount : undefined,
     heroLabel: isBill ? (template === "installment_due" ? "Instalment due" : "Amount due") : undefined,
-    paragraphs: [`Hey ${recipient.firstName},`, message.body],
+    // The greeting is always the channel's, because only it knows who this
+    // copy is going to. An override replaces what comes after it.
+    paragraphs: [`Hey ${recipient.firstName},`, ...(overrides?.paragraphs ?? [message.body])],
     meta: meta.length ? meta : undefined,
     // Derived from the destination rather than written here. A literal label
     // meant every email the chapter sent carried a button reading "Open your
     // dues", including the ones about votes and reimbursements.
     ctaLabel: ctaLabelFor(message),
     ctaHref: `${siteUrl()}${message.link || "/member/dues"}`,
-    footnote: "Reply to this email if you need anything clarified.",
+    footnote: overrides?.footnote ?? "Reply to this email if you need anything clarified.",
     replyTo: replyToFor(message.category),
-    preheader: message.push,
+    preheader: overrides?.preheader ?? message.push,
   };
 }
 

@@ -89,6 +89,30 @@ export function paidCentsFor(charge: any): number {
   );
 }
 
+/// The part of `paidCents` that was actually money the member handed over.
+///
+/// Credit and write-offs settle a balance without anybody paying anything:
+/// credit is the chapter's own debt being absorbed, a write-off is an officer
+/// deciding to stop chasing. They are excluded here so that "has this been
+/// paid?" means what a treasurer means by it. That distinction is what lets a
+/// charge settled entirely by credit still be voided, which matters because
+/// voiding is the one action that hands that credit back to the member.
+export function memberPaidCentsFor(charge: any): number {
+  if (!Array.isArray(charge?.payments)) return 0;
+  return charge.payments.reduce((sum: number, payment: any) => {
+    const method = String(payment?.method || "other");
+    if (method === "credit" || method === "writeoff") return sum;
+    return (
+      sum +
+      Math.max(
+        0,
+        (Number(payment?.amountCents) || 0) -
+          (Number(payment?.reversedCents) || 0)
+      )
+    );
+  }, 0);
+}
+
 /// What the member still owes. Anything not "open" owes nothing, and
 /// overpayment never becomes a negative balance.
 export function balanceCentsFor(charge: any): number {

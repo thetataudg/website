@@ -136,3 +136,42 @@ export const maybePresignUrl = async (
     return url;
   }
 };
+
+/// Read an object straight out of Garage, given the URL we stored for it.
+///
+/// The server has the bucket credentials, so it has no business signing a
+/// public URL and then fetching that URL over the open internet to read its
+/// own storage. Doing it that way made reading a member's photo depend on the
+/// container having outbound access to the public Garage hostname and on the
+/// presign clock being right, neither of which is true everywhere the app
+/// runs. It is why the Apple Wallet pass quietly fell back to the crest in
+/// production while working perfectly against the same data locally.
+///
+/// Returns null rather than throwing: a missing photo costs a thumbnail, not
+/// the pass.
+export const fetchGarageObject = async (url?: string): Promise<Buffer | null> => {
+  if (!url) return null;
+  const parsed = parseGarageUrl(url);
+  if (!parsed) return null;
+
+  try {
+    const built = await buildS3Client();
+    if (!built) return null;
+    const result = await built.client.send(
+      new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
+    );
+    const body = result.Body as any;
+    if (!body) return null;
+    // The SDK hands back a Node stream here; `transformToByteArray` is the
+    // documented way to drain it without assuming which stream flavour.
+    if (typeof body.transformToByteArray === "function") {
+      return Buffer.from(await body.transformToByteArray());
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks);
+  } catch (err: any) {
+    logger.warn({ err, key: parsed.key }, "Could not read object from Garage");
+    return null;
+  }
+};
