@@ -19,6 +19,11 @@ interface AttendanceRow {
 
 interface Attendance {
   committeeName: string;
+  /// The term these counts cover. The route scopes to the current one unless
+  /// asked for another, so this is named on screen rather than left implicit —
+  /// "3 meetings" with no term attached is what made the old all-time tally
+  /// look like this semester's.
+  term: string;
   meetingsHeld: number;
   members: AttendanceRow[];
 }
@@ -94,13 +99,14 @@ export default function CommitteeAttendance({
       <div>
         <h4 className="mb-1 text-sm font-semibold text-foreground">Attendance</h4>
         <p className="text-sm text-muted-foreground">
-          No meetings have been held yet, so there is nothing to count.
+          No meetings have been held in {data.term || "this term"}, so there is
+          nothing to count.
         </p>
       </div>
     );
   }
 
-  // Everyone currently on the committee, across every meeting held.
+  // Everyone currently on the committee, across every meeting held this term.
   const current = data.members.filter((row) => row.onCommittee);
   const possible = data.meetingsHeld * current.length;
   const actual = current.reduce((sum, row) => sum + row.attended, 0);
@@ -112,6 +118,7 @@ export default function CommitteeAttendance({
         <Users className="size-4 text-muted-foreground" aria-hidden="true" />
         Attendance
         <span className="font-normal text-muted-foreground">
+          {data.term ? `${data.term} · ` : ""}
           {data.meetingsHeld === 1 ? "1 meeting" : `${data.meetingsHeld} meetings`}
           {turnout !== null ? ` · ${turnout}% turnout` : ""}
         </span>

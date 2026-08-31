@@ -721,11 +721,29 @@ async function normalizeToPng(source: Buffer, options: ResizeOptions) {
 
 async function trySharpTransform(source: Buffer, options: ResizeOptions) {
   try {
-    const dynamicImport = new Function(
-      "specifier",
-      "return import(specifier)"
-    ) as (specifier: string) => Promise<any>;
-    const sharpModule = await dynamicImport("sharp");
+    // A plain dynamic import, deliberately. Do not reintroduce an indirection
+    // here.
+    //
+    // This used to go through `new Function("s", "return import(s)")` to hide
+    // the specifier from the bundler, on the theory that a native module must
+    // not be bundled. It hid it too well. Next only traces what it can see, so
+    // sharp was never copied into the deployed function, this returned null on
+    // every production request, and the wallet pass came out wearing the crest
+    // instead of the member's photo. `route.js.nft.json` for the pass route
+    // listed 769 files and not one of them was sharp.
+    //
+    // The bundling worry was already handled: sharp is on Next's built-in list
+    // of packages that stay external, so a plain `import` is left as a runtime
+    // require *and* traced — 21 sharp files including the platform `.node`
+    // binary. Naming it in `experimental.serverComponentsExternalPackages` was
+    // tried and is actively wrong on Next 14: it pulled sharp *into* a webpack
+    // chunk and the trace lost it again.
+    //
+    // None of this reproduces locally. On a developer's Mac sharp resolves
+    // straight out of node_modules whatever the bundler did, and `sips` is
+    // there to catch anything it misses — which is why the pass was correct on
+    // localhost and wrong in production for the same member.
+    const sharpModule = await import("sharp");
     const sharp = sharpModule.default;
     return await sharp(source)
       .rotate()

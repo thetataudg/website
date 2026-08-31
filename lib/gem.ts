@@ -305,11 +305,22 @@ export function parseSemesterRange(params: {
   return defaultRange;
 }
 
-function deriveSemesterNameFromDate(date: Date): string {
+/// Which term a date falls in. The inverse of `parseSemesterName`.
+///
+/// Exported because more than the GEM report needs it now: anything that
+/// buckets records by term — committee attendance over several years, for one —
+/// has to agree with this file about where August sits, and a second copy of
+/// the month arithmetic somewhere else is how two screens end up disagreeing
+/// about which term a meeting was in.
+export function semesterNameForDate(date: Date): string {
   const arizonaDate = DateTime.fromJSDate(date, { zone: ARIZONA_ZONE });
   return arizonaDate.month <= 7
     ? `Spring ${arizonaDate.year}`
     : `Fall ${arizonaDate.year}`;
+}
+
+function deriveSemesterNameFromDate(date: Date): string {
+  return semesterNameForDate(date);
 }
 
 export function normalizeGemCategory(value?: string | null): GemCategory | null {

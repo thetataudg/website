@@ -59,13 +59,14 @@ async function normalizeImage(
   source: Buffer
 ): Promise<{ buffer: Buffer; width: number; height: number } | null> {
   try {
-    // Imported at runtime, matching `appleWalletPass`. sharp is a native
-    // module and bundling it breaks the Netlify build.
-    const dynamicImport = new Function(
-      "specifier",
-      "return import(specifier)"
-    ) as (specifier: string) => Promise<any>;
-    const sharp = (await dynamicImport("sharp")).default;
+    // A plain dynamic import, matching `appleWalletPass` — see the long note
+    // there before changing this. sharp is native and must stay out of the
+    // bundle, but Next already keeps it external on its own; the `new Function`
+    // indirection that used to be here hid the specifier from Next's tracer as
+    // well, so sharp never shipped to production and this returned null on
+    // every deployed upload. Newsletter images were stored exactly as the
+    // browser sent them: full size, and without EXIF rotation applied.
+    const sharp = (await import("sharp")).default;
 
     const buffer = await sharp(source)
       .rotate()
