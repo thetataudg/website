@@ -34,6 +34,7 @@ import {
   type CalloutVariant,
   type ImageLayout,
 } from "@/lib/newsletterTypes";
+import { prepareImageForUpload } from "@/lib/prepareImageUpload";
 
 /// A block as the builder holds it.
 ///
@@ -102,8 +103,12 @@ export async function uploadNewsletterImage(file: File): Promise<{
   width: number;
   height: number;
 }> {
+  // Shrunk here rather than sent whole: the server resizes to 2000px anyway,
+  // and a camera original is large enough to be refused by the platform before
+  // the route sees it. See lib/prepareImageUpload.
+  const prepared = await prepareImageForUpload(file);
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", prepared);
   const res = await fetch("/api/newsletters/images", {
     method: "POST",
     body: form,
