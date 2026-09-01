@@ -2,53 +2,30 @@
 
 import Image from "next/image";
 import { useEffect } from "react";
-import { Bungee } from "next/font/google";
-import { FaHeart, FaHandshake, FaSeedling, FaWrench } from "react-icons/fa";
 
-const bungee = Bungee({
-  subsets: ["latin"],
-  display: "swap",
-  weight: "400",
-});
+import { bungee } from "../../fonts";
+import DonateForm from "./DonateForm";
 
-const impactItems = [
+/// What the chapter actually spends money on, in the chapter's own words. This
+/// list is the page's spine: it matches the funds a donor can choose in the
+/// form one for one, so nobody is offered a designation the page never
+/// explained, or told about a cause they cannot then give to.
+const uses = [
   {
-    title: "Scholarships",
-    copy: "Support academic awards and conference travel.",
-    icon: FaSeedling,
+    title: "Housing",
+    copy: "Keeping the chapter house running, and keeping it somewhere members want to be.",
   },
   {
-    title: "Professional Growth",
-    copy: "Power workshops, speakers, and leadership training.",
-    icon: FaHandshake,
+    title: "Chapter operations",
+    copy: "Meetings, events, and the ordinary running costs that dues do not always cover.",
   },
   {
-    title: "Service Projects",
-    copy: "Fuel outreach, philanthropy, and community builds.",
-    icon: FaHeart,
+    title: "Professional certifications",
+    copy: "FE exam fees, certifications, and training members carry into their careers.",
   },
   {
-    title: "Chapter Tools",
-    copy: "Keep equipment and event resources stocked.",
-    icon: FaWrench,
-  },
-];
-
-const givingLevels = [
-  {
-    tier: "Supporter",
-    amount: "$50",
-    detail: "Helps cover event supplies and meeting resources.",
-  },
-  {
-    tier: "Mentor",
-    amount: "$150",
-    detail: "Funds a professional workshop or speaker night.",
-  },
-  {
-    tier: "Builder",
-    amount: "$300",
-    detail: "Supports service projects and chapter initiatives.",
+    title: "Tools and equipment",
+    copy: "Materials and shop tools for the project teams that actually build things.",
   },
 ];
 
@@ -70,13 +47,12 @@ export default function DonatePage() {
     );
 
     elements.forEach((el) => observer.observe(el));
-
     return () => observer.disconnect();
   }, []);
 
   return (
-    <main className="bg-[#120a0a] pb-16 text-white">
-      <section className="relative min-h-[70vh] w-full">
+    <main className="bg-[#120a0a] pb-24 text-white">
+      <section className="relative min-h-[56vh] w-full">
         <Image
           src="/everyone.jpg"
           fill
@@ -84,177 +60,69 @@ export default function DonatePage() {
           alt="Theta Tau members together"
           className="object-cover object-[50%_40%]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/65 to-[#120a0a]" />
-        <div className="relative z-10 flex min-h-[70vh] flex-col items-start justify-end px-6 pb-12 sm:px-12 reveal">
-          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
-            Give Back
-          </p>
-          <h1 className={`${bungee.className} mt-3 text-4xl text-[#b3202a] sm:text-6xl`}>
-            Donate to Delta Gamma
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.15)_0%,rgba(0,0,0,0.46)_40%,rgba(18,10,10,0.93)_72%,#120a0a_100%)]" />
+        <div className="reveal relative z-10 mx-auto flex min-h-[56vh] w-full max-w-4xl flex-col items-start justify-end px-6 pb-14">
+          <h1
+            className={`${bungee.className} text-[28px] leading-[1.08] text-[#b3202a] sm:text-4xl lg:text-5xl`}
+          >
+            Support Delta Gamma
           </h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/85">
-            Your support fuels scholarships, professional development, and service
-            projects for the next generation of engineers.
+          <p className="mt-4 max-w-xl text-lg leading-relaxed text-white/80">
+            Gifts from alumni and friends go straight to the chapter: the house,
+            the certifications members earn, and the tools they build with.
           </p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <a href="#donate-form" className="tt-button-primary">
-              Make a Donation
-            </a>
-            <a href="/brothers" className="tt-button-secondary">
-              Meet the Chapter
-            </a>
-          </div>
+          <a
+            href="#give"
+            className="tt-button-primary tt-button-plain mt-7 inline-block"
+          >
+            Give now
+          </a>
         </div>
       </section>
 
-      <section className="mx-4 mt-12 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
-        <div className="grid gap-10 lg:grid-cols-[1.2fr,0.8fr]">
-          <div>
-            <h2 className={`${bungee.className} text-4xl text-[#7a0104]`}>
-              Why Your Gift Matters
-            </h2>
-            <p className="mt-4 text-lg text-[#1b0f0f]/80">
-              Theta Tau Delta Gamma builds engineers who lead with integrity. Gifts
-              help us expand mentoring, send members to conferences, and serve our
-              community. Every donation is an investment in student success.
-            </p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              {impactItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.title}
-                    className="rounded-[20px] bg-white p-5 shadow-[0_10px_22px_rgba(0,0,0,0.12)]"
-                  >
-                    <Icon className="text-2xl text-[#b3202a]" />
-                    <h3 className={`${bungee.className} mt-3 text-xl text-[#7a0104]`}>
-                      {item.title}
-                    </h3>
-                    <p className="mt-2 text-sm text-[#1b0f0f]/70">
-                      {item.copy}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="rounded-[28px] bg-[#120a0a] p-8 text-white shadow-[0_12px_26px_rgba(0,0,0,0.35)]">
-            <p className="text-xs uppercase tracking-[0.4em] text-[#f5d79a]">
-              Giving Levels
-            </p>
-            <div className="mt-6 space-y-5">
-              {givingLevels.map((tier) => (
-                <div
-                  key={tier.tier}
-                  className="rounded-[20px] border border-white/10 px-4 py-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className={`${bungee.className} text-xl text-[#e2ab16]`}>
-                      {tier.tier}
-                    </h3>
-                    <span className="text-sm uppercase tracking-[0.3em] text-white/60">
-                      {tier.amount}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm text-white/70">{tier.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      <section className="reveal mx-auto mt-20 w-full max-w-4xl px-6">
+        <h2 className={`${bungee.className} text-2xl text-[#e2ab16]`}>
+          Where your gift goes
+        </h2>
+        <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/60">
+          You can point a gift at any of these, or leave it unrestricted and let
+          the chapter put it where the gap is.
+        </p>
+
+        <ul className="mt-8 divide-y divide-white/10 border-y border-white/10">
+          {uses.map((use) => (
+            <li
+              key={use.title}
+              className="grid gap-1 py-5 sm:grid-cols-[15rem,1fr] sm:gap-8"
+            >
+              <h3 className="text-base font-medium leading-snug text-[#e2ab16]">
+                {use.title}
+              </h3>
+              <p className="text-[15px] leading-relaxed text-white/65">{use.copy}</p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section
-        id="donate-form"
-        className="mx-auto mt-16 w-full max-w-5xl px-6 reveal"
+        id="give"
+        className="reveal mx-auto mt-20 w-full max-w-4xl scroll-mt-28 px-6"
       >
-        <div className="rounded-[32px] bg-[#1b0f0f] p-10 text-white shadow-[0_16px_34px_rgba(0,0,0,0.45)]">
-          <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h2 className={`${bungee.className} text-3xl text-[#b3202a]`}>
-                Make a Donation
-              </h2>
-              <p className="mt-3 text-sm text-white/70">
-                This form is a placeholder. We can connect it to Stripe, Venmo,
-                or your preferred giving platform.
-              </p>
-            </div>
-            <a href="mailto:thetatau-dg@asu.edu" className="tt-button-secondary">
-              Contact Us
-            </a>
-          </div>
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-            <label className="text-xs uppercase tracking-[0.3em] text-white/60">
-              Amount
-              <input
-                className="mt-3 w-full rounded-[16px] border border-white/10 bg-black/30 px-4 py-3 text-base text-white outline-none focus:border-[#e2ab16]"
-                placeholder="$150"
-                type="text"
-              />
-            </label>
-            <label className="text-xs uppercase tracking-[0.3em] text-white/60">
-              Name
-              <input
-                className="mt-3 w-full rounded-[16px] border border-white/10 bg-black/30 px-4 py-3 text-base text-white outline-none focus:border-[#e2ab16]"
-                placeholder="Your name"
-                type="text"
-              />
-            </label>
-            <label className="text-xs uppercase tracking-[0.3em] text-white/60">
-              Email
-              <input
-                className="mt-3 w-full rounded-[16px] border border-white/10 bg-black/30 px-4 py-3 text-base text-white outline-none focus:border-[#e2ab16]"
-                placeholder="name@email.com"
-                type="email"
-              />
-            </label>
-            <label className="text-xs uppercase tracking-[0.3em] text-white/60">
-              Message
-              <input
-                className="mt-3 w-full rounded-[16px] border border-white/10 bg-black/30 px-4 py-3 text-base text-white outline-none focus:border-[#e2ab16]"
-                placeholder="Optional dedication"
-                type="text"
-              />
-            </label>
-          </div>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <button type="button" className="tt-button-primary">
-              Submit Gift
-            </button>
-            <button type="button" className="tt-button-secondary">
-              Sponsor an Event
-            </button>
-          </div>
-        </div>
+        <DonateForm />
       </section>
 
-      <section className="mx-4 mt-14 rounded-[36px] bg-[#fdf7df] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="rounded-[24px] bg-white p-6 shadow-[0_10px_24px_rgba(0,0,0,0.12)]">
-            <h3 className={`${bungee.className} text-2xl text-[#7a0104]`}>
-              Alumni & Friends
-            </h3>
-            <p className="mt-3 text-sm text-[#1b0f0f]/70">
-              Help us keep Delta Gamma strong for future classes of engineers.
-            </p>
-          </div>
-          <div className="rounded-[24px] bg-white p-6 shadow-[0_10px_24px_rgba(0,0,0,0.12)]">
-            <h3 className={`${bungee.className} text-2xl text-[#7a0104]`}>
-              Corporate Partners
-            </h3>
-            <p className="mt-3 text-sm text-[#1b0f0f]/70">
-              Sponsor a workshop, project team, or professional speaker series.
-            </p>
-          </div>
-          <div className="rounded-[24px] bg-white p-6 shadow-[0_10px_24px_rgba(0,0,0,0.12)]">
-            <h3 className={`${bungee.className} text-2xl text-[#7a0104]`}>
-              Service Allies
-            </h3>
-            <p className="mt-3 text-sm text-[#1b0f0f]/70">
-              Partner with us on service initiatives across the ASU community.
-            </p>
-          </div>
-        </div>
+      <section className="reveal mx-auto mt-16 w-full max-w-4xl px-6">
+        <p className="text-sm leading-relaxed text-white/45">
+          Giving as a company, or want to fund something specific like a
+          workshop or a project team?{" "}
+          <a
+            href="mailto:thetatau-dg@asu.edu"
+            className="text-[#e2ab16] underline underline-offset-4 hover:text-[#f0c34a]"
+          >
+            Email the chapter
+          </a>{" "}
+          and we will find the right way to do it.
+        </p>
       </section>
     </main>
   );

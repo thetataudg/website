@@ -11,6 +11,8 @@ export interface FinanceEventRefs {
   submissionId?: any;
   creditEntryId?: any;
   paymentId?: any;
+  terminalPaymentId?: any;
+  donationId?: any;
 }
 
 export interface RecordFinanceEventInput {
@@ -71,6 +73,8 @@ export async function recordFinanceEvent(
         submissionId: input.refs?.submissionId ?? null,
         creditEntryId: input.refs?.creditEntryId ?? null,
         paymentId: input.refs?.paymentId ?? null,
+        terminalPaymentId: input.refs?.terminalPaymentId ?? null,
+        donationId: input.refs?.donationId ?? null,
       },
       meta: input.meta ?? {},
     });
@@ -121,6 +125,8 @@ export async function recordFinanceEvents(
           submissionId: input.refs?.submissionId ?? null,
           creditEntryId: input.refs?.creditEntryId ?? null,
           paymentId: input.refs?.paymentId ?? null,
+          terminalPaymentId: input.refs?.terminalPaymentId ?? null,
+          donationId: input.refs?.donationId ?? null,
         },
         meta: input.meta ?? {},
       })),

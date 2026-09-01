@@ -37,6 +37,7 @@ const CreditEntrySchema = new Schema(
     refs: {
       reimbursementId: { type: Schema.Types.ObjectId, default: null },
       onlinePaymentId: { type: Schema.Types.ObjectId, default: null },
+      terminalPaymentId: { type: Schema.Types.ObjectId, default: null },
     },
     actorId: { type: Schema.Types.ObjectId, ref: "Member", default: null },
     note: { type: String, default: "" },
@@ -50,6 +51,15 @@ CreditEntrySchema.index(
   {
     unique: true,
     partialFilterExpression: { "refs.onlinePaymentId": { $type: "objectId" } },
+  }
+);
+// The same guarantee for in-person payments: one payment can leave behind at
+// most one credit row, however many times a webhook retries.
+CreditEntrySchema.index(
+  { "refs.terminalPaymentId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: { "refs.terminalPaymentId": { $type: "objectId" } },
   }
 );
 

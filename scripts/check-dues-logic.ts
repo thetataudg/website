@@ -7,6 +7,16 @@ import {
   pendingOnlinePrincipalCents,
 } from "@/lib/onlineDuesPayments";
 import { formatCents } from "@/lib/financeEvents";
+import { holdsOffice, normalizeOffice } from "@/lib/officeMatch";
+import { isUnassignedTerminalPayment, readCardPresentDetails } from "@/lib/terminalPayments";
+import { thankYouSkipReason } from "@/lib/donationReceipt";
+import {
+  isDonationDesignation,
+  donationDesignationLabel,
+  donorLabel,
+  MAX_DONATION_CENTS,
+  MIN_DONATION_CENTS,
+} from "@/lib/donations";
 import { fromAddressFor, alertsDomain, replyToFor } from "@/lib/notify/from";
 import { renderTemplate, renderOfficerMessage, ctaLabelFor } from "@/lib/notify/templates";
 import { renderEmailHtml, renderEmailText } from "@/lib/notify/emailTemplate";
@@ -476,6 +486,88 @@ check("only genuinely pending rows reserve balance", pendingOnlinePrincipalCents
   { principalCents: 5000, status: "failed" },
   { principalCents: 10000, status: "requires_payment_method", confirmedAt: new Date() },
 ]), 30000);
+
+console.log("\nwho is allowed to take a card payment");
+// This is a permission boundary, so the normalization has to agree with the iOS
+// client's exactly. A mismatch is a button that shows on the phone and 403s.
+check("the plain title", holdsOffice("Treasurer", "treasurer"), true);
+check("lowercase", holdsOffice("treasurer", "treasurer"), true);
+check("spacing and punctuation are ignored", holdsOffice("  Trea surer ", "treasurer"), true);
+check("a different office is not the treasurer", holdsOffice("Vice Regent", "treasurer"), false);
+check("but it is the vice regent", holdsOffice("Vice Regent", "viceRegent"), true);
+check("the common misspelling still lands", holdsOffice("vicergent", "viceRegent"), true);
+check("scribe answers to secretary", holdsOffice("Secretary", "scribe"), true);
+// "Treasurer-Elect" is not the Treasurer. Somebody who has been elected but not
+// installed must not be able to take money on the chapter's account.
+check("treasurer-elect is not the treasurer", holdsOffice("Treasurer-Elect", "treasurer"), false);
+check("an empty position holds nothing", holdsOffice("", "treasurer"), false);
+check("so does a missing one", holdsOffice(undefined, "treasurer"), false);
+check("and one that is only punctuation", holdsOffice("---", "treasurer"), false);
+check("normalizing strips to letters", normalizeOffice("Vice-Regent 2026"), "viceregent");
+
+console.log("\nmoney taken in person, before it has an owner");
+// The queue an officer works through. Only settled money with nobody's name on
+// it belongs there: an abandoned intent is not a decision anybody has to make.
+check("settled with no member is unassigned", isUnassignedTerminalPayment({ status: "succeeded", memberId: null }), true);
+check("settled with a member is not", isUnassignedTerminalPayment({ status: "succeeded", memberId: "abc" }), false);
+check("an abandoned intent is not", isUnassignedTerminalPayment({ status: "creating", memberId: null }), false);
+check("neither is a declined card", isUnassignedTerminalPayment({ status: "failed", memberId: null }), false);
+check("nor a canceled one", isUnassignedTerminalPayment({ status: "canceled", memberId: null }), false);
+// A partial refund still leaves money on the table that somebody owns.
+check("partially refunded still needs an owner", isUnassignedTerminalPayment({ status: "partially_refunded", memberId: null }), true);
+check("a fully refunded one does not", isUnassignedTerminalPayment({ status: "refunded", memberId: null }), false);
+// A donation is never assigned to a ledger, so it must never sit in the queue
+// asking to be.
+check("a donation is never unassigned money", isUnassignedTerminalPayment({ status: "succeeded", memberId: null, purpose: "donation" }), false);
+check("nothing at all", isUnassignedTerminalPayment(null), false);
+
+console.log("\nreading the card off a settled charge");
+check("brand, last four and wallet", readCardPresentDetails({
+  latest_charge: { id: "ch_1", payment_method_details: { card_present: { brand: "visa", last4: "4242", wallet: { type: "apple_pay" } } } },
+} as any), { stripeChargeId: "ch_1", cardBrand: "visa", last4: "4242", walletType: "apple_pay" });
+check("a plain card has no wallet", readCardPresentDetails({
+  latest_charge: { id: "ch_2", payment_method_details: { card_present: { brand: "amex", last4: "0005" } } },
+} as any), { stripeChargeId: "ch_2", cardBrand: "amex", last4: "0005", walletType: "" });
+// An unexpanded charge is a string, not an object. This must not throw on a
+// payment that has already settled.
+check("an unexpanded charge reads empty rather than throwing", readCardPresentDetails({ latest_charge: "ch_3" } as any), { stripeChargeId: null, cardBrand: "", last4: "", walletType: "" });
+check("and so does nothing at all", readCardPresentDetails({} as any), { stripeChargeId: null, cardBrand: "", last4: "", walletType: "" });
+
+console.log("\ngifts to the chapter");
+check("the default fund is real", isDonationDesignation("general"), true);
+check("so are the named ones", [isDonationDesignation("housing"), isDonationDesignation("operations"), isDonationDesignation("professional"), isDonationDesignation("tools")], [true, true, true, true]);
+// The funds the public page advertises and the funds the server accepts have to
+// be the same set, or a donor gets offered something that 400s.
+check("a fund the page dropped is no longer accepted", [isDonationDesignation("scholarship"), isDonationDesignation("philanthropy")], [false, false]);
+// A donor must not be able to invent a restriction the chapter cannot honor.
+check("an invented fund is refused", isDonationDesignation("buy me a car"), false);
+check("so is an empty one", isDonationDesignation(""), false);
+check("unknown designations still label safely", donationDesignationLabel("nonsense"), "Where it's needed most");
+check("the floor is a dollar", MIN_DONATION_CENTS, 100);
+check("the floor is above Stripe's 50 cent minimum", MIN_DONATION_CENTS >= 50, true);
+check("anonymous donors are not named", donorLabel({ isAnonymous: true, donorName: "Vinny" }), "An anonymous donor");
+check("named donors are", donorLabel({ donorName: "Vinny" }), "Vinny");
+check("an unnamed donor is still described", donorLabel({ donorName: "  " }), "A donor");
+check("the ceiling is above the floor", MAX_DONATION_CENTS > MIN_DONATION_CENTS, true);
+
+console.log("\nthanking a donor");
+const gift = { donorEmail: "a@b.com", status: "succeeded", receiptSentAt: null };
+check("a settled gift with an address gets thanked", thankYouSkipReason(gift, { configured: true }), null);
+// Giving an address is optional, and a gift without one is still a gift.
+check("no address is a skip, not a failure", thankYouSkipReason({ ...gift, donorEmail: "" }, { configured: true }), "no email address");
+check("whitespace is not an address", thankYouSkipReason({ ...gift, donorEmail: "   " }, { configured: true }), "no email address");
+// The one that matters: a webhook redelivery must not thank somebody twice.
+check("already thanked is not thanked again", thankYouSkipReason({ ...gift, receiptSentAt: new Date() }, { configured: true }), "already thanked");
+check("unless an officer asks for it on purpose", thankYouSkipReason({ ...gift, receiptSentAt: new Date() }, { configured: true, force: true }), null);
+// Never thank for money that has not settled: it can still fail.
+check("a processing gift waits", thankYouSkipReason({ ...gift, status: "processing" }, { configured: true }), "not settled");
+check("a failed gift is never thanked", thankYouSkipReason({ ...gift, status: "failed" }, { configured: true }), "not settled");
+check("a refunded gift is not re-thanked", thankYouSkipReason({ ...gift, status: "refunded" }, { configured: true }), "not settled");
+check("no mail provider is a skip", thankYouSkipReason(gift, { configured: false }), "email is not configured");
+// Force does not override the two guards that protect the donor.
+check("force does not invent an address", thankYouSkipReason({ ...gift, donorEmail: "" }, { configured: true, force: true }), "no email address");
+check("force does not thank for unsettled money", thankYouSkipReason({ ...gift, status: "processing" }, { configured: true, force: true }), "not settled");
+check("nothing at all", thankYouSkipReason(null, { configured: true }), "no donation");
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

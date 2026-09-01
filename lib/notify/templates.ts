@@ -45,6 +45,9 @@ export const TRANSACTIONAL_TEMPLATES = [
   "plan_defaulted",
   "installment_missed",
   "credit_applied",
+  // Tap to Pay requirement 5.12: an officer who walked away before the
+  // result landed still has to be told the card was declined.
+  "terminal_payment_failed",
 ] as const;
 
 export type ReminderTemplate = (typeof REMINDER_TEMPLATES)[number];
@@ -194,6 +197,18 @@ export function renderTemplate(
         push: `Your semester dues are ${amount}, due ${when}.`,
         emailSubject: "Your semester dues",
         link: "/member/dues",
+        category: "dues",
+      };
+
+    case "terminal_payment_failed":
+      return {
+        title: "That card payment did not go through",
+        body: context.description
+          ? `The ${amount} card payment you took was declined. ${context.description} Nothing was charged, so you can try again or take another card.`
+          : `The ${amount} card payment you took was declined. Nothing was charged, so you can try again or take another card.`,
+        push: `The ${amount} card payment was declined. Nothing was charged.`,
+        emailSubject: "A card payment was declined",
+        link: "/member/admin/dues",
         category: "dues",
       };
 
@@ -501,6 +516,13 @@ const OFFICER_HEADLINES: Record<string, OfficerHeadline> = {
   payment_rejected: { title: "Payment rejected",     category: "dues",          link: "/member/admin/dues/requests" },
   payment_recorded: { title: "Payment recorded",     category: "dues",          link: "/member/admin/dues" },
   payment_removed:  { title: "Payment removed",      category: "dues",          link: "/member/admin/dues" },
+  // Tap to Pay, taken by an officer standing in front of the payer.
+  payment_terminal_succeeded: { title: "Card payment taken",     category: "dues",    link: "/member/admin/dues" },
+  payment_terminal_refunded:  { title: "Card payment refunded",  category: "dues",    link: "/member/admin/dues" },
+  payment_terminal_disputed:  { title: "Card payment disputed",  category: "dues",    link: "/member/admin/dues" },
+  payment_assigned:   { title: "Payment assigned",   category: "dues",          link: "/member/admin/dues" },
+  payment_unassigned: { title: "Payment unassigned", category: "dues",          link: "/member/admin/dues" },
+  donation_received:  { title: "Donation received",  category: "general",       link: "/member/admin/dues" },
 
   plan_approved:    { title: "Plan approved",        category: "plan",          link: "/member/admin/dues/requests" },
   plan_denied:      { title: "Plan denied",          category: "plan",          link: "/member/admin/dues/requests" },

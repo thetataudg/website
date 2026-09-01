@@ -37,3 +37,42 @@ export function stripePublishableKey() {
   if (!key) throw new Error("Stripe publishable key is not configured");
   return key;
 }
+
+/// Tap to Pay readers are not registered ahead of time; they are attached to a
+/// Terminal location at connection time, and the location's `display_name` is
+/// what the cardholder reads on the tap screen. No location, no in-person
+/// payments — so this is checked before a connection token is ever issued.
+export function terminalLocationId() {
+  return process.env.STRIPE_TERMINAL_LOCATION_ID ?? "";
+}
+
+export function terminalPaymentsEnabled() {
+  return (
+    onlineDuesPaymentsEnabled() &&
+    stripeIsConfigured() &&
+    Boolean(terminalLocationId())
+  );
+}
+
+/// Whether the iOS app may collect a gift natively, rather than sending the
+/// donor to the website.
+///
+/// Its own switch, defaulting on, because this is the one part of giving that
+/// carries App Review risk: guideline 3.2.2(iv) restricts in-app fundraising to
+/// Apple-approved nonprofits. If review ever objects, setting
+/// APP_DONATIONS_ENABLED=false makes the app fall back to opening the web page
+/// immediately, with no resubmission and no wait.
+export function appDonationsEnabled() {
+  return donationsEnabled() && process.env.APP_DONATIONS_ENABLED !== "false";
+}
+
+/// Donations ride the same Stripe account but are switched separately, because
+/// the public page is reachable without signing in and wants to be able to go
+/// dark on its own.
+export function donationsEnabled() {
+  return (
+    stripeIsConfigured() &&
+    (process.env.DONATIONS_ENABLED === "true" ||
+      process.env.NODE_ENV === "development")
+  );
+}
