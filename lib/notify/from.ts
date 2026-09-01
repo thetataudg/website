@@ -31,6 +31,11 @@ const SENDERS: Record<string, Sender> = {
   plan: { local: "dues", name: "Theta Tau Treasury" },
   reimbursement: { local: "dues", name: "Theta Tau Treasury" },
   events: { local: "events", name: "Theta Tau Events" },
+  // Gifts get their own mailbox. A donor is usually an alumnus or a stranger
+  // with no other relationship to the chapter's mail, and a thank-you arriving
+  // from "Theta Tau Treasury" reads like a bill from an organisation they do
+  // not owe anything to.
+  donation: { local: "giving", name: "Theta Tau Delta Gamma" },
   // Account invitations. Its own mailbox rather than chapter@ because it is the
   // first mail a prospective member ever gets from us, and "invitations@" tells
   // them what it is before they open it.
@@ -61,6 +66,7 @@ const REPLY_TO: Record<string, string> = {
   plan: "treasurer@thetatau-dg.org",
   reimbursement: "treasurer@thetatau-dg.org",
   events: "general@thetatau-dg.org",
+  donation: "treasurer@thetatau-dg.org",
   invitation: "general@thetatau-dg.org",
   general: "general@thetatau-dg.org",
 };

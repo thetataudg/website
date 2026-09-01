@@ -120,6 +120,30 @@ export default function DuesRosterPage() {
   const [viewingHistory, setViewingHistory] = useState<RosterRow | null>(null);
   const [creatingCharge, setCreatingCharge] = useState(false);
   const [exporting, setExporting] = useState(false);
+  /// Settled card money nobody owns yet. Fetched separately from the roster
+  /// because it is not a fact about any member, which is exactly what makes it
+  /// easy to forget.
+  const [unassigned, setUnassigned] = useState<{
+    count: number;
+    cents: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/terminal/payments?unassigned=true", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.totals) return;
+        setUnassigned({
+          count: data.totals.unassignedCount ?? 0,
+          cents: data.totals.unassignedCents ?? 0,
+        });
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -259,6 +283,26 @@ export default function DuesRosterPage() {
           </Alert>
         )}
       </div>
+
+      {unassigned && unassigned.count > 0 ? (
+        <Alert>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              <strong className="tabular-nums">
+                {(unassigned.cents / 100).toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                })}
+              </strong>{" "}
+              taken in person has no owner yet, across {unassigned.count}{" "}
+              payment{unassigned.count === 1 ? "" : "s"}.
+            </span>
+            <Button size="sm" variant="outline" asChild>
+              <a href="/member/admin/dues/unassigned">Assign it</a>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {tiles.map((tile) => (

@@ -162,6 +162,9 @@ export async function POST(req: Request) {
         description: `Theta Tau dues for ${member.fName} ${member.lName}`.trim(),
         receipt_email: member.email || undefined,
         metadata: {
+          // Tells the webhook which collection owns this intent. Every intent
+          // the app creates carries one.
+          kind: "dues",
           onlineDuesPaymentId: String(localPayment._id),
           note,
           memberId: String(member._id),

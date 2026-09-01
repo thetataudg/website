@@ -19,6 +19,17 @@ export const FINANCE_EVENT_TYPES = [
   "payment_online_succeeded",
   "payment_online_refunded",
   "payment_online_disputed",
+  // In-person card payments taken with Tap to Pay on an officer's iPhone.
+  "payment_terminal_succeeded",
+  "payment_terminal_refunded",
+  "payment_terminal_disputed",
+  // Money taken before anybody knew whose it was, later given an owner. The
+  // pair exists because reassignment reverses one member's ledger and credits
+  // another, and both of them deserve to see that in their history.
+  "payment_assigned",
+  "payment_unassigned",
+  "donation_received",
+  "donation_refunded",
   "plan_proposed",
   "plan_approved",
   "plan_denied",
@@ -71,6 +82,8 @@ const FinanceEventSchema = new Schema(
       submissionId: { type: Schema.Types.ObjectId, default: null },
       creditEntryId: { type: Schema.Types.ObjectId, default: null },
       paymentId: { type: Schema.Types.ObjectId, default: null },
+      terminalPaymentId: { type: Schema.Types.ObjectId, default: null },
+      donationId: { type: Schema.Types.ObjectId, default: null },
     },
     meta: { type: Schema.Types.Mixed, default: {} },
   },
