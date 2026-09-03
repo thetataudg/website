@@ -124,3 +124,30 @@ export async function autoCompleteStaleEvents() {
   logger.info({ completed: stale.length }, "Auto-completed events past their end time");
   return { completed: stale.length };
 }
+
+/// Normalises the "where" half of an event body.
+///
+/// One helper for both routes because create and edit have to agree: a value
+/// the POST accepts and the PATCH silently drops is a field that works until
+/// somebody edits the event, which is the worst time to find out.
+///
+/// The kind is what decides the rest. Anything that is not exactly "virtual"
+/// is physical, and a physical event carries no platform and no link even if
+/// the client sent them, so switching an event back to a room cannot leave a
+/// dead Zoom URL attached to it.
+export function normalizeWhere(input: any, existing?: any) {
+  const kind = input?.locationKind === "virtual" ? "virtual" : "physical";
+  if (kind === "physical") {
+    return { locationKind: "physical", virtualPlatform: null, virtualLink: "" };
+  }
+  const platforms = ["discord", "zoom", "meet", "teams", "other"];
+  const sent = String(input?.virtualPlatform || "").toLowerCase();
+  const platform = platforms.includes(sent)
+    ? sent
+    : existing?.virtualPlatform ?? null;
+  // Trimmed but not validated into oblivion: an officer pasting a link with a
+  // stray space around it means the link, and refusing the save over it would
+  // be pedantry. The app only ever *offers* to open it when it parses.
+  const link = String(input?.virtualLink ?? existing?.virtualLink ?? "").trim();
+  return { locationKind: "virtual", virtualPlatform: platform, virtualLink: link };
+}

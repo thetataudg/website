@@ -212,7 +212,7 @@ export function renderTemplate(
   // `ctaLabelFor` matches on the path, so both forms resolve to "Open the
   // event" without the templates having to say so.
   const eventLink = context.eventId
-    ? `/member/events?id=${encodeURIComponent(context.eventId)}`
+    ? `/member/events/${encodeURIComponent(context.eventId)}`
     : "/member/events";
 
   switch (template) {

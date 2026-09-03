@@ -8,7 +8,7 @@ import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { applyTimeOfDay } from "@/lib/recurrence";
 import { syncEventWithCalendar, deleteCalendarEvent } from "@/lib/calendar";
-import { ensureFutureOccurrences } from "@/lib/eventLifecycle";
+import { ensureFutureOccurrences, normalizeWhere } from "@/lib/eventLifecycle";
 import { announceEventStarted } from "@/lib/eventNotify";
 import { normalizeGemCategory } from "@/lib/gem";
 
@@ -204,6 +204,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       // never back to chapter-wide, because an explicit null fell through to
       // the existing value. Presence of the key is the signal.
       committeeId: "committeeId" in updates ? updates.committeeId : event.committeeId,
+      // Only when the client said something about it. An older build that does
+      // not know these fields exist must not blank them on every save.
+      ...("locationKind" in updates ? normalizeWhere(updates, event) : {}),
     };
 
     if (nextStatus === "ongoing" && !event.startedAt) {

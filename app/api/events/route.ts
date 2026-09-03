@@ -6,7 +6,7 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { syncEventWithCalendar } from "@/lib/calendar";
-import { ensureFutureOccurrences } from "@/lib/eventLifecycle";
+import { ensureFutureOccurrences, normalizeWhere } from "@/lib/eventLifecycle";
 import { announceEventPublished } from "@/lib/eventNotify";
 import { normalizeGemCategory } from "@/lib/gem";
 
@@ -75,6 +75,8 @@ export async function POST(req: Request) {
       visibleToAlumni = true,
       recurrence = {},
     } = body;
+
+    const where = normalizeWhere(body);
 
     if (!name || !startTime || !endTime) {
       return NextResponse.json(
@@ -148,6 +150,7 @@ export async function POST(req: Request) {
       recurrence: normalizedRecurrence,
       status,
       visibleToAlumni,
+      ...where,
       attendees: [],
     };
 

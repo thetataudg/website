@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, TriangleAlert } from "lucide-react";
+import { Loader2, TriangleAlert, X } from "lucide-react";
 
 import {
   AlertDialog,
@@ -41,7 +41,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { GEM_CATEGORIES, GEM_CATEGORY_LABELS } from "@/lib/gem";
 import { toArizonaInputValue, toArizonaIso } from "@/lib/recurrence";
 
-import type { Committee, EventItem } from "./types";
+import type {
+  Committee,
+  EventItem,
+  EventLocationKind,
+  VirtualPlatform,
+} from "./types";
+import { VIRTUAL_PLATFORM_LABEL, platformExpectsLink } from "./types";
 
 /**
  * The one form that makes and edits an event.
@@ -62,6 +68,9 @@ export interface EventFormValues {
   startTime: string;
   endTime: string;
   location: string;
+  locationKind: EventLocationKind;
+  virtualPlatform: string;
+  virtualLink: string;
   gemCategory: string;
   eventType: string;
   status: string;
@@ -82,6 +91,9 @@ function blankForm(defaults?: Partial<EventFormValues>): EventFormValues {
     startTime: "",
     endTime: "",
     location: "",
+    locationKind: "physical",
+    virtualPlatform: "",
+    virtualLink: "",
     gemCategory: "",
     eventType: "event",
     status: "scheduled",
@@ -111,6 +123,11 @@ function formFor(event: any, defaults?: Partial<EventFormValues>): EventFormValu
     startTime: toArizonaInputValue(event.startTime),
     endTime: toArizonaInputValue(event.endTime),
     location: event.location || "",
+    // Matches the schema default: every event that existed before the field
+    // did was a physical one.
+    locationKind: event.locationKind === "virtual" ? "virtual" : "physical",
+    virtualPlatform: event.virtualPlatform || "",
+    virtualLink: event.virtualLink || "",
     gemCategory: event.gemCategory || "",
     eventType: event.eventType || (event.committeeId ? "event" : "chapter"),
     status: event.status || "scheduled",
@@ -203,6 +220,12 @@ export function EventFormDialog({
       ...form,
       startTime: toArizonaIso(form.startTime),
       endTime: toArizonaIso(form.endTime),
+      locationKind: form.locationKind,
+      // Explicit nulls, so switching an event back to a room clears the
+      // platform on the server rather than leaving the old one attached.
+      virtualPlatform:
+        form.locationKind === "virtual" ? form.virtualPlatform || null : null,
+      virtualLink: form.locationKind === "virtual" ? form.virtualLink.trim() : "",
       committeeId: form.chapterWide ? null : form.committeeId || null,
       gemCategory: form.gemCategory || null,
       recurrence: {
@@ -396,13 +419,122 @@ export function EventFormDialog({
               </div>
 
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="event-location">Location</Label>
-                <LocationInput
-                  id="event-location"
-                  value={form.location}
-                  onValueChange={(next) => set("location", next)}
-                  placeholder="Discovery Hall 250"
-                />
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="event-location">
+                    {form.locationKind === "virtual" ? "Room or channel" : "Location"}
+                  </Label>
+                  {/* Two buttons rather than a select: there are exactly two
+                      answers, and which one is chosen changes the fields
+                      underneath, which a dropdown hides until it is opened. */}
+                  <div className="inline-flex rounded-md border p-0.5">
+                    {(["physical", "virtual"] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() => {
+                          set("locationKind", kind);
+                          // A physical event carries no platform and no link,
+                          // so switching back cannot leave a dead Zoom URL on
+                          // an event that now happens in a room.
+                          if (kind === "physical") {
+                            set("virtualPlatform", "");
+                            set("virtualLink", "");
+                          }
+                        }}
+                        className={`rounded px-3 py-1 text-xs font-medium transition ${
+                          form.locationKind === kind
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        aria-pressed={form.locationKind === kind}
+                      >
+                        {kind === "physical" ? "In person" : "Virtual"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <LocationInput
+                    id="event-location"
+                    value={form.location}
+                    onValueChange={(next) => set("location", next)}
+                    placeholder={
+                      form.locationKind === "virtual"
+                        ? "Tech channel"
+                        : "Discovery Hall 250"
+                    }
+                    className={form.location ? "pr-9" : undefined}
+                  />
+                  {/* Clearing by hand meant holding backspace through a full
+                      postal address, which is the whole reason a wrong click
+                      on a suggestion felt so expensive. */}
+                  {form.location ? (
+                    <button
+                      type="button"
+                      onClick={() => set("location", "")}
+                      aria-label="Clear location"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
+
+                {form.locationKind === "virtual" ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Select
+                      value={form.virtualPlatform || UNCATEGORIZED}
+                      onValueChange={(value) =>
+                        set(
+                          "virtualPlatform",
+                          value === UNCATEGORIZED ? "" : value
+                        )
+                      }
+                    >
+                      <SelectTrigger aria-label="Platform">
+                        <SelectValue placeholder="Platform" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNCATEGORIZED}>Choose a platform</SelectItem>
+                        {(
+                          Object.keys(VIRTUAL_PLATFORM_LABEL) as VirtualPlatform[]
+                        ).map((platform) => (
+                          <SelectItem key={platform} value={platform}>
+                            {VIRTUAL_PLATFORM_LABEL[platform]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Never required. An officer who has not made the Zoom yet
+                        should still be able to put the event on the calendar. */}
+                    {platformExpectsLink(
+                      (form.virtualPlatform || null) as VirtualPlatform | null
+                    ) ? (
+                      <div className="relative">
+                        <Input
+                          id="event-virtual-link"
+                          value={form.virtualLink}
+                          onChange={(e) => set("virtualLink", e.target.value)}
+                          placeholder="Link (optional)"
+                          inputMode="url"
+                          className={form.virtualLink ? "pr-9" : undefined}
+                        />
+                        {form.virtualLink ? (
+                          <button
+                            type="button"
+                            onClick={() => set("virtualLink", "")}
+                            aria-label="Clear link"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition hover:text-foreground"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2 sm:col-span-2">
