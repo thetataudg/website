@@ -44,6 +44,7 @@ export function serializeTerminalPayment(row: any) {
     note: row?.note ?? "",
     status: row?.status ?? "creating",
     failureMessage: row?.failureMessage ?? "",
+    declineCode: row?.declineCode ?? "",
     cardBrand: row?.cardBrand ?? "",
     last4: row?.last4 ?? "",
     walletType: row?.walletType ?? "",
@@ -109,6 +110,7 @@ export async function fulfillTerminalPayment(intent: Stripe.PaymentIntent) {
   const details = readCardPresentDetails(intent);
   row.status = "succeeded";
   row.failureMessage = "";
+  row.declineCode = "";
   row.paidAt =
     row.paidAt ??
     new Date((intent.created || Math.floor(Date.now() / 1000)) * 1000);

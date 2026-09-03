@@ -3,6 +3,7 @@ import { connectDB } from "../../lib/db";
 import logger from "../../lib/logger";
 import { syncAllEvents } from "../../lib/calendar";
 import { autoCompleteStaleEvents } from "../../lib/eventLifecycle";
+import { remindUpcomingEvents } from "../../lib/eventNotify";
 
 export const config = {
   schedule: "*/10 * * * *", // every 10 minutes
@@ -28,9 +29,17 @@ export const handler: Handler = async () => {
     // already runs every ten minutes, which is far finer than the three-hour
     // grace period the sweep works to.
     const closed = await autoCompleteStaleEvents();
+    // Also rides along here. The half-hour warning wants a tick well inside
+    // its own lead time, and ten minutes is the finest schedule already
+    // running; a second scheduled function for one query would be a whole
+    // moving part to buy nothing.
+    const upcoming = await remindUpcomingEvents();
     const results = await syncAllEvents();
     const summary = formatSummary(results);
-    logger.info({ ...summary, ...closed }, "Netlify scheduled calendar sync completed");
+    logger.info(
+      { ...summary, ...closed, ...upcoming },
+      "Netlify scheduled calendar sync completed"
+    );
 
     return {
       statusCode: 200,
@@ -39,6 +48,7 @@ export const handler: Handler = async () => {
         total: results.length,
         ...summary,
         ...closed,
+        ...upcoming,
       }),
     };
   } catch (err: any) {

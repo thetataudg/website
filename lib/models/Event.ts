@@ -45,6 +45,14 @@ const EventSchema = new Schema(
       default: "scheduled",
     },
     visibleToAlumni: { type: Boolean, default: true },
+    /// Notification guards. Each is the timestamp of the one announcement of
+    /// its kind, and each is set *before* the send rather than after, so a
+    /// retried request or a second cron tick that overlaps the first cannot
+    /// announce the same event twice. Null means "not yet announced", which is
+    /// also what every event created before this existed reads as.
+    publishedNotifiedAt: { type: Date, default: null },
+    startingSoonNotifiedAt: { type: Date, default: null },
+    startedNotifiedAt: { type: Date, default: null },
     // Who *said* they're coming. Distinct from `attendees`, which is who
     // actually checked in at the door — an RSVP is an intention, attendance is
     // a fact, and GEM only ever counts the latter.

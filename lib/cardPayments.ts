@@ -67,15 +67,20 @@ export async function postCardPayment(
     memberId,
     "payments.sourceRef": sourceId,
   });
+  // The ids counted below. The allocation loop runs a later, separate query, so
+  // it can see a payment this read missed — that is the shape of a concurrent
+  // replay of the same Stripe event. Anything it finds that is not in this set
+  // has not been subtracted yet, and must come off `remaining` there instead.
+  const countedPaymentIds = new Set<string>();
   const alreadyCents = alreadyPosted.reduce((sum: number, charge: any) => {
     return (
       sum +
       (charge.payments ?? [])
         .filter((payment: any) => String(payment.sourceRef) === String(sourceId))
-        .reduce(
-          (part: number, payment: any) => part + Number(payment.amountCents || 0),
-          0
-        )
+        .reduce((part: number, payment: any) => {
+          countedPaymentIds.add(String(payment._id));
+          return part + Number(payment.amountCents || 0);
+        }, 0)
     );
   }, 0);
 
@@ -115,6 +120,12 @@ export async function postCardPayment(
         reversedCents: existing.reversedCents ?? 0,
         ledgerPaymentId: existing._id,
       });
+      // Posted by a run whose write landed after our `alreadyPosted` read.
+      // Without this the money stays in `remaining` and is banked a second
+      // time as credit, so the member is both charged and credited for it.
+      if (!countedPaymentIds.has(String(existing._id))) {
+        remaining = Math.max(0, remaining - (Number(existing.amountCents) || 0));
+      }
       continue;
     }
     if (remaining <= 0) continue;
@@ -236,12 +247,14 @@ export async function reconcileCardReversal(
     previousAllocationReversed + Math.min(previousDesired, originalCredit);
 
   const creditReversed = Math.min(desired, originalCredit);
-  if (originalCredit > 0) {
-    await CreditEntry.findOneAndUpdate(
-      { [`refs.${creditRef}`]: row._id },
-      { amountCents: originalCredit - creditReversed }
-    );
-  }
+  // Unconditional on purpose. `originalCredit` is what the credit *should* be,
+  // derived from the payment itself, so writing it also corrects an entry that
+  // should never have existed — the guard this replaced skipped exactly the
+  // rows that were wrong. Matching nothing is a no-op.
+  await CreditEntry.findOneAndUpdate(
+    { [`refs.${creditRef}`]: row._id },
+    { amountCents: Math.max(0, originalCredit - creditReversed) }
+  );
 
   let remaining = Math.max(0, desired - creditReversed);
   const charges = await DuesCharge.find({
