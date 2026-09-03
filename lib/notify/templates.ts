@@ -48,6 +48,16 @@ export const TRANSACTIONAL_TEMPLATES = [
   // Tap to Pay requirement 5.12: an officer who walked away before the
   // result landed still has to be told the card was declined.
   "terminal_payment_failed",
+  // Tap to Pay requirements 3.1 and 3.3: every eligible officer has to be told
+  // once that the feature exists, and a push is one of the ways Apple accepts.
+  "tap_to_pay_available",
+  // Calendar. Transactional rather than reminder because each one reports a
+  // fact about a specific event that can only be true once, and the cooldown
+  // is keyed on the template alone: a chapter with two events in a week would
+  // otherwise announce the first and silently swallow the second.
+  "event_published",
+  "event_starting_soon",
+  "event_started",
 ] as const;
 
 export type ReminderTemplate = (typeof REMINDER_TEMPLATES)[number];
@@ -78,6 +88,13 @@ export interface TemplateContext {
   /// are about somebody else, so they need both; member templates ignore them.
   memberName?: string;
   actorName?: string;
+  /// Calendar. `eventWhen` is formatted in Phoenix by the caller for the same
+  /// reason `dueLabel` is: "tonight" versus "tomorrow" is a timezone question,
+  /// and it gets answered once, upstream.
+  eventName?: string;
+  eventWhen?: string;
+  eventLocation?: string;
+  eventId?: string;
 }
 
 export interface RenderedMessage {
@@ -89,7 +106,7 @@ export interface RenderedMessage {
   push: string;
   emailSubject: string;
   link: string;
-  category: "dues" | "reimbursement" | "plan" | "general";
+  category: "dues" | "reimbursement" | "plan" | "event" | "general";
   /// What the email's button says. Optional, and usually left unset: the
   /// wording is derived from `link` by `ctaLabelFor` so the button can never
   /// promise somewhere it does not go. Set it only when the action deserves
@@ -123,6 +140,10 @@ const DUES_PAGE_LABELS: Record<RenderedMessage["category"], string> = {
   dues: "Open your dues",
   plan: "Open your payment plan",
   reimbursement: "Open your reimbursements",
+  // Unreachable in practice, since nothing in the event category links to the
+  // dues page. Present because the Record is total, and a wrong-but-harmless
+  // label beats widening the type to allow a missing one.
+  event: "Open your dues",
   general: "Open your dues",
 };
 
@@ -154,6 +175,7 @@ const CTA_BY_CATEGORY: Record<RenderedMessage["category"], string> = {
   dues: "Open your dues",
   plan: "Open your payment plan",
   reimbursement: "Open your reimbursements",
+  event: "Open the event",
   general: "Open the portal",
 };
 
@@ -186,6 +208,12 @@ export function renderTemplate(
   const method = context.method
     ? context.method.charAt(0).toUpperCase() + context.method.slice(1)
     : "";
+  // Deep-links to the one event when we know which; the calendar otherwise.
+  // `ctaLabelFor` matches on the path, so both forms resolve to "Open the
+  // event" without the templates having to say so.
+  const eventLink = context.eventId
+    ? `/member/events/${encodeURIComponent(context.eventId)}`
+    : "/member/events";
 
   switch (template) {
     case "assigned":
@@ -211,6 +239,70 @@ export function renderTemplate(
         link: "/member/admin/dues",
         category: "dues",
       };
+
+    // Apple's own copy, from the Value proposition block of the Tap to Pay on
+    // iPhone Marketing Guide (US English, August 2025). Not ours to reword:
+    // the toolkit is the only approved source for this wording, em dash and
+    // all, and "Terms apply." has to travel with it.
+    case "tap_to_pay_available":
+      return {
+        title: "Accept in-person payments with Tap to Pay on iPhone.",
+        body: "You can accept all types of contactless payments right on your iPhone\u2014from physical debit and credit cards to Apple Pay and other digital wallets. Terms apply.",
+        push: "You can accept all types of contactless payments right on your iPhone\u2014from physical debit and credit cards to Apple Pay and other digital wallets. Terms apply.",
+        emailSubject: "Accept in-person payments with Tap to Pay on iPhone.",
+        link: "/member/admin/dues",
+        category: "dues",
+      };
+
+    // --- calendar ---
+    //
+    // No em dashes in any of this copy: it lands on a lock screen, and the
+    // house style for member-facing wording is plain commas.
+    case "event_published": {
+      const where = context.eventLocation ? ` at ${context.eventLocation}` : "";
+      return {
+        title: context.eventName || "A new event",
+        body: `${context.eventName || "A new event"} is on the calendar for ${
+          context.eventWhen || "soon"
+        }${where}.`,
+        push: `${context.eventName || "A new event"} is on the calendar for ${
+          context.eventWhen || "soon"
+        }.`,
+        emailSubject: `New event: ${context.eventName || "on the calendar"}`,
+        link: eventLink,
+        category: "event",
+      };
+    }
+
+    case "event_starting_soon": {
+      const where = context.eventLocation ? ` at ${context.eventLocation}` : "";
+      return {
+        title: `${context.eventName || "Your event"} starts in 30 minutes`,
+        body: `${
+          context.eventName || "Your event"
+        } starts in about 30 minutes${where}.`,
+        push: `${
+          context.eventName || "Your event"
+        } starts in about 30 minutes${where}.`,
+        emailSubject: `Starting soon: ${context.eventName || "your event"}`,
+        link: eventLink,
+        category: "event",
+      };
+    }
+
+    case "event_started": {
+      const where = context.eventLocation ? ` at ${context.eventLocation}` : "";
+      return {
+        title: `${context.eventName || "Your event"} has started`,
+        body: `${
+          context.eventName || "Your event"
+        } has started${where}. Check in when you get there.`,
+        push: `${context.eventName || "Your event"} has started${where}.`,
+        emailSubject: `Started: ${context.eventName || "your event"}`,
+        link: eventLink,
+        category: "event",
+      };
+    }
 
     case "upcoming":
       return {

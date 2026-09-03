@@ -108,6 +108,10 @@ const TerminalPaymentSchema = new Schema(
       index: true,
     },
     failureMessage: { type: String, default: "" },
+    /// The bank's own reason code, when there was one. Kept apart from the
+    /// message because the message is prose an officer reads and this is a
+    /// token support can be given over the phone.
+    declineCode: { type: String, default: "" },
 
     /// Stamped when the phone finishes confirming, before any webhook lands.
     confirmedAt: { type: Date, default: null },

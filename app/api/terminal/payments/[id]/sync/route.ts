@@ -54,6 +54,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     await payment.save();
   }
 
+  // What the phone saw. The reader can refuse a card without the intent ever
+  // carrying a `last_payment_error`, and the app is deliberately vague in
+  // front of the cardholder, so the reason it did not say out loud is written
+  // down here instead. Stripe's own wording still wins when it has any.
+  const reportedFailure = String(body?.failureMessage ?? "").trim().slice(0, 500);
+  const reportedDeclineCode = String(body?.declineCode ?? "").trim().slice(0, 60);
+
   if (payment.stripePaymentIntentId) {
     try {
       const intent = await getStripe().paymentIntents.retrieve(
@@ -72,10 +79,31 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       } else if (intent.last_payment_error) {
         payment.status = "failed";
         payment.failureMessage =
-          intent.last_payment_error.message || "The card was declined";
+          intent.last_payment_error.message ||
+          reportedFailure ||
+          "The card was declined";
+        payment.declineCode =
+          (intent.last_payment_error as any)?.decline_code ||
+          reportedDeclineCode ||
+          "";
+        await payment.save();
+      } else if (reportedFailure) {
+        // Stripe has nothing to say and the phone does. This is the reader
+        // refusing a card, or the app losing the network mid-confirm: either
+        // way the attempt happened and belongs in the log rather than sitting
+        // as an intent that looks like nobody ever tried.
+        payment.status = "failed";
+        payment.failureMessage = reportedFailure;
+        payment.declineCode = reportedDeclineCode;
         await payment.save();
       }
     } catch (err: any) {
+      if (reportedFailure && payment.status !== "succeeded") {
+        payment.status = "failed";
+        payment.failureMessage = reportedFailure;
+        payment.declineCode = reportedDeclineCode;
+        await payment.save();
+      }
       // The webhook will still settle this.
       logger.warn(
         { err, paymentId: params.id },

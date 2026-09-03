@@ -6,7 +6,8 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { syncEventWithCalendar } from "@/lib/calendar";
-import { ensureFutureOccurrences } from "@/lib/eventLifecycle";
+import { ensureFutureOccurrences, normalizeWhere } from "@/lib/eventLifecycle";
+import { announceEventPublished } from "@/lib/eventNotify";
 import { normalizeGemCategory } from "@/lib/gem";
 
 async function getMemberByClerk(req: Request) {
@@ -74,6 +75,8 @@ export async function POST(req: Request) {
       visibleToAlumni = true,
       recurrence = {},
     } = body;
+
+    const where = normalizeWhere(body);
 
     if (!name || !startTime || !endTime) {
       return NextResponse.json(
@@ -147,6 +150,7 @@ export async function POST(req: Request) {
       recurrence: normalizedRecurrence,
       status,
       visibleToAlumni,
+      ...where,
       attendees: [],
     };
 
@@ -189,6 +193,11 @@ export async function POST(req: Request) {
         event.calendarEventId = syncResult.calendarEventId;
       }
     }
+
+    // Not awaited, for the same reason the newsletter announcement is not: a
+    // create must not sit behind sixty pushes, and `announceEventPublished`
+    // swallows its own failures.
+    void announceEventPublished(event, member?._id ?? null);
 
     logger.info({ eventId: event._id }, "Event created");
     return NextResponse.json(event, { status: 201 });

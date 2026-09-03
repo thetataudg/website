@@ -337,6 +337,10 @@ for (const template of [
     dues: "Open your dues",
     plan: "Open your payment plan",
     reimbursement: "Open your reimbursements",
+    // Every template in this loop links to /member/dues, so the event case is
+    // unreachable here. Present because the lookup is exhaustive over the
+    // category union.
+    event: "Open your dues",
     general: "Open your dues",
   }[rendered.category]);
 }

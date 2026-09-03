@@ -113,6 +113,44 @@ export async function treasuryRecipients(
   return recipients;
 }
 
+/// The officers who may actually take a card, and therefore the only people
+/// Tap to Pay is worth telling about.
+///
+/// Mirrors `requireTerminalOperator` exactly: the Treasurer, plus admins who
+/// cover for them. Apple asks that the awareness moment reach "all eligible
+/// users" (requirement 3.3), and a member who cannot be handed the phone is
+/// not eligible for anything. Pushing a merchant announcement at forty
+/// undergraduates who can never act on it is noise, not compliance.
+///
+/// Not cached: this is sent once, and a stale roster on a one-time
+/// announcement is worse than the query it saves.
+export async function terminalOperatorRecipients(): Promise<Recipient[]> {
+  const officers = await Member.find({
+    status: "Active",
+    $or: [
+      { role: { $in: ["admin", "superadmin"] } },
+      { isECouncil: true, ecouncilPosition: /treasurer/i },
+    ],
+  })
+    .select("_id rollNo fName lName email clerkId")
+    .lean<any[]>();
+
+  try {
+    await ensureMemberEmails(officers.map((officer) => officer._id));
+    const fresh = await Member.find({ _id: { $in: officers.map((o) => o._id) } })
+      .select("_id email")
+      .lean<any[]>();
+    const emailById = new Map(fresh.map((m) => [String(m._id), m.email ?? null]));
+    officers.forEach((officer) => {
+      officer.email = emailById.get(String(officer._id)) ?? officer.email ?? null;
+    });
+  } catch (err: any) {
+    logger.warn({ err }, "Could not refresh operator emails — sending with what we have");
+  }
+
+  return officers.map(toRecipient);
+}
+
 /// Everyone the chapter can address as a body.
 ///
 /// Active members only, and only those with a Clerk account behind them: a
@@ -141,6 +179,48 @@ export async function chapterRecipients(): Promise<Recipient[]> {
     });
   } catch (err: any) {
     logger.warn({ err }, "Could not refresh chapter emails, sending with what we have");
+  }
+
+  return members.map(toRecipient);
+}
+
+/// Everyone who can see one event, as recipients.
+///
+/// Mirrors the visibility filter in `GET /api/events` exactly, and that is the
+/// whole point: actives see every event, alumni see only the ones flagged
+/// `visibleToAlumni`. A notification for an event the recipient cannot open is
+/// worse than no notification, so the audience is derived from the same rule
+/// the list is, rather than a second rule that has to be kept in agreement
+/// with it by hand.
+///
+/// Committee events are deliberately not narrowed to the committee. The events
+/// list does not narrow them either, so a committee meeting is already
+/// chapter-visible; sending it to the roster tells people something they can
+/// act on rather than something they have to go looking for.
+///
+/// Not cached, for the same reason `chapterRecipients` is not.
+export async function eventRecipients(
+  visibleToAlumni: boolean
+): Promise<Recipient[]> {
+  const statuses = visibleToAlumni ? ["Active", "Alumni"] : ["Active"];
+  const members = await Member.find({
+    status: { $in: statuses },
+    clerkId: { $nin: [null, ""] },
+  })
+    .select("_id rollNo fName lName email clerkId")
+    .lean<any[]>();
+
+  try {
+    await ensureMemberEmails(members.map((member) => member._id));
+    const fresh = await Member.find({ _id: { $in: members.map((m) => m._id) } })
+      .select("_id email")
+      .lean<any[]>();
+    const emailById = new Map(fresh.map((m) => [String(m._id), m.email ?? null]));
+    members.forEach((member) => {
+      member.email = emailById.get(String(member._id)) ?? member.email ?? null;
+    });
+  } catch (err: any) {
+    logger.warn({ err }, "Could not refresh event emails, sending with what we have");
   }
 
   return members.map(toRecipient);

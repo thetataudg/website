@@ -24,9 +24,58 @@ export interface EventItem {
   startTime: string;
   endTime: string;
   location?: string;
+  /**
+   * Whether the event happens in a room or on a call. `location` keeps its
+   * meaning under both: a street address for a physical event, the name of the
+   * room or channel for a virtual one.
+   */
+  locationKind?: EventLocationKind;
+  virtualPlatform?: VirtualPlatform | null;
+  virtualLink?: string;
   gemCategory?: string | null;
   status: string;
   visibleToAlumni: boolean;
+}
+
+export type EventLocationKind = "physical" | "virtual";
+
+export type VirtualPlatform = "discord" | "zoom" | "meet" | "teams" | "other";
+
+export const VIRTUAL_PLATFORM_LABEL: Record<VirtualPlatform, string> = {
+  discord: "Discord",
+  zoom: "Zoom",
+  meet: "Google Meet",
+  teams: "Microsoft Teams",
+  other: "Somewhere else",
+};
+
+/**
+ * Whether a link is the normal way in. Discord is the exception: the chapter
+ * has one server, everybody is already in it, and a channel is a place rather
+ * than a URL somebody has to mint each week.
+ */
+export function platformExpectsLink(platform: VirtualPlatform | null): boolean {
+  return platform !== null && platform !== "discord";
+}
+
+/**
+ * The link, only when it is one a browser can actually open.
+ *
+ * An officer may type "zoom link coming" into the field, and a button that
+ * opens nothing is worse than no button.
+ */
+export function virtualHref(event: EventItem): string | null {
+  const raw = (event.virtualLink || "").trim();
+  if (!raw) return null;
+  const candidate = raw.includes("://") ? raw : `https://${raw}`;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (!url.host) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 export interface Committee {

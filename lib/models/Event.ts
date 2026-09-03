@@ -16,6 +16,27 @@ const EventSchema = new Schema(
     startedAt: { type: Date },
     endedAt: { type: Date },
     location: { type: String, default: "" },
+    /// Where the event happens, in the sense of "is there an address at all".
+    ///
+    /// `location` keeps its meaning under both: a street address for a
+    /// physical event, and the human name of the room for a virtual one
+    /// ("Tech channel", "Vinny's Zoom"), which is what the calendar row and
+    /// the notification copy read. The link lives apart from it so the maps
+    /// buttons never try to route to a URL.
+    locationKind: {
+      type: String,
+      enum: ["physical", "virtual"],
+      default: "physical",
+    },
+    virtualPlatform: {
+      type: String,
+      enum: ["discord", "zoom", "meet", "teams", "other", null],
+      default: null,
+    },
+    /// Optional even when the event is virtual. A Discord meeting in the
+    /// chapter's own server needs no link, and an officer who has not made the
+    /// Zoom yet should still be able to put the event on the calendar.
+    virtualLink: { type: String, default: "" },
     calendarEventId: { type: String, default: null },
     eventType: {
       type: String,
@@ -45,6 +66,14 @@ const EventSchema = new Schema(
       default: "scheduled",
     },
     visibleToAlumni: { type: Boolean, default: true },
+    /// Notification guards. Each is the timestamp of the one announcement of
+    /// its kind, and each is set *before* the send rather than after, so a
+    /// retried request or a second cron tick that overlaps the first cannot
+    /// announce the same event twice. Null means "not yet announced", which is
+    /// also what every event created before this existed reads as.
+    publishedNotifiedAt: { type: Date, default: null },
+    startingSoonNotifiedAt: { type: Date, default: null },
+    startedNotifiedAt: { type: Date, default: null },
     // Who *said* they're coming. Distinct from `attendees`, which is who
     // actually checked in at the door — an RSVP is an intention, attendance is
     // a fact, and GEM only ever counts the latter.
