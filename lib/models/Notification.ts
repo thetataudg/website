@@ -34,6 +34,23 @@ const NotificationSchema = new Schema(
     /// not any external channel worked, so this is how you tell "we sent it and
     /// email was down" from "we never tried".
     channels: { type: [String], default: [] },
+    /// Every attempted channel, including failures and configuration skips.
+    /// `channels` remains the compact list of successful deliveries used by
+    /// existing clients; this is the diagnostic trail for everything else.
+    deliveryAttempts: {
+      type: [
+        new Schema(
+          {
+            channel: { type: String, required: true },
+            delivered: { type: Boolean, required: true },
+            reason: { type: String, default: undefined },
+            attemptedAt: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     refs: {
       chargeId: { type: Schema.Types.ObjectId, default: null },
       planId: { type: Schema.Types.ObjectId, default: null },

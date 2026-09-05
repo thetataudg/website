@@ -188,6 +188,31 @@ async function main() {
     const first = await notify({ recipient, template: "due_today", context, refs: {} });
     check("the first one goes", first.sent, true);
     check("in-app is always a channel", first.channels, ["inapp"]);
+    check(
+      "every delivery attempt is reported",
+      first.attempts.map(({ channel, delivered }) => ({ channel, delivered })),
+      [
+        { channel: "inapp", delivered: true },
+        { channel: "email", delivered: false },
+        { channel: "push", delivered: false },
+      ]
+    );
+    const storedFirst = await Notification.findOne({
+      memberId: member._id,
+      template: "due_today",
+    }).lean<any>();
+    check(
+      "failed external attempts are retained for diagnosis",
+      storedFirst?.deliveryAttempts?.map((attempt: any) => ({
+        channel: attempt.channel,
+        delivered: attempt.delivered,
+      })),
+      [
+        { channel: "inapp", delivered: true },
+        { channel: "email", delivered: false },
+        { channel: "push", delivered: false },
+      ]
+    );
     check("and it's now in cooldown", await isInCooldown(member._id, "due_today"), true);
     const second = await notify({ recipient, template: "due_today", context, refs: {} });
     check("the second is refused", second.sent, false);
