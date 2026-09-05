@@ -40,6 +40,7 @@ const SENDERS: Record<string, Sender> = {
   // first mail a prospective member ever gets from us, and "invitations@" tells
   // them what it is before they open it.
   invitation: { local: "invitations", name: "Theta Tau" },
+  auth: { local: "accounts", name: "Theta Tau" },
   general: { local: "chapter", name: "Theta Tau" },
 };
 
@@ -68,6 +69,7 @@ const REPLY_TO: Record<string, string> = {
   events: "general@thetatau-dg.org",
   donation: "treasurer@thetatau-dg.org",
   invitation: "general@thetatau-dg.org",
+  auth: "general@thetatau-dg.org",
   general: "general@thetatau-dg.org",
 };
 

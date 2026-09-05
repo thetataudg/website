@@ -26,6 +26,9 @@ const EmailDeliverySchema = new Schema(
     /// False when the instance is configured to hand delivery off to its own
     /// provider, in which case Clerk knows nothing beyond handing it over.
     deliveredByClerk: { type: Boolean, default: null },
+    provider: { type: String, enum: ["clerk", "resend"], default: null },
+    providerMessageId: { type: String, default: null },
+    sendError: { type: String, default: null },
     /// When Clerk created the email, not when we received the webhook.
     occurredAt: { type: Date, default: null },
   },

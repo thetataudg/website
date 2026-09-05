@@ -39,6 +39,7 @@ export type EmailDelivery = {
   status: string | null;
   occurredAt: string | null;
   deliveredByClerk: boolean | null;
+  provider: "clerk" | "resend" | null;
 };
 
 interface Props {
@@ -46,10 +47,9 @@ interface Props {
   onRevoke: (id: string) => void;
 }
 
-/// Clerk reports only that it created and queued the message; whether it landed
-/// in an inbox is between Clerk's provider and the recipient's mail server. So
-/// the badge deliberately says "Sent", never "Delivered", unless Clerk itself
-/// used that word.
+/// The creation webhook confirms that Clerk or Resend accepted the message.
+/// It does not confirm inbox delivery, so the badge says "Sent" unless the
+/// provider reports a later delivery state.
 function EmailStatusBadge({ delivery }: { delivery?: EmailDelivery | null }) {
   if (!delivery) {
     return (
@@ -84,7 +84,10 @@ function EmailStatusBadge({ delivery }: { delivery?: EmailDelivery | null }) {
   }
 
   return (
-    <Badge variant="muted" title={when ? `Clerk queued this at ${when}` : undefined}>
+    <Badge
+      variant="muted"
+      title={when ? `Sent via ${delivery.provider === "resend" ? "Resend" : "Clerk"} at ${when}` : undefined}
+    >
       <MailCheck className="size-3" />
       Sent
     </Badge>
