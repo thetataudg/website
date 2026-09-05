@@ -8,10 +8,6 @@ import { emailToSlug } from "@/utils/email-to-slug";
 import Member from "@/lib/models/Member";
 import EmailDelivery from "@/lib/models/EmailDelivery";
 import { getRequestSource } from "@/lib/request-source";
-import {
-  invitationEmailConfigured,
-  sendInvitationEmail,
-} from "@/lib/notify/inviteEmail";
 
 export async function GET(req: Request) {
   await connectDB();
@@ -108,6 +104,7 @@ export async function GET(req: Request) {
               status: d.status ?? null,
               occurredAt: d.occurredAt ?? null,
               deliveredByClerk: d.deliveredByClerk ?? null,
+              provider: d.provider ?? null,
             }
           : null,
       };
@@ -130,18 +127,12 @@ export async function GET(req: Request) {
 
 /// Creates a Clerk invitation through the REST API rather than the SDK.
 ///
-/// Two reasons the SDK will not do. Its `Invitation` class is constructed from
-/// six fields and `url` is not one of them, so `createInvitation().url` is
-/// undefined at runtime, not merely untyped — and that ticket URL is the whole
-/// point when we mail the invitation ourselves. It also lets the caller read
-/// Clerk's error codes directly, which matter here: `duplicate_record` when any
-/// prior invitation exists (a revoked one counts, even though the message says
-/// "already pending") and `form_identifier_exists` when the address already has
-/// a Clerk user.
+/// The REST endpoint lets us set `ignore_existing` and read Clerk's error codes
+/// directly. Those codes distinguish an existing invitation from an address
+/// that already has a Clerk user.
 async function createInvitation(params: {
   email: string;
   redirectUrl: string;
-  notify: boolean;
 }): Promise<{ ok: boolean; status: number; body: any }> {
   const res = await fetch("https://api.clerk.com/v1/invitations", {
     method: "POST",
@@ -152,7 +143,9 @@ async function createInvitation(params: {
     body: JSON.stringify({
       email_address: params.email,
       redirect_url: params.redirectUrl,
-      notify: params.notify,
+      // Clerk always creates the email. When "Delivered by Clerk" is disabled,
+      // email.created hands it to our webhook for delivery through Resend.
+      notify: true,
       // Without this, every address that has ever been invited and rejected is
       // permanently un-invitable: rejecting deletes the Clerk user, which
       // revokes their invitation, and a revoked invitation still trips Clerk's
@@ -223,15 +216,8 @@ export async function POST(req: NextRequest) {
     `${process.env.NEXT_PUBLIC_APP_URL}` +
     `/member/onboard/${emailToSlug(email)}`;
 
-  // Who mails the invitation. Clerk's own copy cannot be restyled without the
-  // paid `app:custom_email_template` feature, so when Resend is available we
-  // create the invitation silently and send the branded version ourselves. If
-  // it is not, Clerk sends its plain one: an unbranded invitation beats an
-  // invitation nobody receives.
-  const weSendIt = invitationEmailConfigured();
-
   try {
-    const created = await createInvitation({ email, redirectUrl, notify: !weSendIt });
+    const created = await createInvitation({ email, redirectUrl });
 
     if (!created.ok) {
       const friendly =
@@ -244,42 +230,11 @@ export async function POST(req: NextRequest) {
 
     const invitation = created.body;
 
-    if (weSendIt) {
-      const result = await sendInvitationEmail({
-        email,
-        // Clerk's ticket URL, the same link its own email would have carried.
-        acceptUrl: invitation.url,
-      });
-
-      if (!result.sent) {
-        // Roll the invitation back. Leaving it pending would mean an address
-        // that received nothing yet cannot be re-invited without hitting
-        // Clerk's duplicate check, and would sit in the admin's pending list
-        // looking as though it had been delivered.
-        try {
-          await clerkClient.invitations.revokeInvitation(invitation.id);
-        } catch (revokeErr: any) {
-          logger.error(
-            { err: revokeErr, invitationId: invitation.id },
-            "Could not revoke an invitation whose email failed"
-          );
-        }
-        logger.error(
-          { reason: result.reason, email },
-          "Invitation created but the email could not be sent"
-        );
-        return NextResponse.json(
-          { error: "Could not send the invitation email. Nothing was sent; try again." },
-          { status: 502 }
-        );
-      }
-    }
-
     logger.info({
       event: "Invitation sent",
       invitationId: invitation.id,
       by: admin.clerkId,
-      sentVia: weSendIt ? "resend" : "clerk",
+      sentVia: "clerk-email-pipeline",
     });
     return NextResponse.json(invitation, { status: 201 });
   } catch (err: any) {
