@@ -7,6 +7,7 @@ import Member from "@/lib/models/Member";
 import PendingList from "./PendingList";
 
 interface PendingRequest {
+  requestType?: "access" | "deletion";
   _id: string;
   clerkId: string;
   rollNo: string;
@@ -58,6 +59,7 @@ export default async function PendingPage() {
 
   const rawRequests = await PendingMember.find({ status: "pending" }).lean();
   const requests: PendingRequest[] = rawRequests.map((r: any) => ({
+    requestType: r.requestType || "access",
     _id: r._id.toString(),
     clerkId: r.clerkId,
     rollNo: r.rollNo,

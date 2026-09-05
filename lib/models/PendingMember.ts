@@ -2,6 +2,11 @@ import mongoose, { Schema, model, models } from "mongoose";
 
 const PendingMemberSchema = new Schema(
   {
+    requestType: {
+      type: String,
+      enum: ["access", "deletion"],
+      default: "access",
+    },
     clerkId: { type: String, required: true, unique: true },
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },

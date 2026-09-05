@@ -69,6 +69,11 @@ const MemberSchema = new Schema(
     resumeUrl: { type: String },
     profilePicUrl: { type: String },
     isHidden: { type: Boolean, default: false },
+    // Set as soon as the member asks to delete their account. The profile is
+    // hidden at the same time; the previous value lets a cancellation restore
+    // exactly what was true before the request.
+    accountDeletionRequestedAt: { type: Date, default: null },
+    accountDeletionPreviousHidden: { type: Boolean, default: false },
     socialLinks: { type: Map, of: String, default: {} },
     status: {
       type: String,

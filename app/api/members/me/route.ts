@@ -32,6 +32,7 @@ type PendingMemberDoc = {
   reviewedAt?: Date;
   reviewComments?: string;
   discordId?: string;
+  requestType?: string;
 };
 
 export async function GET(req: Request) {
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId familyLine committees previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf"
+      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId familyLine committees previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf accountDeletionRequestedAt"
     )
     .lean() as any;
 
@@ -76,6 +77,8 @@ export async function GET(req: Request) {
                 needsProfileReview: member.needsProfileReview,
                 needsPermissionReview: member.needsPermissionReview,
                 discordId: member.discordId || null,
+                accountDeletionRequested: Boolean(member.accountDeletionRequestedAt),
+                accountDeletionRequestedAt: member.accountDeletionRequestedAt?.toISOString(),
             },
             { status: 200 }
         );
@@ -103,6 +106,7 @@ export async function GET(req: Request) {
         needsProfileReview: pending.status === "pending",
         needsPermissionReview: pending.isECouncil,
         pendingStatus: pending.status,
+        pendingRequestType: pending.requestType || "access",
         pendingSubmittedAt: pending.submittedAt?.toISOString(),
                 pendingReviewComments: pending.reviewComments,
                 pendingReviewedAt: pending.reviewedAt?.toISOString(),

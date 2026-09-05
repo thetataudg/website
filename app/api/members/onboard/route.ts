@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     const pending = await PendingMember.create({
+      requestType: "access",
       clerkId,
       rollNo,
       fName,

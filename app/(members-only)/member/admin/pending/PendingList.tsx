@@ -87,6 +87,7 @@ const REVIEW_SECTIONS: Array<{
 ];
 
 interface PendingRequest {
+  requestType?: "access" | "deletion";
   _id: string;
   clerkId: string;
   rollNo: string;
@@ -381,6 +382,12 @@ export default function PendingList({ initialRequests }: Props) {
     if (!selected) return;
     setProcessing(true);
     setError(null);
+    if (selected.requestType === "deletion") {
+      await review(selected._id, "approve");
+      setSelected(null);
+      setProcessing(false);
+      return;
+    }
     const updateRes = await fetch(`/api/members/pending/${selected._id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -410,8 +417,8 @@ export default function PendingList({ initialRequests }: Props) {
   return (
     <PageContainer className="max-w-7xl space-y-6">
       <PageHeader
-        title="Profile requests"
-        description="Review member-submitted profiles before they join the roster."
+        title="Account requests"
+        description="Review requests to join the roster or remove an existing account."
       />
 
       <Card className="overflow-hidden">
@@ -428,6 +435,7 @@ export default function PendingList({ initialRequests }: Props) {
               <TableRow>
                 <TableHead className="w-28 pl-6">Roll</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead className="hidden sm:table-cell">Type</TableHead>
                 <TableHead className="hidden sm:table-cell">Submitted</TableHead>
                 <TableHead className="w-28 pr-6">
                   <span className="sr-only">Actions</span>
@@ -443,6 +451,9 @@ export default function PendingList({ initialRequests }: Props) {
                     </TableCell>
                     <TableCell className="font-medium">
                       {r.fName} {r.lName}
+                    </TableCell>
+                    <TableCell className="hidden text-sm sm:table-cell">
+                      {r.requestType === "deletion" ? "Delete account" : "Request access"}
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
                       {r.submittedAt
@@ -463,7 +474,7 @@ export default function PendingList({ initialRequests }: Props) {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-56 text-center">
+                  <TableCell colSpan={5} className="h-56 text-center">
                     <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
                       <div className="rounded-full bg-muted p-3">
                         <ClipboardList className="size-5 text-muted-foreground" />
@@ -497,11 +508,13 @@ export default function PendingList({ initialRequests }: Props) {
           >
             <DialogHeader className="shrink-0 border-b px-5 py-5 pr-14 text-left sm:px-6">
               <DialogTitle>
-                Review #{selected.rollNo} {selected.fName} {selected.lName}
+                {selected.requestType === "deletion" ? "Delete account for" : "Review"}{" "}
+                #{selected.rollNo} {selected.fName} {selected.lName}
               </DialogTitle>
               <DialogDescription>
-                Edit anything that needs correcting, then approve or reject the
-                request.
+                {selected.requestType === "deletion"
+                  ? "Their public profile was hidden when this request was submitted. Approving marks the member Removed; declining restores their account."
+                  : "Edit anything that needs correcting, then approve or reject the request."}
               </DialogDescription>
             </DialogHeader>
 
@@ -1160,7 +1173,7 @@ export default function PendingList({ initialRequests }: Props) {
                       type="button"
                       variant="outline"
                       onClick={saveUpdates}
-                      disabled={saving || processing}
+                      disabled={saving || processing || selected.requestType === "deletion"}
                     >
                       {saving && <LoadingSpinner size="sm" />}
                       {saving ? "Saving…" : "Save changes"}
@@ -1173,7 +1186,7 @@ export default function PendingList({ initialRequests }: Props) {
                       className="text-destructive hover:text-destructive"
                     >
                       <X className="size-4" />
-                      Reject
+                      {selected.requestType === "deletion" ? "Keep account" : "Reject"}
                     </Button>
                     <Button
                       type="button"
@@ -1185,7 +1198,11 @@ export default function PendingList({ initialRequests }: Props) {
                       ) : (
                         <Check className="size-4" />
                       )}
-                      {processing ? "Approving…" : "Approve"}
+                      {processing
+                        ? "Approving…"
+                        : selected.requestType === "deletion"
+                          ? "Mark Removed"
+                          : "Approve"}
                     </Button>
                   </div>
                 </DialogFooter>
@@ -1199,10 +1216,16 @@ export default function PendingList({ initialRequests }: Props) {
       <AlertDialog open={confirmReject} onOpenChange={setConfirmReject}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reject this request?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {selected?.requestType === "deletion"
+                ? "Keep this account?"
+                : "Reject this request?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {selected
-                ? `#${selected.rollNo} ${selected.fName} ${selected.lName} will not be added to the roster.`
+                ? selected.requestType === "deletion"
+                  ? `#${selected.rollNo} ${selected.fName} ${selected.lName} will keep access and their previous public-profile visibility will be restored.`
+                  : `#${selected.rollNo} ${selected.fName} ${selected.lName} will not be added to the roster.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1215,7 +1238,7 @@ export default function PendingList({ initialRequests }: Props) {
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Reject request
+              {selected?.requestType === "deletion" ? "Keep account" : "Reject request"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

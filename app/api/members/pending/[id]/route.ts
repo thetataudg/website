@@ -3,7 +3,6 @@ import { requireRole } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
-import { clerkClient } from "@clerk/clerk-sdk-node";
 import logger from "@/lib/logger";
 
 const memberStatusOptions = ["Active", "Alumni", "Removed", "Deceased"];
@@ -55,6 +54,45 @@ export async function PATCH(
   const pending = await PendingMember.findById(params.id);
   if (!pending) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Deletion requests change an existing member rather than creating one.
+  // Approval closes access; rejection keeps the account and restores whatever
+  // public-profile visibility existed before the request.
+  if (pending.requestType === "deletion") {
+    if (action === "update") {
+      return NextResponse.json(
+        { error: "Deletion requests cannot be edited" },
+        { status: 400 }
+      );
+    }
+
+    const member = await Member.findOne({ clerkId: pending.clerkId });
+    if (!member) {
+      await PendingMember.findByIdAndDelete(params.id);
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    if (action === "approve") {
+      member.status = "Removed";
+      member.isHidden = true;
+    } else {
+      member.isHidden = Boolean(member.accountDeletionPreviousHidden);
+    }
+    member.accountDeletionRequestedAt = null;
+    member.accountDeletionPreviousHidden = undefined;
+    await member.save();
+    await PendingMember.findByIdAndDelete(params.id);
+
+    logger.info({
+      event: action === "approve" ? "Account deletion approved" : "Account deletion declined",
+      memberId: member._id.toString(),
+      reviewedBy: admin.clerkId,
+    });
+    return NextResponse.json(
+      { status: action === "approve" ? "removed" : "kept" },
+      { status: 200 }
+    );
   }
 
   if (action === "update") {
@@ -187,66 +225,20 @@ export async function PATCH(
 
     return NextResponse.json({ status: "approved" }, { status: 200 });
   } else {
-    // Read the address off the Clerk user before deleting them: once the user
-    // is gone there is no way back to it, and it is what the outstanding
-    // invitation is keyed by.
-    let email: string | undefined;
-    try {
-      const user = await clerkClient.users.getUser(pending.clerkId);
-      email =
-        user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
-          ?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
-    } catch (err: any) {
-      logger.warn({ err, clerkId: pending.clerkId }, "Could not read Clerk user before rejection");
-    }
-
-    // Revoke the invitation that brought them here. Deleting the Clerk user
-    // revokes it anyway, but doing it explicitly keeps the admin's pending list
-    // honest even when the user delete below fails.
-    if (email) {
-      try {
-        const invites = await clerkClient.invitations.getInvitationList({
-          status: "pending",
-        });
-        const theirs = invites.filter(
-          (i) => i.emailAddress.toLowerCase() === email!.toLowerCase()
-        );
-        for (const inv of theirs) {
-          await clerkClient.invitations.revokeInvitation(inv.id);
-          logger.info({ event: "Invitation revoked on rejection", invitationId: inv.id });
-        }
-      } catch (err: any) {
-        logger.error({ err, email }, "Failed to revoke invitations during rejection");
-      }
-    }
-
-    try {
-      await clerkClient.users.deleteUser(pending.clerkId);
-      logger.info({
-        event: "Clerk user deleted",
-        clerkId: pending.clerkId,
-      });
-    } catch (err: any) {
-      logger.error({ err }, "Failed to delete Clerk user");
-    }
-
-    await PendingMember.findByIdAndDelete(params.id);
-
-    // Guarded: Mongoose strips undefined from a filter, so a missing clerkId
-    // would turn this into deleteOne({}) and remove an unrelated member.
-    let removedMembers = 0;
-    if (pending.clerkId) {
-      const res = await Member.deleteMany({ clerkId: pending.clerkId });
-      removedMembers = res.deletedCount ?? 0;
-    }
+    // Keep the Clerk session and request long enough for the applicant to see
+    // the decision. They may then sign out or explicitly delete the request
+    // and sign-in account from the status screen.
+    pending.status = "rejected";
+    pending.reviewedBy = admin.clerkId;
+    pending.reviewedAt = new Date();
+    pending.reviewComments = reviewComments || "";
+    await pending.save();
 
     logger.info({
-      event: "Pending request rejected and deleted",
+      event: "Pending request rejected",
       pendingId: params.id,
       rejectedBy: admin.clerkId,
       comments: reviewComments,
-      email,
-      removedMembers,
     });
 
     return NextResponse.json({ status: "rejected" }, { status: 200 });
