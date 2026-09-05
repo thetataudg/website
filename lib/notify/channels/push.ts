@@ -19,6 +19,14 @@ const BUNDLE_ID = process.env.APNS_BUNDLE_ID || "org.thetatau.dg.ThetaTau";
 const TOKEN_TTL_MS = 45 * 60 * 1000;
 
 let cachedToken: { value: string; mintedAt: number } | null = null;
+let reportedMissingConfiguration = false;
+
+function missingConfiguration(): string[] {
+  return [
+    !process.env.APNS_KEY_P8 ? "APNS_KEY_P8" : "",
+    !process.env.APNS_KEY_ID ? "APNS_KEY_ID" : "",
+  ].filter(Boolean);
+}
 
 function base64url(input: Buffer | string): string {
   return Buffer.from(input)
@@ -166,12 +174,21 @@ export const pushChannel: Channel = {
   name: "push",
 
   isConfigured() {
-    return Boolean(process.env.APNS_KEY_P8 && process.env.APNS_KEY_ID);
+    return missingConfiguration().length === 0;
   },
 
   async deliver(request: DeliveryRequest): Promise<DeliveryResult> {
-    if (!this.isConfigured()) {
-      return { channel: "push", delivered: false, skipped: "not configured" };
+    const missing = missingConfiguration();
+    if (missing.length) {
+      if (!reportedMissingConfiguration) {
+        reportedMissingConfiguration = true;
+        logger.error({ missing }, "APNs push is not configured");
+      }
+      return {
+        channel: "push",
+        delivered: false,
+        skipped: `not configured: ${missing.join(", ")}`,
+      };
     }
     const jwt = providerToken();
     if (!jwt) {

@@ -71,6 +71,7 @@ export interface NotifyResult {
   /// reports these back honestly rather than counting them as sends.
   skipped?: "cooldown" | "no recipient";
   channels: string[];
+  attempts: Array<{ channel: string; delivered: boolean; reason?: string }>;
 }
 
 /// Has this member already had this template inside the cooldown window?
@@ -116,11 +117,11 @@ export async function membersInCooldown(
 export async function notify(input: NotifyInput): Promise<NotifyResult> {
   const { recipient, template } = input;
   if (!recipient?.memberId) {
-    return { sent: false, skipped: "no recipient", channels: [] };
+    return { sent: false, skipped: "no recipient", channels: [], attempts: [] };
   }
 
   if (await isInCooldown(recipient.memberId, template)) {
-    return { sent: false, skipped: "cooldown", channels: [] };
+    return { sent: false, skipped: "cooldown", channels: [], attempts: [] };
   }
 
   const message = {
@@ -144,16 +145,22 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
   // In-app first and always. It is the record; the rest are attempts to reach
   // someone who isn't looking at the app right now.
   const delivered: string[] = [];
+  const attempts: NotifyResult["attempts"] = [];
   let notificationId: any = null;
   try {
     const result = await inAppChannel.deliver(request);
     delivered.push("inapp");
+    attempts.push({ channel: "inapp", delivered: true });
     notificationId = result.id ?? null;
   } catch (err: any) {
     // If even this failed the member has no way to learn what we tried to tell
     // them, so the whole send is a failure rather than a partial one.
     logger.error({ err, rollNo: recipient.rollNo, template }, "In-app notification failed");
-    return { sent: false, channels: [] };
+    return {
+      sent: false,
+      channels: [],
+      attempts: [{ channel: "inapp", delivered: false, reason: "storage error" }],
+    };
   }
 
   const wanted = input.channels
@@ -161,24 +168,52 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     : EXTERNAL_CHANNELS;
 
   for (const channel of wanted) {
-    if (!channel.isConfigured()) continue;
     try {
       const result = await channel.deliver(request);
-      if (result.delivered) delivered.push(result.channel);
+      attempts.push({
+        channel: result.channel,
+        delivered: result.delivered,
+        ...(result.skipped ? { reason: result.skipped } : {}),
+      });
+      if (result.delivered) {
+        delivered.push(result.channel);
+      } else {
+        logger.warn(
+          {
+            channel: result.channel,
+            reason: result.skipped ?? "not delivered",
+            rollNo: recipient.rollNo,
+            template,
+          },
+          "Notification channel did not deliver"
+        );
+      }
     } catch (err: any) {
+      attempts.push({ channel: channel.name, delivered: false, reason: "channel threw" });
       logger.warn({ err, channel: channel.name }, "Notification channel threw");
     }
   }
 
-  if (notificationId && delivered.length > 1) {
+  // Always stamp the row, even when only in-app worked. Previously a missing
+  // APNs key was filtered out before `deliver`, leaving no log and no database
+  // evidence that push had been skipped at all.
+  if (notificationId) {
     await Notification.updateOne(
       { _id: notificationId },
-      { $set: { channels: delivered } }
+      {
+        $set: {
+          channels: delivered,
+          deliveryAttempts: attempts.map((attempt) => ({
+            ...attempt,
+            attemptedAt: new Date(),
+          })),
+        },
+      }
     ).catch(() => undefined);
   }
 
   if (input.audit === false) {
-    return { sent: true, channels: delivered };
+    return { sent: true, channels: delivered, attempts };
   }
 
   await recordFinanceEvent({
@@ -192,7 +227,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     meta: { template, channels: delivered },
   });
 
-  return { sent: true, channels: delivered };
+  return { sent: true, channels: delivered, attempts };
 }
 
 /// What actually happened on a send, in the words the treasurer needs to hear.
