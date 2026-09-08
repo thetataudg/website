@@ -1,5 +1,5 @@
 /* app/member/onboard/[[...slug]]/page.tsx */
-import { SignUp } from "@clerk/nextjs";
+import SignUpWorkspace from "@/components/auth/SignUpWorkspace";
 import { clerkClient as getClerk, auth } from "@clerk/nextjs/server";
 import OnboardForm from "./OnboardForm";
 import { emailToSlug } from "@/utils/email-to-slug";
@@ -15,11 +15,11 @@ export default async function OnboardPage({ params }: { params: Params }) {
   const { userId } = await auth();
 
   if (!userId) {
-    return (
-      <PageContainer className="flex max-w-md justify-center">
-        <SignUp routing="path" path="/member/onboard" signInUrl="/sign-in" />
-      </PageContainer>
-    );
+    // The chapter's own form rather than Clerk's component: it is the same
+    // surface as /sign-up and /sign-in, and it carries no third-party footer.
+    // On success it lands back here, where `userId` is now set and the
+    // invitation form below takes over.
+    return <SignUpWorkspace redirectUrl="/member/onboard" />;
   }
 
   const clerk = await getClerk();

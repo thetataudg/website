@@ -10,7 +10,6 @@ import React, {
 } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
 import { ChevronDown, ExternalLink, Menu } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -30,6 +29,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
+import AccountMenu from "./AccountMenu";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 
@@ -427,7 +427,7 @@ export default function MemberNavbar() {
           </Link>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Initializing…</span>
-            <UserButton />
+            <AccountMenu />
           </div>
         </div>
       </header>
@@ -536,7 +536,7 @@ export default function MemberNavbar() {
             aria-hidden="true"
             className="mx-1 hidden h-6 w-px bg-border sm:block"
           />
-          <UserButton />
+          <AccountMenu />
 
           {/* Overflow menu — holds whatever the bar could not fit. */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

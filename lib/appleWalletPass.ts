@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import logger from "@/lib/logger";
 import { fetchGarageObject, maybePresignUrl } from "@/lib/garage";
+import { resizeToPngSync } from "@/lib/imageResize";
 import { generateWalletPassToken } from "@/lib/checkinCode";
 import type { MemberPassProfile } from "@/lib/memberPassProfile";
 
@@ -686,9 +687,12 @@ async function createWalletPassThumbnails(input: {
       "No member photo available for the wallet pass, using the crest"
     );
   } catch (err: any) {
-    logger.warn(
+    // Was a warning, which is how this stayed unnoticed: the pass still built,
+    // it just had the wrong picture on it. If a member has a photo and it does
+    // not reach their pass, that is a fault worth finding in the logs.
+    logger.error(
       { err, rollNo: input.rollNo },
-      "Skipping wallet pass thumbnail because the member photo could not be converted"
+      "Member photo could not be converted for the wallet pass; falling back to the crest"
     );
   }
 
@@ -703,6 +707,14 @@ async function createWalletPassThumbnails(input: {
   }
 }
 
+/// Three tiers, in order of quality, ending in one that cannot be missing.
+///
+/// The last tier is the point. sharp is the best of these and `sips` is fine
+/// on a Mac, but both are things that can be absent from a deployed function —
+/// and when both were absent the old code fell through to "return the source
+/// unchanged", which silently produced a pass with three identical unresized
+/// images and a crest where the member's face should be. A pure-JavaScript
+/// resize cannot go missing, so that branch is now unreachable in practice.
 async function normalizeToPng(source: Buffer, options: ResizeOptions) {
   const withSharp = await trySharpTransform(source, options);
   if (withSharp) return withSharp;
@@ -710,12 +722,17 @@ async function normalizeToPng(source: Buffer, options: ResizeOptions) {
   const withCli = await tryCliTransform(source, options);
   if (withCli) return withCli;
 
-  if (isPng(source)) {
-    return source;
+  const withPureJs = resizeToPngSync(source, options);
+  if (withPureJs) {
+    logger.info(
+      { width: options.width, height: options.height },
+      "Wallet pass image resized in JavaScript; sharp was unavailable"
+    );
+    return withPureJs;
   }
 
   throw new Error(
-    "Unable to convert wallet pass images to PNG. Install sharp or provide PNG assets."
+    "Unable to convert wallet pass image to PNG: the source is neither PNG nor JPEG."
   );
 }
 
@@ -907,12 +924,6 @@ async function getSipsDimensions(inputPath: string) {
   } catch {
     return null;
   }
-}
-
-function isPng(buffer: Buffer) {
-  return buffer.subarray(0, 8).equals(
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  );
 }
 
 function formatList(values?: string[]) {

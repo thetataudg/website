@@ -13,7 +13,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
+    /* `signInUrl` points every Clerk redirect at the chapter's own sign-in
+     * page rather than the hosted account portal. Set here rather than in the
+     * environment so the three layouts that mount a provider cannot drift. */
     <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       appearance={{
         /* customise if you like – `rootBox` is fine */
         elements: { rootBox: "container" },
