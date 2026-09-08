@@ -27,6 +27,7 @@
     "check:payments": "esbuild scripts/check-online-payments-db.ts --bundle --platform=node --format=cjs --outfile=.payments-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .payments-check.cjs dotenv_config_path=.env; rc=$?; rm -f .payments-check.cjs; exit $rc",
     "announce:taptopay": "esbuild scripts/announce-tap-to-pay.ts --bundle --platform=node --format=cjs --outfile=.announce-ttp.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .announce-ttp.cjs dotenv_config_path=.env; rc=$?; rm -f .announce-ttp.cjs; exit $rc",
     "seed:newsletter": "esbuild scripts/seed-newsletter.ts --bundle --platform=node --format=cjs --outfile=.seed-newsletter.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose --external:sharp && node -r dotenv/config .seed-newsletter.cjs dotenv_config_path=.env; rc=$?; rm -f .seed-newsletter.cjs; exit $rc",
+    "check:sessions": "esbuild scripts/check-sessions.ts --bundle --platform=node --format=cjs --outfile=.sessions-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .sessions-check.cjs dotenv_config_path=.env; rc=$?; rm -f .sessions-check.cjs; exit $rc",
     "check:newsletters": "esbuild scripts/check-newsletters.ts --bundle --platform=node --format=cjs --outfile=.newsletters-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .newsletters-check.cjs; rc=$?; rm -f .newsletters-check.cjs; exit $rc"
   },
   "dependencies": {
