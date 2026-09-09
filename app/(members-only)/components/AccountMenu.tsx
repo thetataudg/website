@@ -131,7 +131,7 @@ export default function AccountMenu() {
         </DropdownMenuItem>
 
         <DropdownMenuItem
-          onSelect={() => signOut({ redirectUrl: "/sign-in" })}
+          onSelect={() => signOut({ redirectUrl: "/sign-in?logout=manual" })}
           className="text-destructive focus:text-destructive"
         >
           <LogOut className="mr-2 size-4" aria-hidden="true" />

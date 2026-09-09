@@ -15,11 +15,12 @@ export const dynamic = "force-dynamic";
 export default function SignInPage({
   searchParams,
 }: {
-  searchParams: { redirect_url?: string; redirect?: string };
+  searchParams: { redirect_url?: string; redirect?: string; logout?: string };
 }) {
   return (
     <SignInWorkspace
       redirectUrl={searchParams?.redirect_url ?? searchParams?.redirect ?? ""}
+      logoutReason={searchParams?.logout}
     />
   );
 }

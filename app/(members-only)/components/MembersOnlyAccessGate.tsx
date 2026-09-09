@@ -1,39 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
 import LoadingState from "./LoadingState";
 import MembershipRevokedState from "./MembershipRevokedState";
-import SessionRevokedState from "./SessionRevokedState";
-
-/// Where the last signed-in Clerk id is parked.
-///
-/// Needed because the question "why was I signed out?" can only be asked after
-/// the session is gone, when the browser no longer has anything identifying to
-/// send. Written while signed in, read once on the way out.
-const LAST_CLERK_ID_KEY = "ttdg:last-clerk-id";
-
-type RevokeNotice = { sessionId: string; deviceLabel: string };
-
-/// localStorage throws in private windows and with site data blocked, and a
-/// courtesy message is never worth a blank page.
-function readStoredClerkId(): string {
-  try {
-    return window.localStorage.getItem(LAST_CLERK_ID_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function writeStoredClerkId(value: string) {
-  try {
-    if (value) window.localStorage.setItem(LAST_CLERK_ID_KEY, value);
-    else window.localStorage.removeItem(LAST_CLERK_ID_KEY);
-  } catch {
-    // Nothing to do: the member simply gets the ordinary sign-in prompt.
-  }
-}
+import {
+  useRevokeNotice,
+  writeStoredClerkId,
+} from "@/components/auth/revokeNotice";
 
 export default function MembersOnlyAccessGate({
   children,
@@ -41,64 +17,30 @@ export default function MembersOnlyAccessGate({
   children: React.ReactNode;
 }>) {
   const { isLoaded, isSignedIn, userId } = useAuth();
+  const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [isRemoved, setIsRemoved] = useState(false);
-  const [revokeNotice, setRevokeNotice] = useState<RevokeNotice | null>(null);
-  const [checkedRevoke, setCheckedRevoke] = useState(false);
+  // Only worth asking once Clerk has resolved and says we are signed out. The
+  // note is consumed here: all it decides is which `?logout=` reason to
+  // redirect with, and the message on the sign-in page comes from the URL.
+  const { notice: revokeNotice, checked: checkedRevoke } = useRevokeNotice(
+    isLoaded && !isSignedIn
+  );
 
   // Remember who this is while there is still a session to read it from.
   useEffect(() => {
     if (isSignedIn && userId) writeStoredClerkId(userId);
   }, [isSignedIn, userId]);
 
-  // Signed out: find out whether an admin did it, before bouncing to sign-in.
+  // Signed out: leave for the sign-in page, saying why. `?logout=` is how
+  // that page decides which message to show; `session-revoked` only when the
+  // server actually has a note, so an ordinary expiry is not mislabelled as an
+  // admin action.
   useEffect(() => {
-    if (!isLoaded || isSignedIn) return;
-
-    let cancelled = false;
-    const clerkId = readStoredClerkId();
-    if (!clerkId) {
-      setCheckedRevoke(true);
-      return;
-    }
-
-    (async () => {
-      try {
-        const response = await fetch(
-          `/api/session-revoked?clerkId=${encodeURIComponent(clerkId)}`,
-          { cache: "no-store" }
-        );
-        const payload = await response.json().catch(() => ({}));
-        if (cancelled) return;
-
-        if (payload?.revoked) {
-          setRevokeNotice({
-            sessionId: String(payload.sessionId ?? ""),
-            deviceLabel: String(payload.deviceLabel ?? ""),
-          });
-          // Shown once. Acknowledged as soon as it is displayed rather than on
-          // dismissal, because the member's next act is to leave for the sign-in
-          // page and there is no dismissal to wait for.
-          if (payload.sessionId) {
-            fetch("/api/session-revoked", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sessionId: payload.sessionId }),
-            }).catch(() => {});
-          }
-          writeStoredClerkId("");
-        }
-      } catch {
-        // Fall through to the ordinary sign-in redirect.
-      } finally {
-        if (!cancelled) setCheckedRevoke(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded, isSignedIn]);
+    if (!isLoaded || isSignedIn || !checkedRevoke) return;
+    const reason = revokeNotice ? "session-revoked" : "session-expired";
+    router.replace(`/sign-in?logout=${reason}`);
+  }, [isLoaded, isSignedIn, checkedRevoke, revokeNotice, router]);
 
   // Membership status only matters for someone who is actually signed in.
   // Asking for it while signed out is what produced a pair of 401s and a
@@ -142,13 +84,13 @@ export default function MembersOnlyAccessGate({
   // render their own loading state first — which is why a signed-out visitor
   // to /member used to sit on "Loading dashboard..." indefinitely.
   if (!isSignedIn) {
+    // Held until the lookup finishes so the redirect can carry the right
+    // reason. Bouncing first and explaining never is the behaviour this whole
+    // path exists to avoid.
     if (!checkedRevoke) {
       return <LoadingState message="Checking access..." />;
     }
-    if (revokeNotice) {
-      return <SessionRevokedState deviceLabel={revokeNotice.deviceLabel} />;
-    }
-    return <RedirectToSignIn />;
+    return <LoadingState message="Redirecting to sign in..." />;
   }
 
   if (isRemoved) {

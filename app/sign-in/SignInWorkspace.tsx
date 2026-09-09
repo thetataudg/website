@@ -22,11 +22,17 @@ import { useSignIn } from "@clerk/nextjs";
 import { ArrowLeft, CircleAlert, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import LoadingState from "../(members-only)/components/LoadingState";
 import { AUTH_MESSAGES, authErrorMessage } from "@/lib/clerkErrors";
+import {
+  LOGOUT_REASONS,
+  LOGOUT_TONE_CLASSES,
+  parseLogoutReason,
+} from "@/components/auth/logoutReason";
 import AuthCard from "@/components/auth/AuthCard";
 import { AppleMark, GoogleMark } from "@/components/auth/BrandIcons";
 import styles from "@/components/auth/auth.module.css";
@@ -56,8 +62,13 @@ function safeRedirect(value: string): string {
 
 export default function SignInWorkspace({
   redirectUrl,
+  logoutReason,
 }: {
   redirectUrl: string;
+  /// The `?logout=` value, read on the server and handed down rather than
+  /// pulled from `useSearchParams`, which would need its own Suspense
+  /// boundary for no benefit.
+  logoutReason?: string;
 }) {
   const { isLoaded, signIn, setActive } = useSignIn();
   const router = useRouter();
@@ -75,6 +86,8 @@ export default function SignInWorkspace({
   const [notice, setNotice] = useState("");
 
   const destination = useMemo(() => safeRedirect(redirectUrl), [redirectUrl]);
+
+  const reason = parseLogoutReason(logoutReason);
 
   // Nothing on these pages takes focus on its own — not on load, and not when
   // the step changes. Moving the caret without being asked steals the next
@@ -320,6 +333,21 @@ export default function SignInWorkspace({
       }
     >
       <>
+        {/* One tinted line above the form. Not an Alert: no icon, no heading,
+          * no border — the member is already looking at the thing that fixes
+          * it, and anything larger just pushes the email field down. */}
+        {reason && !error ? (
+          <p
+            className={cn(
+              styles.alert,
+              "m-0 mb-5 rounded-lg px-4 py-2.5 text-center text-sm",
+              LOGOUT_TONE_CLASSES[LOGOUT_REASONS[reason].tone]
+            )}
+          >
+            {LOGOUT_REASONS[reason].message}
+          </p>
+        ) : null}
+
         {error ? (
           <Alert variant="destructive" className={`${styles.alert} mb-4`}>
             <CircleAlert className="size-4" aria-hidden="true" />
