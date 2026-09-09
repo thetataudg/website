@@ -216,7 +216,9 @@ export default function MemberNavbar() {
    * not admins get no tab strip, so they go straight to the one admin page they
    * can use. */
   const adminHref = isAdmin ? "/member/admin/members" : "/member/admin/gem";
-  const showEventsDropdown = canSeeCommitteeEvents || canSeeManageEvents;
+  // The dropdown only exists to hold "Manage Events" now; committee events
+  // moved to each committee's dashboard.
+  const showEventsDropdown = canSeeManageEvents;
 
   const profileHref = userData?.rollNo
     ? `/member/profile/${userData.rollNo}`
@@ -273,13 +275,8 @@ export default function MemberNavbar() {
           href: "/member/events/manage",
         });
       }
-      if (canSeeCommitteeEvents) {
-        children.push({
-          key: "events-committee",
-          label: "Committee Events",
-          href: "/member/events/committee",
-        });
-      }
+      // Committee events now live on each committee's dashboard under
+      // Committees, so there is no separate "Committee Events" screen.
       items.push({
         key: "events",
         label: "Events",

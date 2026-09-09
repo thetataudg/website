@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import logger from "@/lib/logger";
 import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
+import { detachMemberFromCommittees } from "@/lib/committeeMembership";
 
 export const runtime = "nodejs";
 
@@ -379,10 +380,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const graduating = await Member.find({ rollNo: { $in: validRollNos } })
+      .select("_id")
+      .lean<{ _id: any }[]>();
+
     await Member.updateMany(
       { rollNo: { $in: validRollNos } },
       { $set: { status: "Alumni" } }
     );
+
+    // Off every committee roster and head slot, same as a one-off graduation.
+    for (const member of graduating) {
+      await detachMemberFromCommittees(member._id).catch(() => undefined);
+    }
 
     logger.info(
       {

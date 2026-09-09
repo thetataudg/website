@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
-import Committee from "@/lib/models/Committee";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
-import { syncEventWithCalendar } from "@/lib/calendar";
-import { ensureFutureOccurrences, normalizeWhere } from "@/lib/eventLifecycle";
-import { announceEventPublished } from "@/lib/eventNotify";
-import { normalizeGemCategory } from "@/lib/gem";
+import { checkEventScopeAccess } from "@/lib/eventAuth";
+import { createEvent } from "@/lib/events/createEvent";
 
 async function getMemberByClerk(req: Request) {
   const clerkId = await requireAuth(req as any);
@@ -76,8 +73,6 @@ export async function POST(req: Request) {
       recurrence = {},
     } = body;
 
-    const where = normalizeWhere(body);
-
     if (!name || !startTime || !endTime) {
       return NextResponse.json(
         { error: "name, startTime, endTime are required" },
@@ -85,121 +80,32 @@ export async function POST(req: Request) {
       );
     }
 
-    const isAdmin = member.role === "admin" || member.role === "superadmin";
-    const isECouncil = member.isECouncil;
-    const isChapterWide = !committeeId;
-
-    let committee = null;
-    let isHeadOrMember = false;
-    if (!isChapterWide) {
-      committee = await Committee.findById(committeeId);
-      if (!committee) {
-        return NextResponse.json(
-          { error: "Committee not found" },
-          { status: 404 }
-        );
-      }
-      const headId = committee.committeeHeadId?.toString();
-      const memberIds = (committee.committeeMembers || []).map((id: any) =>
-        id.toString()
+    const access = await checkEventScopeAccess(member as any, committeeId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status }
       );
-      isHeadOrMember =
-        headId === member._id?.toString() ||
-        memberIds.includes(member._id?.toString());
     }
 
-    if (isChapterWide) {
-      if (!isAdmin && !isECouncil) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-    } else if (!isAdmin && !isECouncil && !isHeadOrMember) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const normalizedEventType =
-      eventType === "meeting" || eventType === "chapter" || eventType === "event"
-        ? eventType
-        : "event";
-
-    const normalizedGemCategory = normalizeGemCategory(gemCategory);
-
-    const normalizedRecurrence = {
-      enabled: !!recurrence?.enabled,
-      frequency:
-        recurrence?.frequency === "daily" ||
-        recurrence?.frequency === "weekly" ||
-        recurrence?.frequency === "monthly"
-          ? recurrence.frequency
-          : "weekly",
-      interval: Number(recurrence?.interval) || 1,
-      endDate: recurrence?.endDate ? new Date(recurrence.endDate) : null,
-      count: Math.max(Number(recurrence?.count) || 1, 1),
-    };
-
-    const eventDoc = {
-      name: name.trim(),
+    const event = await createEvent({
+      name,
       description,
       committeeId: committeeId || null,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      startedAt: null,
-      endedAt: null,
+      startTime,
+      endTime,
       location,
-      eventType: normalizedEventType,
-      gemCategory: normalizedGemCategory,
-      recurrence: normalizedRecurrence,
+      locationKind: body.locationKind,
+      virtualPlatform: body.virtualPlatform,
+      virtualLink: body.virtualLink,
+      eventType,
+      gemCategory,
       status,
       visibleToAlumni,
-      ...where,
-      attendees: [],
-    };
+      recurrence,
+      actorId: member?._id ?? null,
+    });
 
-    let event;
-    if (!committeeId) {
-      const created = new Event(eventDoc);
-      await created.save({ validateBeforeSave: false });
-      event = created.toObject();
-    } else {
-      event = await Event.create(eventDoc);
-    }
-
-    if (event?._id) {
-      await Event.collection.updateOne(
-      { _id: event._id },
-      {
-        $set: {
-          eventType: normalizedEventType,
-          recurrence: normalizedRecurrence,
-          gemCategory: normalizedGemCategory,
-        },
-      }
-    );
-      event.recurrence = normalizedRecurrence;
-    }
-
-    if (committeeId) {
-      await Committee.findByIdAndUpdate(committeeId, {
-        $addToSet: { events: event._id },
-      });
-    }
-
-    if (normalizedRecurrence.enabled && event?._id) {
-      await ensureFutureOccurrences(event._id);
-    }
-
-    if (event) {
-      const syncResult = await syncEventWithCalendar(event);
-      if (syncResult.calendarEventId) {
-        event.calendarEventId = syncResult.calendarEventId;
-      }
-    }
-
-    // Not awaited, for the same reason the newsletter announcement is not: a
-    // create must not sit behind sixty pushes, and `announceEventPublished`
-    // swallows its own failures.
-    void announceEventPublished(event, member?._id ?? null);
-
-    logger.info({ eventId: event._id }, "Event created");
     return NextResponse.json(event, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to create event");

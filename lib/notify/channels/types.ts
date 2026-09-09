@@ -20,6 +20,15 @@ export interface DeliveryRequest {
   amountCents: number | null;
   refs: Record<string, any>;
   sentBy: any | null;
+  /// The channels the caller explicitly named, or null for "all defaults". A
+  /// default-off channel (Discord DM) uses this to tell a deliberate opt-in
+  /// from the global fan-out.
+  explicitChannels?: string[] | null;
+  /// `#RRGGBB` accent for rich renderers — the Discord embed stripe. Set to a
+  /// committee's calendar colour so a poll DM reads as that committee's, the
+  /// same as its events on the calendar. Undefined falls back to chapter
+  /// crimson.
+  accentColor?: string | null;
   /// Breaks through a Focus and stays on the lock screen for an hour.
   ///
   /// Reserved for the handful of things with a deadline the member cannot see

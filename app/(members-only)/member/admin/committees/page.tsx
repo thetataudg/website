@@ -727,6 +727,10 @@ function MemberPicker({
   disabledIds?: string[];
 }) {
   const [open, setOpen] = useState(false);
+  // Controlled so a pick can clear it: adding several people in a row, you
+  // type "dhy", hit enter, and the box is empty and ready for the next name
+  // rather than still filtered to the last one.
+  const [search, setSearch] = useState("");
   const selected = value
     .map((memberId) => members.find((m) => m._id === memberId))
     .filter((m): m is Member => Boolean(m));
@@ -738,11 +742,19 @@ function MemberPicker({
         ? value.filter((existing) => existing !== memberId)
         : [...value, memberId]
     );
+    setSearch("");
   };
 
   return (
     <div className="space-y-2">
-      <Popover open={open} onOpenChange={setOpen} modal>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setSearch("");
+        }}
+        modal
+      >
         <PopoverTrigger asChild>
           <Button
             id={id}
@@ -772,7 +784,11 @@ function MemberPicker({
           className="w-[var(--radix-popover-trigger-width)] p-0"
         >
           <Command>
-            <CommandInput placeholder="Search by name or roll number…" />
+            <CommandInput
+              placeholder="Search by name or roll number…"
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList>
               <CommandEmpty>No members found.</CommandEmpty>
               <CommandGroup>

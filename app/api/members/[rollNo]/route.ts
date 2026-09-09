@@ -8,6 +8,7 @@ import logger from "@/lib/logger";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { maybePresignUrl } from "@/lib/garage";
 import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
+import { detachMemberFromCommittees } from "@/lib/committeeMembership";
 
 const MEMBER_SECRET_HEADER = process.env.MEMBER_API_SECRET_HEADER || "x-api-secret";
 const MEMBER_SECRET_QUERY_PARAM = process.env.MEMBER_API_SECRET_QUERY_PARAM || "secret";
@@ -216,6 +217,19 @@ export async function PATCH(
   }
 
   await markWalletPassUpdatedForMember(updatedMember._id.toString());
+
+  // Committees are for actives. Graduating (or removing) someone strips them
+  // from every roster and head slot, so they stop showing on the directory,
+  // the PDF and the phone with no way to take them off by hand.
+  if ("status" in updates && updates.status && updates.status !== "Active") {
+    await detachMemberFromCommittees(updatedMember._id).catch((err) =>
+      logger.warn(
+        { err, rollNo: params.rollNo },
+        "Failed to detach non-active member from committees"
+      )
+    );
+  }
+
   logger.info(
     { adminId, rollNo: params.rollNo, updates },
     "Admin PATCH successful"

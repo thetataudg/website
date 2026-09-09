@@ -6,6 +6,7 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { isCalendarColor } from "@/lib/calendarColors";
+import { pruneInactiveCommitteeMembers } from "@/lib/committeeMembership";
 
 async function updateHeadFlags(oldHeadId?: string | null, newHeadId?: string | null, committeeId?: string) {
   if (newHeadId) {
@@ -27,6 +28,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   try {
     await requireAuth(req as any);
     await connectDB();
+    await pruneInactiveCommitteeMembers();
 
     const committee = await Committee.findById(params.id)
       .populate("committeeHeadId", "fName lName rollNo")

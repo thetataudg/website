@@ -1,7 +1,7 @@
-import CommitteeEventsWorkspace from "./CommitteeEventsWorkspace";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
+// Committee events moved onto each committee's own dashboard. The chapter-wide
+// "Manage Events" and "All Events" screens are unchanged.
 export default function CommitteeEventsPage() {
-  return <CommitteeEventsWorkspace />;
+  redirect("/member/committees");
 }

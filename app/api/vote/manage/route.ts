@@ -6,6 +6,7 @@ import Vote from "@/lib/models/Vote";
 import VoteLocation from "@/lib/models/VoteLocation";
 import logger from "@/lib/logger";
 import { isArchived, markEnded } from "@/lib/voteLifecycle";
+import { announceVoteOpened } from "@/lib/voteNotify";
 
 /**
  * The write gate for votes: creating, starting, ending, relocating, deleting,
@@ -137,7 +138,9 @@ export async function DELETE(req: Request) {
 // PATCH: Start, end, or next round
 export async function PATCH(req: Request) {
   try {
-    await requireECouncil(req);
+    // Held, rather than discarded, so an announcement can say who opened the
+    // vote and can skip pushing to them.
+    const officer = await requireECouncil(req);
     const body = await req.json();
     const { action, countdown, voteId } = body;
     
@@ -195,6 +198,14 @@ export async function PATCH(req: Request) {
       vote.startedAt = new Date(); // Set the start time
       vote.endTime = null; // Clear any existing end time
       await vote.save();
+
+      // The chapter has to be told, and this is the only moment it can be:
+      // a vote runs for minutes and the in-app banner only reaches somebody
+      // who already has the app open. Not awaited, and it cannot throw, so a
+      // dead APNs key can never fail the opening of a vote. The `started`
+      // guard above is what makes a second send impossible.
+      void announceVoteOpened(vote, (officer as any)?._id ?? null);
+
       return NextResponse.json({ success: true });
     }
     

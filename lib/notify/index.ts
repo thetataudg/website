@@ -25,11 +25,16 @@ import {
 import { inAppChannel } from "@/lib/notify/channels/inapp";
 import { emailChannel } from "@/lib/notify/channels/email";
 import { pushChannel } from "@/lib/notify/channels/push";
+import { discordChannel } from "@/lib/notify/channels/discord";
 import type { Channel, Recipient } from "@/lib/notify/channels/types";
 
 export const COOLDOWN_HOURS = 24;
 
-const EXTERNAL_CHANNELS: Channel[] = [emailChannel, pushChannel];
+// Discord is last and, unless DISCORD_DM_NOTIFICATIONS is set, only fires when
+// a send names it in `channels`. See lib/notify/channels/discord.ts for why it
+// is opt-in: adding it here would otherwise start DMing the whole roster about
+// every dues notice at once.
+const EXTERNAL_CHANNELS: Channel[] = [emailChannel, pushChannel, discordChannel];
 
 export interface NotifyInput {
   recipient: Recipient;
@@ -51,6 +56,10 @@ export interface NotifyInput {
   /// Which external channels to attempt. Undefined means all of them. In-app
   /// is not listed because it is the record, not a delivery choice.
   channels?: string[];
+  /// `#RRGGBB` accent for the Discord embed stripe. A committee's calendar
+  /// colour, so a poll DM matches that committee's events. Undefined is
+  /// chapter crimson.
+  accentColor?: string | null;
   /// Send this one as a time-sensitive alert. See the note on
   /// `DeliveryRequest.timeSensitive` for when that is justified.
   timeSensitive?: boolean;
@@ -140,6 +149,11 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     refs: input.refs ?? {},
     sentBy: input.sentBy ?? null,
     timeSensitive: input.timeSensitive ?? false,
+    /// The channels the caller explicitly asked for, if any. A channel that is
+    /// off by default (Discord DM) reads this to know it was opted into for
+    /// this one send rather than turned on for the whole chapter.
+    explicitChannels: input.channels ?? null,
+    accentColor: input.accentColor ?? null,
   };
 
   // In-app first and always. It is the record; the rest are attempts to reach

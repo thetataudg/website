@@ -12,8 +12,28 @@ import DeviceToken from "@/lib/models/DeviceToken";
 import logger from "@/lib/logger";
 import type { Channel, DeliveryRequest, DeliveryResult } from "./types";
 
-const TEAM_ID = process.env.APNS_TEAM_ID || "WVQ9Z7S7RR";
-const BUNDLE_ID = process.env.APNS_BUNDLE_ID || "org.thetatau.dg.ThetaTau";
+/// An environment value with the hosting platform's packaging taken back off.
+///
+/// Coolify stores a multiline variable with real newlines and no quotes, which
+/// is what the dashboard shows, then writes it into the container's env file as
+/// a single line with escaped newlines *and quotes around it*. Those quotes are
+/// part of the value as far as `process.env` is concerned. That is how the APNs
+/// key came to be the only quoted value out of fifty-three: it is the only
+/// multiline one.
+///
+/// Applied to all four rather than just the key. A quoted `APNS_KEY_ID` signs a
+/// JWT with a `kid` Apple does not recognise and a quoted `APNS_BUNDLE_ID`
+/// sends to a topic that does not exist — both fail at Apple with a generic
+/// rejection rather than here with a message that names the cause, and both are
+/// one dashboard edit away from being multiline too.
+function envValue(name: string): string {
+  const raw = process.env[name];
+  if (!raw) return "";
+  return raw.trim().replace(/^(["'])([\s\S]*)\1$/, "$2");
+}
+
+const TEAM_ID = envValue("APNS_TEAM_ID") || "WVQ9Z7S7RR";
+const BUNDLE_ID = envValue("APNS_BUNDLE_ID") || "org.thetatau.dg.ThetaTau";
 /// A provider token is good for an hour and must not be regenerated more often
 /// than every 20 minutes, so it's minted at most once every 45.
 const TOKEN_TTL_MS = 45 * 60 * 1000;
@@ -23,8 +43,8 @@ let reportedMissingConfiguration = false;
 
 function missingConfiguration(): string[] {
   return [
-    !process.env.APNS_KEY_P8 ? "APNS_KEY_P8" : "",
-    !process.env.APNS_KEY_ID ? "APNS_KEY_ID" : "",
+    !envValue("APNS_KEY_P8") ? "APNS_KEY_P8" : "",
+    !envValue("APNS_KEY_ID") ? "APNS_KEY_ID" : "",
   ].filter(Boolean);
 }
 
@@ -38,15 +58,23 @@ function base64url(input: Buffer | string): string {
 
 /// The .p8 file, either inline in the env var or with its newlines escaped —
 /// which is what happens to it in every hosting dashboard on earth.
+///
+/// The surrounding quotes are stripped for the same reason. A PEM is the one
+/// secret people paste with quotes around it, because it is the one secret
+/// that contains newlines and every guide shows it wrapped. `process.env`
+/// hands those quotes straight through, OpenSSL rejects a key that begins with
+/// one, and the failure surfaces three layers away as "no provider token" on
+/// every notification the chapter sends. That is exactly what happened here:
+/// APNS_KEY_P8 was the only quoted value out of fifty-three.
 function privateKey(): string | null {
-  const raw = process.env.APNS_KEY_P8;
-  if (!raw) return null;
-  return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+  const unquoted = envValue("APNS_KEY_P8");
+  if (!unquoted) return null;
+  return unquoted.includes("\\n") ? unquoted.replace(/\\n/g, "\n") : unquoted;
 }
 
 function providerToken(): string | null {
   const key = privateKey();
-  const keyId = process.env.APNS_KEY_ID;
+  const keyId = envValue("APNS_KEY_ID");
   if (!key || !keyId) return null;
 
   if (cachedToken && Date.now() - cachedToken.mintedAt < TOKEN_TTL_MS) {
