@@ -1,4 +1,5 @@
 import VoteLocation from "@/lib/models/VoteLocation";
+import VotePresence from "@/lib/models/VotePresence";
 import logger from "@/lib/logger";
 
 export type BallotLocation = {
@@ -49,7 +50,13 @@ export function readBallotLocation(raw: any): BallotLocation | null {
 }
 
 /**
- * Records where a ballot came from, with nothing that identifies who cast it.
+ * Records where a ballot came from, as two records that must never be joined.
+ *
+ * `VoteLocation` gets the coordinates and no member. `VotePresence` gets the
+ * member and no coordinates — just how far from the anchor they were, which is
+ * the only part an officer needs in order to ask somebody why they voted from
+ * another city. See the note on `VotePresence` for why that split is the whole
+ * design rather than an implementation detail.
  *
  * Deliberately best-effort: a failure here must never lose a ballot that has
  * already been counted. The audit trail is worth less than the vote.
@@ -58,12 +65,12 @@ export function readBallotLocation(raw: any): BallotLocation | null {
  */
 export async function recordBallotLocation(opts: {
   voteId: any;
+  clerkId: string;
   location: BallotLocation | null;
   proxy: boolean;
-  choices: string[];
   anchor?: { lat?: number; lng?: number; radiusMeters?: number } | null;
 }): Promise<void> {
-  const { voteId, location, proxy, choices, anchor } = opts;
+  const { voteId, clerkId, location, proxy, anchor } = opts;
   if (!location) return;
 
   try {
@@ -87,20 +94,44 @@ export async function recordBallotLocation(opts: {
     const trustworthy =
       location.accuracy == null || location.accuracy <= Math.max(radius, 100);
 
-    const flagged =
-      distance !== null && !proxy && trustworthy && distance > radius;
+    // The map's `flagged` keeps the accuracy guard below: it paints a red pin
+    // on an anonymous point nobody can defend, so a loose fix should not earn
+    // one. `outside` on the presence record is the plain geometric fact, with
+    // the accuracy carried alongside it — a member 50 km away on a weak fix is
+    // still 50 km away, and suppressing that here would have left the roll
+    // reporting them as at the meeting. The roll hedges the wording instead.
+    const outside = distance !== null && distance > radius;
+    const flagged = outside && !proxy && trustworthy;
+    const rounded = distance === null ? null : Math.round(distance);
 
+    // No `choices` any more. Nothing ever rendered them, and once a member's
+    // name sits on a distance in `VotePresence`, a matching distance on a
+    // point that also carried choices would join the two back together and
+    // publish how that member voted. The map wants positions, not ballots.
     await VoteLocation.create({
       voteId,
       lat: location.lat,
       lng: location.lng,
       accuracyMeters: location.accuracy ?? null,
       proxy,
-      choices,
-      distanceMeters: distance === null ? null : Math.round(distance),
+      distanceMeters: rounded,
       flagged,
       dayKey: new Date().toISOString().slice(0, 10),
     });
+
+    // Upserted rather than created: a client that retries a submission whose
+    // ballot already landed must not leave two rows on one member.
+    await VotePresence.updateOne(
+      { voteId, clerkId },
+      {
+        $set: {
+          distanceMeters: rounded,
+          accuracyMeters: location.accuracy ?? null,
+          outside,
+        },
+      },
+      { upsert: true }
+    );
   } catch (err) {
     logger.error({ err, voteId }, "Failed to record ballot location");
   }

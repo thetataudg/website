@@ -5,6 +5,9 @@ export interface MemberDoc {
   rollNo: string;
   fName: string;
   lName: string;
+  /// E.164, or null when not yet imported. See `lib/phone.ts`.
+  phone?: string | null;
+  email?: string | null;
   majors: string[];
   minors?: string[];
   gradYear?: number;

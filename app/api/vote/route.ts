@@ -11,6 +11,7 @@ import {
   proxyRequestFor,
 } from "@/lib/voteGeo";
 import { markEnded } from "@/lib/voteLifecycle";
+import { distinctVoterCount } from "@/lib/voteCounts";
 
 // Helper to check active member
 async function requireActiveMember(req: Request) {
@@ -67,12 +68,12 @@ export async function POST(req: Request) {
         ? vote.votingLocation
         : null;
 
-    const audit = (isProxy: boolean, choices: string[]) =>
+    const audit = (isProxy: boolean) =>
       recordBallotLocation({
         voteId: vote._id,
+        clerkId,
         location: ballotLocation,
         proxy: isProxy,
-        choices,
         anchor,
       });
 
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Already voted or vote has ended" }, { status: 400 });
       }
       
-      await audit(!!proxy, [choice]);
+      await audit(!!proxy);
       return NextResponse.json({ success: true });
     } else if (vote.type === "Pledge") {
       // Support batch ballot submission with dual choices
@@ -195,10 +196,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Already voted for one or more pledges or vote has ended" }, { status: 400 });
         }
         
-        await audit(
-          isProxy,
-          votesToInsert.map((v) => `${v.pledge}: ${v.round} ${v.choice}`)
-        );
+        await audit(isProxy);
         return NextResponse.json({ success: true });
       } else {
         // Fallback: single pledge vote (legacy)
@@ -235,7 +233,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Already voted for this pledge this round or vote has ended" }, { status: 400 });
         }
         
-        await audit(isProxySingle, [`${pledge}: ${vote.round} ${choice}`]);
+        await audit(isProxySingle);
         return NextResponse.json({ success: true });
       }
     } else if (vote.type === "Bidding") {
@@ -285,7 +283,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Already voted for one or more rushees or vote has ended" }, { status: 400 });
         }
         
-        await audit(isProxy, votesToInsert.map((v) => `${v.rushee}: ${v.choice}`));
+        await audit(isProxy);
         return NextResponse.json({ success: true });
       }
     }
@@ -356,7 +354,7 @@ export async function GET(req: Request) {
         startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         hasVoted,
-        totalVotes: vote.votes.length,
+        totalVotes: distinctVoterCount(vote.votes),
         voterListVerified: vote.voterListVerified || false,
         ...common,
       });
@@ -386,7 +384,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         votedPledges,
         abstainedPledges,
-        totalVotes: new Set(vote.votes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
+        totalVotes: distinctVoterCount(vote.votes.filter((v: any) => v.round === "board")),
         voterListVerified: vote.voterListVerified || false,
         ...common,
       });
@@ -412,7 +410,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         votedRushees,
         abstainedRushees,
-        totalVotes: new Set(vote.votes.map((v: any) => v.clerkId)).size, // Count unique voters
+        totalVotes: distinctVoterCount(vote.votes),
         voterListVerified: vote.voterListVerified || false,
         ...common,
       });

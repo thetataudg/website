@@ -68,6 +68,38 @@ export default function PollResultsClient({
   >("weekly");
   const [interval, setIntervalValue] = React.useState("1");
   const [keepUpcoming, setKeepUpcoming] = React.useState("4");
+  const [nudgingId, setNudgingId] = React.useState<string | null>(null);
+
+  /// Who was asked and has not answered by hand, as {id, name}.
+  const outstandingPeople = React.useMemo(() => {
+    if (!data) return [];
+    const answered = new Set(
+      (data.poll.responses || [])
+        .filter((r) => r.source !== "prefill")
+        .map((r) => String(r.memberId))
+    );
+    const nameById = new Map(data.members.map((m) => [m._id, m.name]));
+    return (data.poll.invitees || [])
+      .map((i) => String(i.memberId))
+      .filter((id) => !answered.has(id))
+      .map((id) => ({ id, name: nameById.get(id) || "Unknown" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
+
+  const nudgeOne = async (memberId: string, name: string) => {
+    setNudgingId(memberId);
+    try {
+      const r = await pollApi.remind(pollId, [memberId]);
+      toast.success(
+        r.reminded ? `Nudged ${name}.` : `${name} has hit the reminder limit.`
+      );
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setNudgingId(null);
+    }
+  };
 
   const load = React.useCallback(async () => {
     try {
@@ -227,6 +259,41 @@ export default function PollResultsClient({
                 Open the event
               </Link>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {poll.status === "open" && outstandingPeople.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              Waiting on {outstandingPeople.length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-border">
+              {outstandingPeople.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between gap-2 px-4 py-2.5"
+                >
+                  <span className="text-sm text-foreground">{p.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={nudgingId === p.id}
+                    onClick={() => nudgeOne(p.id, p.name)}
+                  >
+                    {nudgingId === p.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <BellRing className="size-4" />
+                    )}
+                    Remind
+                  </Button>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

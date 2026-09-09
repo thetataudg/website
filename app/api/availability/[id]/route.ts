@@ -146,6 +146,9 @@ export async function PATCH(
   }
 }
 
+// Actually deletes the poll document. Manager only. The scheduled Event, if
+// there is one, is a chapter calendar entry in its own right and is left
+// alone — only the poll and its responses go.
 export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
@@ -157,13 +160,10 @@ export async function DELETE(
     if (!ctx.isManager) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    await AvailabilityPoll.updateOne(
-      { _id: params.id },
-      { $set: { status: "cancelled" } }
-    );
+    await AvailabilityPoll.deleteOne({ _id: params.id });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {
-    logger.error({ err }, "Failed to cancel availability poll");
+    logger.error({ err }, "Failed to delete availability poll");
     return NextResponse.json({ error: err.message }, { status: 403 });
   }
 }

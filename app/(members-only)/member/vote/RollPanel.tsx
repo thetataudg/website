@@ -8,6 +8,7 @@ import {
   LockKeyholeOpen,
   RotateCcw,
   Search,
+  MapPin,
   ShieldCheck,
   TriangleAlert,
   X,
@@ -43,9 +44,13 @@ import type { VoterListResponse, VoterRecord } from "./types";
 /**
  * Who voted, who did not, and whose ballot should not stand.
  *
- * Note what the roll is *not*. It knows that a member voted; it does not know
- * what they voted for. Those are separate records on the server, and striking
- * a ballot removes it from the tally without anybody ever seeing its contents.
+ * Note what the roll is *not*. It knows that a member voted, and — once
+ * E-Council has set a meeting location — roughly how far away they were when
+ * they did. It does not know what they voted for. Those are separate records
+ * on the server, and the one carrying a member's name has never held a choice,
+ * so no amount of reading this screen can reconstruct a ballot. Striking a
+ * ballot likewise removes it from the tally without anybody seeing its
+ * contents.
  *
  * Verifying is one-way. The server refuses every further change afterwards,
  * which is the entire point of it, so the confirmation says so plainly.
@@ -55,10 +60,42 @@ const FILTERS = [
   { id: "all", label: "Everyone" },
   { id: "voted", label: "Voted" },
   { id: "proxy", label: "Proxy" },
+  { id: "offsite", label: "Off-site" },
   { id: "missing", label: "No ballot" },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
+
+/**
+ * A member who voted from outside the boundary without an approved proxy.
+ *
+ * Proxy ballots are outside on purpose, so counting them here would bury the
+ * one row an officer is actually looking for under every row they already
+ * approved themselves.
+ */
+function isOffSite(voter: VoterRecord): boolean {
+  return !!voter.outsideBoundary && !voter.isProxy && !voter.isInvalidated;
+}
+
+/**
+ * "180 m" / "4.2 km". Metres below a kilometre, one decimal above it — the
+ * precision of a phone's fix does not survive being written out any finer.
+ */
+function formatDistance(metres: number): string {
+  if (metres < 1000) return `${Math.round(metres)} m`;
+  return `${(metres / 1000).toFixed(1)} km`;
+}
+
+/**
+ * Whether the fix was tight enough to say anything with.
+ *
+ * A 500 m accuracy circle 250 m outside the boundary is not evidence that
+ * anybody was anywhere, and a hedge on the row is more honest than a badge.
+ */
+function isVague(voter: VoterRecord, radius: number): boolean {
+  const accuracy = voter.accuracyMeters;
+  return accuracy != null && accuracy > Math.max(radius, 100);
+}
 
 export function RollPanel({
   voteId,
@@ -97,17 +134,28 @@ export function RollPanel({
   const voters = React.useMemo(() => data?.voterList ?? [], [data]);
   const verified = data?.voterListVerified ?? false;
 
+  const anchor = data?.anchor ?? null;
+
   const counts: Record<FilterId, number> = {
     all: voters.length,
     voted: voters.filter((v) => v.status === "voted").length,
     proxy: voters.filter((v) => v.status === "proxy").length,
+    offsite: voters.filter(isOffSite).length,
     missing: voters.filter((v) => v.status === "no-ballot").length,
   };
+
+  // Without an anchor there is nothing to be outside of, so the filter would
+  // read a permanent zero and invite the wrong conclusion.
+  const filters = React.useMemo(
+    () => FILTERS.filter((option) => option.id !== "offsite" || anchor),
+    [anchor]
+  );
 
   const rows = React.useMemo(() => {
     let list = voters;
     if (filter === "voted") list = list.filter((v) => v.status === "voted");
     if (filter === "proxy") list = list.filter((v) => v.status === "proxy");
+    if (filter === "offsite") list = list.filter(isOffSite);
     if (filter === "missing") list = list.filter((v) => v.status === "no-ballot");
 
     const needle = query.trim().toLowerCase();
@@ -187,13 +235,15 @@ export function RollPanel({
           <div className="space-y-1.5">
             <CardTitle>Roll and ballots</CardTitle>
             <CardDescription>
-              Whether a member&apos;s ballot is in, never what it said.
+              {anchor
+                ? "Whether a member's ballot is in and where from, never what it said."
+                : "Whether a member's ballot is in, never what it said."}
             </CardDescription>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap gap-2">
-              {FILTERS.map((option) => (
+              {filters.map((option) => (
                 <Button
                   key={option.id}
                   type="button"
@@ -233,6 +283,7 @@ export function RollPanel({
               <VoterRow
                 key={voter.clerkId}
                 voter={voter}
+                anchor={anchor}
                 first={index === 0}
                 canEdit={!verified}
                 working={working === voter.clerkId}
@@ -287,12 +338,14 @@ export function RollPanel({
 
 function VoterRow({
   voter,
+  anchor,
   first,
   canEdit,
   working,
   onToggle,
 }: {
   voter: VoterRecord;
+  anchor: { label?: string | null; radiusMeters: number } | null;
   first: boolean;
   canEdit: boolean;
   working: boolean;
@@ -319,6 +372,40 @@ function VoterRow({
   // on precisely the rows that need it.
   const actionable = voter.status !== "no-ballot" || voter.isInvalidated;
 
+  const status = voter.isInvalidated
+    ? "Ballot struck"
+    : voter.status === "voted"
+    ? "Voted"
+    : voter.status === "proxy"
+    ? "Proxy ballot"
+    : "No ballot";
+
+  /**
+   * Where they voted from, as a second line rather than a badge.
+   *
+   * Only ever a distance. The record this comes from carries no coordinates
+   * and no choices, which is what makes it safe to put a member's name beside.
+   * Silent when there is no anchor, no ballot, or no position — a member may
+   * decline the permission and still vote, and an absent line says that better
+   * than "unknown" repeated down the whole roll.
+   */
+  const offSite = isOffSite(voter);
+  const vague = anchor ? isVague(voter, anchor.radiusMeters) : false;
+  const place =
+    !anchor || voter.isInvalidated || voter.status === "no-ballot"
+      ? null
+      : voter.distanceMeters == null
+      ? null
+      : offSite
+      ? vague
+        ? `Possibly off-site — ${formatDistance(voter.distanceMeters)} away, weak fix`
+        : `Off-site — ${formatDistance(voter.distanceMeters)} from ${
+            anchor.label || "the meeting"
+          }`
+      : voter.outsideBoundary
+      ? `${formatDistance(voter.distanceMeters)} away, by approved proxy`
+      : "At the meeting";
+
   return (
     <div className={cn("flex items-center gap-3 px-6 py-3", !first && "border-t")}>
       <Icon className={cn("size-4 shrink-0", tint)} aria-hidden="true" />
@@ -330,14 +417,21 @@ function VoterRow({
             voter.isInvalidated ? "text-destructive" : "text-muted-foreground"
           )}
         >
-          {voter.isInvalidated
-            ? "Ballot struck"
-            : voter.status === "voted"
-            ? "Voted"
-            : voter.status === "proxy"
-            ? "Proxy ballot"
-            : "No ballot"}
+          {status}
         </p>
+        {place ? (
+          <p
+            className={cn(
+              "mt-0.5 flex items-center gap-1 text-xs",
+              offSite && !vague
+                ? "text-amber-700 dark:text-amber-500"
+                : "text-muted-foreground"
+            )}
+          >
+            <MapPin className="size-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{place}</span>
+          </p>
+        ) : null}
       </div>
       {voter.rollNo ? (
         <span className="shrink-0 font-mono text-xs text-muted-foreground">

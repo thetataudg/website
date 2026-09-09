@@ -39,8 +39,13 @@ const VoteLocationSchema = new Schema({
   /// expected, and one cast far from chapter without the marking is not.
   proxy: { type: Boolean, default: false },
 
-  /// What was voted for, with no voter attached — "Abstain", an election
-  /// option, or the set of choices on a pledge/bidding ballot.
+  /// Legacy. No longer written and no longer served.
+  ///
+  /// This held what was voted for, with no voter attached, and nothing ever
+  /// rendered it. Once `VotePresence` began naming who voted from outside, a
+  /// distance appearing on both records was enough to join a member to the
+  /// choices sitting beside it here. Kept on the schema only so documents
+  /// written before that stay readable until they purge.
   choices: [{ type: String }],
 
   /// Metres from the vote's anchor, or null when no anchor was set.

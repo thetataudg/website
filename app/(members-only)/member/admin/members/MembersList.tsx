@@ -12,7 +12,9 @@ import {
   Loader2,
   MoreHorizontal,
   Pencil,
+  PhoneCall,
   Search,
+  Smartphone,
   MonitorSmartphone,
   ShieldCheck,
   Trash2,
@@ -74,6 +76,8 @@ import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
 import MemberEditorModal from "./MemberEditorModal";
 import SessionsPanel from "./SessionsPanel";
 import QuickToolsModal from "./QuickToolsModal";
+import PhoneSyncModal from "./PhoneSyncModal";
+import MinimumVersionModal from "./MinimumVersionModal";
 
 export interface MemberData {
   _id: string;
@@ -136,6 +140,8 @@ export default function MembersList({
   const [deleteError, setDeleteError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [showQuickTools, setShowQuickTools] = useState(false);
+  const [showPhoneSync, setShowPhoneSync] = useState(false);
+  const [showMinVersion, setShowMinVersion] = useState(false);
   const [quickToolsTool, setQuickToolsTool] = useState<
     "election" | "graduations"
   >("election");
@@ -510,6 +516,20 @@ export default function MembersList({
                 onClick={() => openQuickTool("graduations")}
                 disabled={!canUseChapterTools}
               />
+              <ToolRow
+                icon={PhoneCall}
+                title="Sync phone numbers"
+                description="Pull phone numbers from Airtable and review the changes before applying."
+                onClick={() => setShowPhoneSync(true)}
+                disabled={!canUseChapterTools}
+              />
+              <ToolRow
+                icon={Smartphone}
+                title="Minimum app version"
+                description="Set the oldest iPhone app version allowed to run."
+                onClick={() => setShowMinVersion(true)}
+                disabled={!canUseChapterTools}
+              />
               {!canUseChapterTools ? (
                 <Alert className="md:col-span-2">
                   <ShieldCheck className="size-4" />
@@ -530,6 +550,23 @@ export default function MembersList({
           </TabsContent>
         ) : null}
       </Tabs>
+
+      {showMinVersion ? (
+        <MinimumVersionModal
+          show={showMinVersion}
+          canSubmit={canUseChapterTools}
+          onClose={() => setShowMinVersion(false)}
+        />
+      ) : null}
+
+      {showPhoneSync ? (
+        <PhoneSyncModal
+          show={showPhoneSync}
+          canSubmit={canUseChapterTools}
+          onClose={() => setShowPhoneSync(false)}
+          onCompleted={refreshMembers}
+        />
+      ) : null}
 
       {showQuickTools ? (
         <QuickToolsModal

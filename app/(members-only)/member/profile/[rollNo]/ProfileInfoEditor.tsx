@@ -112,6 +112,7 @@ export default function ProfileInfoEditor({
     gradYear: member.gradYear?.toString() || "",
     bio: member.bio || "",
     hometown: member.hometown || "",
+    phone: member.phone || "",
     pledgeClass: member.pledgeClass || "",
     big: resolveRollNo(member.bigs?.[0]),
     littles: (member.littles || [])
@@ -216,6 +217,7 @@ export default function ProfileInfoEditor({
         gradYear: Number(form.gradYear),
         bio: form.bio,
         hometown: form.hometown,
+        phone: form.phone,
         pledgeClass: form.pledgeClass.trim(),
         bigs: form.big ? [form.big.trim()] : [],
         littles: parseList(form.littles).slice(0, 5),
@@ -344,6 +346,17 @@ export default function ProfileInfoEditor({
                   ))}
                 </SelectContent>
               </Select>
+            </Field>
+            <Field id="profile-phone" label="Phone number" className="lg:col-span-4">
+              <Input
+                id="profile-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={form.phone}
+                onChange={(event) => updateField("phone", event.target.value)}
+                placeholder="(480) 555-0123"
+              />
             </Field>
             <Field id="profile-hometown" label="Hometown" className="lg:col-span-4">
               <Input

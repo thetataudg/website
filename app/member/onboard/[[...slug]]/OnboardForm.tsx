@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { normalizePhone } from "@/lib/phone";
 import { useUser } from "@clerk/nextjs";
 import { CircleAlert, CircleCheck } from "lucide-react";
 
@@ -55,6 +56,7 @@ export default function OnboardForm({
     rollNo: "",
     headline: "",
     pronouns: "",
+    phone: "",
     majors: "",
     minors: "",
     gradYear: "",
@@ -161,6 +163,18 @@ export default function OnboardForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Checked here as well as on the server so the failure lands next to the
+    // field rather than as a banner after a round trip.
+    const phone = normalizePhone(form.phone);
+    if (!phone.ok || !phone.e164) {
+      setAlert({
+        type: "destructive",
+        message: phone.ok ? "A phone number is required." : phone.error,
+      });
+      return;
+    }
+
     setSaving(true);
     setAlert(null);
 
@@ -168,6 +182,7 @@ export default function OnboardForm({
       rollNo: form.rollNo.trim(),
       headline: form.headline.trim(),
       pronouns: form.pronouns.trim(),
+      phone: phone.e164,
       majors: parseList(form.majors),
       minors: parseList(form.minors),
       gradYear: Number(form.gradYear),
@@ -306,14 +321,28 @@ export default function OnboardForm({
               </Field>
             </div>
 
-            <Field id="onboard-roll" label="Roll Number">
-              <Input
-                id="onboard-roll"
-                value={form.rollNo}
-                onChange={(e) => upd("rollNo", e.target.value)}
-                required
-              />
-            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="onboard-roll" label="Roll Number">
+                <Input
+                  id="onboard-roll"
+                  value={form.rollNo}
+                  onChange={(e) => upd("rollNo", e.target.value)}
+                  required
+                />
+              </Field>
+              <Field id="onboard-phone" label="Phone Number">
+                <Input
+                  id="onboard-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="(480) 555-0123"
+                  value={form.phone}
+                  onChange={(e) => upd("phone", e.target.value)}
+                  required
+                />
+              </Field>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="onboard-majors" label="Majors (comma-separated)">

@@ -106,6 +106,7 @@ interface PendingRequest {
   bio?: string;
   pledgeClass?: string;
   hometown?: string;
+  phone?: string | null;
   skills?: string[];
   funFacts?: string[];
   projects?: Array<{ title?: string; description?: string; link?: string }>;
@@ -153,6 +154,7 @@ export default function PendingList({ initialRequests }: Props) {
     gradYear: "",
     pledgeClass: "",
     hometown: "",
+    phone: "",
     bio: "",
     skills: "",
     funFacts: "",
@@ -276,6 +278,7 @@ export default function PendingList({ initialRequests }: Props) {
       gradYear: request.gradYear ? String(request.gradYear) : "",
       pledgeClass: request.pledgeClass || "",
       hometown: request.hometown || "",
+      phone: request.phone || "",
       bio: request.bio || "",
       skills: (request.skills || []).join("\n"),
       funFacts: (request.funFacts || []).join("\n"),
@@ -337,6 +340,7 @@ export default function PendingList({ initialRequests }: Props) {
       gradYear: Number.isFinite(gradYear) && gradYear ? gradYear : undefined,
       pledgeClass: form.pledgeClass.trim(),
       hometown: form.hometown.trim(),
+      phone: form.phone.trim(),
       bio: form.bio,
       skills: parseList(form.skills),
       funFacts: parseList(form.funFacts),
@@ -585,6 +589,18 @@ export default function PendingList({ initialRequests }: Props) {
                               value={form.pronouns}
                               onChange={(e) =>
                                 updateField("pronouns", e.target.value)
+                              }
+                            />
+                          </Field>
+                          <Field label="Phone number" htmlFor="pr-phone">
+                            <Input
+                              id="pr-phone"
+                              type="tel"
+                              inputMode="tel"
+                              placeholder="(480) 555-0123"
+                              value={form.phone}
+                              onChange={(e) =>
+                                updateField("phone", e.target.value)
                               }
                             />
                           </Field>

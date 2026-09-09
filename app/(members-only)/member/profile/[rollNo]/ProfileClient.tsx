@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import ContactLinks from "@/components/ContactLinks";
 import { useRouter } from "next/navigation";
 import type { MemberDoc } from "@/types/member";
 import ProfileInfoEditor, {
@@ -191,6 +192,7 @@ export default function ProfileClient({
                   <Badge variant="outline">{member.pronouns}</Badge>
                 )}
               </div>
+              <ContactLinks phone={member.phone} email={member.email} />
             </div>
 
             {canEdit && (

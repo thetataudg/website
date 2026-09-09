@@ -12,6 +12,19 @@ const MemberSchema = new Schema(
     /// pipeline; `emailSyncedAt` is how it knows what has gone stale.
     email: { type: String, default: null },
     emailSyncedAt: { type: Date, default: null },
+    /// E.164, e.g. "+14805550123". Normalized by `lib/phone.ts` at every write
+    /// path, so nothing here is what a member typed.
+    ///
+    /// Nullable, and deliberately so: the field arrived after the roster did,
+    /// and the Airtable sync is what backfills it. A null means "not imported
+    /// yet", not "declined to give one". Mandatory only on the paths that
+    /// create a *new* member.
+    ///
+    /// Note for anyone editing `app/api/members/pending/[id]/route.ts`: that
+    /// route copies a pending request into a Member field by field, so this
+    /// one has to be named there explicitly or an approved member silently
+    /// loses the number they just gave.
+    phone: { type: String, default: null },
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },
     lName: { type: String, required: true },

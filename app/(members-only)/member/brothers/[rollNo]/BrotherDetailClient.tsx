@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import ContactLinks from "@/components/ContactLinks";
 import { Download, ExternalLink, Eye, ShieldAlert, UserCircle2 } from "lucide-react";
 
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
@@ -563,6 +564,7 @@ export default function BrotherDetailClient({
                   <Badge variant="muted">{member.pronouns}</Badge>
                 )}
               </div>
+              <ContactLinks phone={member.phone} email={member.email} />
             </div>
 
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">

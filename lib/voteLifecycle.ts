@@ -1,4 +1,5 @@
 import VoteLocation from "@/lib/models/VoteLocation";
+import VotePresence from "@/lib/models/VotePresence";
 
 /**
  * What happens to a vote after the room has finished with it.
@@ -45,9 +46,16 @@ export async function markEnded(vote: any): Promise<void> {
   vote.endedAt = endedAt;
   vote.purgeAt = new Date(endedAt.getTime() + PURGE_AFTER_MS);
 
-  // The ballots' locations expire with the ballots they describe.
-  await VoteLocation.updateMany(
-    { voteId: vote._id },
-    { $set: { purgeAt: vote.purgeAt } }
-  ).catch(() => undefined);
+  // The ballots' locations, and the roll's record of who was in the room,
+  // expire with the ballots they describe.
+  await Promise.all([
+    VoteLocation.updateMany(
+      { voteId: vote._id },
+      { $set: { purgeAt: vote.purgeAt } }
+    ).catch(() => undefined),
+    VotePresence.updateMany(
+      { voteId: vote._id },
+      { $set: { purgeAt: vote.purgeAt } }
+    ).catch(() => undefined),
+  ]);
 }

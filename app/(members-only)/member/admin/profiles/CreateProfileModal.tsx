@@ -130,6 +130,7 @@ export default function CreateProfileModal({ show, onClose, onCreated }: Props) 
     gradYear: "",
     bio: "",
     hometown: "",
+    phone: "",
     pledgeClass: "",
     skills: "",
     funFacts: "",
@@ -182,6 +183,7 @@ export default function CreateProfileModal({ show, onClose, onCreated }: Props) 
       minors: "",
       bio: "",
       hometown: "",
+      phone: "",
       pledgeClass: "",
       skills: "",
       funFacts: "",
@@ -294,6 +296,7 @@ export default function CreateProfileModal({ show, onClose, onCreated }: Props) 
       ...(Number.isFinite(gradYear) && gradYear ? { gradYear } : {}),
       bio: form.bio,
       hometown: form.hometown,
+      phone: form.phone,
       pledgeClass: form.pledgeClass.trim(),
       skills: parseList(form.skills),
       funFacts: parseList(form.funFacts),
@@ -485,6 +488,16 @@ export default function CreateProfileModal({ show, onClose, onCreated }: Props) 
                             value={form.pronouns}
                             onChange={(e) => update("pronouns", e.target.value)}
                             placeholder="he/him, she/her, they/them"
+                          />
+                        </Field>
+                        <Field label="Phone number" htmlFor="cp-phone">
+                          <Input
+                            id="cp-phone"
+                            type="tel"
+                            inputMode="tel"
+                            placeholder="(480) 555-0123"
+                            value={form.phone}
+                            onChange={(e) => update("phone", e.target.value)}
                           />
                         </Field>
                         <Field label="Hometown" htmlFor="cp-hometown">

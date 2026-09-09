@@ -181,12 +181,25 @@ export interface VoterRecord {
   status: "voted" | "proxy" | "no-ballot";
   isInvalidated: boolean;
   isProxy?: boolean;
+  /**
+   * How far from the meeting this member voted from, and whether that put them
+   * outside the boundary. Never what they voted for — the ballot stays secret,
+   * and these come from a record that has never held a choice.
+   *
+   * Null when they declined location, voted before this existed, or E-Council
+   * set no anchor to measure against.
+   */
+  distanceMeters?: number | null;
+  accuracyMeters?: number | null;
+  outsideBoundary?: boolean;
 }
 
 export interface VoterListResponse {
   voterList: VoterRecord[];
   voteEnded: boolean;
   voterListVerified: boolean;
+  /** Null when E-Council never set a meeting location for this vote. */
+  anchor?: { label?: string | null; radiusMeters: number } | null;
 }
 
 export interface ProxyRequest {
@@ -213,7 +226,6 @@ export interface BallotPoint {
   proxy: boolean;
   distanceMeters?: number | null;
   flagged: boolean;
-  choices: string[];
 }
 
 export interface BallotCluster {

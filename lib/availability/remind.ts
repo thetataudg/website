@@ -152,6 +152,12 @@ export interface RemindOptions {
   /// A head clicked the button. Logged as sent-by them; still cadence-gated.
   actorId?: any | null;
   now?: Date;
+  /// Only nudge these members (still must be outstanding). Undefined means
+  /// "everyone outstanding".
+  onlyMemberIds?: string[];
+  /// Skip the per-poll cadence gate. Used for a head deliberately poking one
+  /// named person; `maxReminders` still applies.
+  ignoreCadence?: boolean;
 }
 
 export interface RemindReport {
@@ -170,7 +176,12 @@ export async function remindNonResponders(
   const now = options.now ?? new Date();
   const cadenceMs = Math.max(Number(poll.reminder?.cadenceHours) || 24, 1) * 3600_000;
   const maxReminders = Math.max(Number(poll.reminder?.maxReminders) || 5, 1);
-  const outstanding = outstandingInviteeIds(poll);
+  const only = options.onlyMemberIds
+    ? new Set(options.onlyMemberIds.map(String))
+    : null;
+  const outstanding = outstandingInviteeIds(poll).filter(
+    (id) => !only || only.has(id)
+  );
   const context = baseContext(poll, now);
   const accentColor = await pollAccentColor(poll);
 
@@ -187,7 +198,7 @@ export async function remindNonResponders(
       skippedMaxed += 1;
       continue;
     }
-    if (last && now.getTime() - last < cadenceMs) {
+    if (!options.ignoreCadence && last && now.getTime() - last < cadenceMs) {
       skippedCadence += 1;
       continue;
     }

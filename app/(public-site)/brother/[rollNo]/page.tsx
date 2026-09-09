@@ -45,6 +45,11 @@ type Member = {
   bigs?: Array<string | { fName?: string; lName?: string; rollNo?: string }>;
   littles?: Array<string | { fName?: string; lName?: string; rollNo?: string }>;
   hometown?: string;
+  // Present on the document but deliberately NOT rendered on this page. This
+  // is the public, search-indexed profile; contact details are shown only on
+  // the members-only surfaces.
+  phone?: string | null;
+  email?: string | null;
   familyLine?: string;
   pledgeClass?: string;
   status?: string;
