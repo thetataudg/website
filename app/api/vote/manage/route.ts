@@ -4,8 +4,10 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import Vote from "@/lib/models/Vote";
 import VoteLocation from "@/lib/models/VoteLocation";
+import VotePresence from "@/lib/models/VotePresence";
 import logger from "@/lib/logger";
 import { isArchived, markEnded } from "@/lib/voteLifecycle";
+import { distinctVoterCount, DISTINCT_VOTER_COUNT_EXPR } from "@/lib/voteCounts";
 import { announceVoteOpened } from "@/lib/voteNotify";
 
 /**
@@ -128,6 +130,7 @@ export async function DELETE(req: Request) {
     await Vote.findByIdAndDelete(voteId);
     // Orphaned location records are a pile of coordinates belonging to nothing.
     await VoteLocation.deleteMany({ voteId }).catch(() => undefined);
+    await VotePresence.deleteMany({ voteId }).catch(() => undefined);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete vote");
@@ -268,10 +271,66 @@ export async function GET(req: Request) {
         throw new Error("Not authorized");
       }
       
-      const votes = await Vote.find({}).sort({ createdAt: 1 }).lean();
+      // An aggregation rather than `find({}).lean()`, because the list is a
+      // list of *names*: every row renders a title, a state and a turnout, and
+      // nothing else. The old read pulled whole documents — every ballot of
+      // every vote the chapter has ever run — across the wire and hydrated
+      // them into JS objects just to count them and throw them away. On a
+      // pledge vote that is thousands of subdocuments per row.
+      //
+      // Everything the rows need is now derived inside Mongo, so `votes[]`
+      // never leaves the database.
+      const summaries = await Vote.aggregate([
+        {
+          $project: {
+            type: 1,
+            title: 1,
+            started: 1,
+            ended: 1,
+            createdAt: 1,
+            endedAt: 1,
+            purgeAt: 1,
+            archivedAt: 1,
+            hasLocation: { $ne: [{ $ifNull: ["$votingLocation.lat", null] }, null] },
+            locationLabel: { $ifNull: ["$votingLocation.label", null] },
+            // Distinct voters, not ballot rows. See `lib/voteCounts.ts`.
+            voteCount: DISTINCT_VOTER_COUNT_EXPR,
+            hasVoted: { $in: [clerkId, { $ifNull: ["$votes.clerkId", []] }] },
+            // The caller's own standing, and how many are waiting on a
+            // decision. Enough for a list row to say "proxy approved" or
+            // "3 waiting" without a second request per vote.
+            proxyStatus: {
+              $let: {
+                vars: {
+                  mine: {
+                    $first: {
+                      $filter: {
+                        input: { $ifNull: ["$proxyRequests", []] },
+                        cond: { $eq: ["$$this.clerkId", clerkId] },
+                      },
+                    },
+                  },
+                },
+                in: { $ifNull: ["$$mine.status", null] },
+              },
+            },
+            pendingProxyCount: {
+              $size: {
+                $filter: {
+                  input: { $ifNull: ["$proxyRequests", []] },
+                  cond: { $eq: ["$$this.status", "pending"] },
+                },
+              },
+            },
+          },
+        },
+        { $sort: { createdAt: 1 } },
+      ]);
+
       const now = Date.now();
-      return NextResponse.json({ 
-        votes: votes.map((v: any) => ({
+      return NextResponse.json({
+        votes: summaries.map((v: any) => ({
+          // Derived on read rather than stored — see `voteLifecycle`.
           archived: isArchived(v, now),
           endedAt: v.endedAt || null,
           purgeAt: v.purgeAt || null,
@@ -281,18 +340,13 @@ export async function GET(req: Request) {
           started: v.started,
           ended: v.ended,
           createdAt: v.createdAt,
-          voteCount: v.votes?.length || 0,
-          hasVoted: v.votes?.some((vote: any) => vote.clerkId === clerkId) || false,
-          hasLocation: v.votingLocation?.lat != null,
-          locationLabel: v.votingLocation?.label || null,
-          // The caller's own standing, and how many are waiting on a decision.
-          // Enough for a list row to say "proxy approved" or "3 waiting"
-          // without a second request per vote.
-          proxyStatus:
-            (v.proxyRequests || []).find((r: any) => r.clerkId === clerkId)?.status || null,
-          pendingProxyCount:
-            (v.proxyRequests || []).filter((r: any) => r.status === "pending").length,
-        }))
+          voteCount: v.voteCount || 0,
+          hasVoted: !!v.hasVoted,
+          hasLocation: !!v.hasLocation,
+          locationLabel: v.locationLabel || null,
+          proxyStatus: v.proxyStatus || null,
+          pendingProxyCount: v.pendingProxyCount || 0,
+        })),
       });
     }
     
@@ -338,7 +392,9 @@ export async function GET(req: Request) {
         startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         results: tally,
-        totalVotes: validVotes.length, // This includes abstentions and removed option votes but excludes invalidated
+        // Abstentions and votes for removed options still count as turnout;
+        // invalidated ballots do not. Counted by voter, like every other shape.
+        totalVotes: distinctVoterCount(validVotes),
         voterListVerified: vote.voterListVerified || false,
         removedOptions: vote.removedOptions || [],
       });
@@ -399,7 +455,7 @@ export async function GET(req: Request) {
         endTime: vote.endTime?.toISOString() || null,
         boardResults,
         blackballResults,
-        totalVotes: new Set(validVotes.filter((v: any) => v.round === "board").map((v: any) => v.clerkId)).size, // Count unique voters
+        totalVotes: distinctVoterCount(validVotes.filter((v: any) => v.round === "board")),
         voterListVerified: vote.voterListVerified || false,
       });
     } else if (vote.type === "Bidding") {
@@ -431,7 +487,7 @@ export async function GET(req: Request) {
         startedAt: vote.startedAt?.toISOString() || null,
         endTime: vote.endTime?.toISOString() || null,
         biddingResults,
-        totalVotes: new Set(validVotes.map((v: any) => v.clerkId)).size, // Count unique voters
+        totalVotes: distinctVoterCount(validVotes),
         voterListVerified: vote.voterListVerified || false,
       });
     }

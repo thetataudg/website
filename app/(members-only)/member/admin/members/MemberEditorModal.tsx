@@ -99,6 +99,7 @@ export interface MemberData {
   awards?: AwardItem[];
   customSections?: CustomSection[];
   hometown?: string;
+  phone?: string | null;
   pledgeClass?: string;
   socialLinks?: Record<string, string>;
   profilePicUrl?: string;
@@ -197,6 +198,7 @@ function createFormState(member: MemberData) {
     gradYear: member.gradYear ? String(member.gradYear) : "",
     bio: member.bio ?? "",
     hometown: member.hometown ?? "",
+    phone: member.phone ?? "",
     pledgeClass: member.pledgeClass ?? "",
     skills: (member.skills ?? []).join("\n"),
     funFacts: (member.funFacts ?? []).join("\n"),
@@ -377,6 +379,7 @@ export default function MemberEditorModal({ member, show, onClose, onSave }: Pro
       ...(Number.isFinite(gradYear) && gradYear ? { gradYear } : {}),
       bio: form.bio,
       hometown: form.hometown,
+      phone: form.phone,
       pledgeClass: form.pledgeClass.trim(),
       skills: parseList(form.skills),
       funFacts: parseList(form.funFacts),
@@ -521,6 +524,15 @@ export default function MemberEditorModal({ member, show, onClose, onSave }: Pro
                           value={form.pronouns}
                           onChange={(event) => update("pronouns", event.target.value)}
                           placeholder="he/him, she/her, they/them"
+                        />
+                      </Field>
+                      <Field label="Phone number">
+                        <Input
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="(480) 555-0123"
+                          value={form.phone}
+                          onChange={(event) => update("phone", event.target.value)}
                         />
                       </Field>
                       <Field label="Hometown">

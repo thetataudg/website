@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatPhone } from "@/lib/phone";
 import Link from "next/link";
 import { ExternalLink, GraduationCap, UserCircle2 } from "lucide-react";
 
@@ -253,6 +254,26 @@ export default function BrotherQuickLook({
                     ) : null}
                     {member?.hometown ? (
                       <QuickRow label="Hometown" value={member.hometown} />
+                    ) : null}
+                    {member?.phone ? (
+                      <QuickRow
+                        label="Phone"
+                        value={
+                          <a className="hover:underline" href={`tel:${member.phone}`}>
+                            {formatPhone(member.phone)}
+                          </a>
+                        }
+                      />
+                    ) : null}
+                    {member?.email ? (
+                      <QuickRow
+                        label="Email"
+                        value={
+                          <a className="hover:underline" href={`mailto:${member.email}`}>
+                            {member.email}
+                          </a>
+                        }
+                      />
                     ) : null}
                     {member?.pronouns ? (
                       <QuickRow label="Pronouns" value={member.pronouns} />

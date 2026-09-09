@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { normalizePhone } from "@/lib/phone";
 
 const memberStatusOptions = ["Active", "Alumni", "Removed", "Deceased"];
 // Roles a reviewer may assign from the pending-approval screen. "superadmin" is
@@ -106,6 +107,13 @@ export async function PATCH(
     assignIf("rollNo", updates.rollNo?.trim());
     assignIf("fName", updates.fName);
     assignIf("lName", updates.lName);
+    if (updates.phone !== undefined) {
+      const normalized = normalizePhone(updates.phone);
+      if (!normalized.ok) {
+        return NextResponse.json({ error: normalized.error }, { status: 400 });
+      }
+      sanitized.phone = normalized.e164;
+    }
     assignIf("headline", updates.headline);
     assignIf("pronouns", updates.pronouns);
     assignIf("majors", ensureArray(updates.majors));
@@ -189,6 +197,9 @@ export async function PATCH(
       rollNo: pending.rollNo,
       fName: pending.fName,
       lName: pending.lName,
+      // Named explicitly because this copy is field by field; leaving it out
+      // is a silent data loss, not a compile error.
+      phone: pending.phone,
       headline: pending.headline,
       pronouns: pending.pronouns,
       majors: pending.majors,

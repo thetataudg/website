@@ -28,8 +28,18 @@ export async function POST(
       );
     }
 
+    const body = await req.json().catch(() => ({}));
+    const memberIds = Array.isArray(body?.memberIds)
+      ? body.memberIds.map(String).filter(Boolean)
+      : null;
+
     const report = await remindNonResponders(ctx.poll, {
       actorId: member._id,
+      // A named person is a deliberate poke, so it skips the cadence gate the
+      // "remind everyone" button respects. `maxReminders` still stops it.
+      ...(memberIds && memberIds.length
+        ? { onlyMemberIds: memberIds, ignoreCadence: true }
+        : {}),
     });
     logger.info(
       { pollId: params.id, ...report, by: String(member._id) },

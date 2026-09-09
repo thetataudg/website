@@ -1,5 +1,10 @@
 // GET /api/members
 // Returns all members (TEMP: no auth yet)
+//
+// Knowingly unauthenticated, and that now includes `phone` and `email`: the
+// full lean document goes out with no `.select()`. This was an explicit call,
+// not an oversight — it is recorded here so the next person neither "fixes" it
+// by surprise nor fails to notice what is on the wire.
 
 export const dynamic = "force-dynamic"; // Absolutely no caching for this route, disable if it causes billing problems with Netlify
 
@@ -9,6 +14,7 @@ import { NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { maybePresignUrl } from "@/lib/garage";
 import { requireRole } from "@/lib/clerk";
+import { normalizePhone } from "@/lib/phone";
 
 export async function GET() {
   try {
@@ -72,6 +78,7 @@ export async function POST(req: Request) {
   const lName = String(payload?.lName || "").trim();
   const gradYear = Number(payload?.gradYear);
   const status = String(payload?.status || "Alumni");
+  const normalizedPhone = normalizePhone(payload?.phone);
   const majors = Array.isArray(payload?.majors) ? payload.majors : [];
   const minors = Array.isArray(payload?.minors) ? payload.minors : [];
   const committees = Array.isArray(payload?.committees) ? payload.committees : [];
@@ -92,6 +99,9 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (!normalizedPhone.ok) {
+    return NextResponse.json({ error: normalizedPhone.error }, { status: 400 });
+  }
   if (!["Active", "Alumni", "Removed", "Deceased"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
@@ -109,6 +119,7 @@ export async function POST(req: Request) {
     rollNo,
     fName,
     lName,
+    phone: normalizedPhone.e164,
     gradYear,
     status,
     majors,

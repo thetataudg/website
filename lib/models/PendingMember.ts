@@ -11,6 +11,14 @@ const PendingMemberSchema = new Schema(
     rollNo: { type: String, required: true, unique: true },
     fName: { type: String, required: true },
     lName: { type: String, required: true },
+    /// E.164, normalized by `lib/phone.ts`. See `Member.phone`.
+    ///
+    /// NOT `required: true`, on purpose. Rejecting a request calls `.save()`
+    /// on documents that predate this field, and a schema-level requirement
+    /// would turn that into a validation error — an officer would be unable to
+    /// reject any legacy request. `POST /api/members/onboard` is the only
+    /// creator, so that is where the number is made mandatory.
+    phone: { type: String, default: null },
     majors: [{ type: String }],
     minors: [{ type: String }],
     gradYear: { type: Number, required: true },

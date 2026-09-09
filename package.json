@@ -30,6 +30,7 @@
     "seed:newsletter": "esbuild scripts/seed-newsletter.ts --bundle --platform=node --format=cjs --outfile=.seed-newsletter.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose --external:sharp && node -r dotenv/config .seed-newsletter.cjs dotenv_config_path=.env; rc=$?; rm -f .seed-newsletter.cjs; exit $rc",
     "check:wallet-images": "esbuild scripts/check-wallet-images.ts --bundle --platform=node --format=cjs --outfile=.wallet-images-check.cjs --tsconfig=tsconfig.json --log-level=error && node .wallet-images-check.cjs; rc=$?; rm -f .wallet-images-check.cjs; exit $rc",
     "check:sessions": "esbuild scripts/check-sessions.ts --bundle --platform=node --format=cjs --outfile=.sessions-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .sessions-check.cjs dotenv_config_path=.env; rc=$?; rm -f .sessions-check.cjs; exit $rc",
+    "check:phones": "esbuild scripts/check-phone-sync.ts --bundle --platform=node --format=cjs --outfile=.phones-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .phones-check.cjs; rc=$?; rm -f .phones-check.cjs; exit $rc",
     "check:newsletters": "esbuild scripts/check-newsletters.ts --bundle --platform=node --format=cjs --outfile=.newsletters-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .newsletters-check.cjs; rc=$?; rm -f .newsletters-check.cjs; exit $rc"
   },
   "dependencies": {

@@ -4,6 +4,7 @@ import { requireAuth, getClerkUser } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
 import logger from "@/lib/logger";
+import { normalizePhone } from "@/lib/phone";
 
 export async function POST(req: NextRequest) {
   let clerkId: string;
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
 
   const {
     rollNo,
+    phone = "",
     headline = "",
     pronouns = "",
     majors = [],
@@ -48,7 +50,21 @@ export async function POST(req: NextRequest) {
 
   if (!rollNo || !gradYear) {
     return NextResponse.json(
-      { error: "Missing required fields: rollNo, gradYear, isECouncil" },
+      { error: "Missing required fields: rollNo, gradYear" },
+      { status: 400 }
+    );
+  }
+
+  // Mandatory here rather than on the schema: this is the only path that
+  // creates a request, and a schema-level requirement would break rejecting
+  // the ones that predate the field.
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone.ok) {
+    return NextResponse.json({ error: normalizedPhone.error }, { status: 400 });
+  }
+  if (!normalizedPhone.e164) {
+    return NextResponse.json(
+      { error: "A phone number is required." },
       { status: 400 }
     );
   }
@@ -69,6 +85,7 @@ export async function POST(req: NextRequest) {
       rollNo,
       fName,
       lName,
+      phone: normalizedPhone.e164,
       headline,
       pronouns,
       majors,

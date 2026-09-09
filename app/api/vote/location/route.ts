@@ -6,6 +6,7 @@ import Vote from "@/lib/models/Vote";
 import VoteLocation from "@/lib/models/VoteLocation";
 import logger from "@/lib/logger";
 import { distanceMeters } from "@/lib/voteGeo";
+import { distinctVoterCount } from "@/lib/voteCounts";
 
 /**
  * Where a vote's ballots came from, and which of them do not add up.
@@ -40,7 +41,6 @@ type Point = {
   proxy: boolean;
   distanceMeters: number | null;
   flagged: boolean;
-  choices: string[];
 };
 
 /**
@@ -116,7 +116,7 @@ export async function GET(req: Request) {
     // those would hand back the points in the order the ballots arrived.
     const raw = await VoteLocation.find({ voteId })
       .sort({ shuffleKey: 1 })
-      .select("lat lng accuracyMeters proxy distanceMeters flagged choices")
+      .select("lat lng accuracyMeters proxy distanceMeters flagged")
       .lean();
 
     const points: Point[] = raw.map((r: any) => ({
@@ -126,7 +126,6 @@ export async function GET(req: Request) {
       proxy: !!r.proxy,
       distanceMeters: r.distanceMeters ?? null,
       flagged: !!r.flagged,
-      choices: r.choices || [],
     }));
 
     const anchor =
@@ -153,7 +152,11 @@ export async function GET(req: Request) {
       // Ballots counted vs ballots that reported a position. A gap is not a
       // problem — a member can decline the permission and still vote — but the
       // officer reading this should know the map is not the whole tally.
-      ballotCount: vote.votes?.length || 0,
+      //
+      // Counted by voter. `votes[]` holds one row per subject per round, so
+      // reading its length here claimed thousands of ballots against a handful
+      // of points and made the map look broken rather than incomplete.
+      ballotCount: distinctVoterCount(vote.votes),
       locatedCount: points.length,
       atAnchorCount: atAnchor.length,
       proxyCount: proxied.length,

@@ -180,8 +180,12 @@ export const pollApi = {
     fetch(`/api/availability/${id}/suggestions`).then((r) =>
       json<{ inviteeCount: number; suggestions: RankedSuggestion[] }>(r)
     ),
-  remind: (id: string) =>
-    fetch(`/api/availability/${id}/remind`, { method: "POST" }).then((r) =>
+  remind: (id: string, memberIds?: string[]) =>
+    fetch(`/api/availability/${id}/remind`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(memberIds?.length ? { memberIds } : {}),
+    }).then((r) =>
       json<{ reminded: number; skippedCadence: number; outstanding: number }>(r)
     ),
   schedule: (id: string, payload: any) =>
@@ -196,7 +200,7 @@ export const pollApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).then((r) => json<PollDetail>(r)),
-  cancel: (id: string) =>
+  remove: (id: string) =>
     fetch(`/api/availability/${id}`, { method: "DELETE" }).then((r) =>
       json<{ ok: boolean }>(r)
     ),

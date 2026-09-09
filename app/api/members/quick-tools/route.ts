@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/clerk";
+import { requireChapterToolSubmitter } from "@/lib/chapterTools";
 import { connectDB } from "@/lib/db";
 import logger from "@/lib/logger";
 import Committee from "@/lib/models/Committee";
@@ -39,36 +39,6 @@ const ADMIN_POSITIONS = new Set<ElectionPosition>([
 
 const normalizeRollNo = (value: unknown) => String(value || "").trim();
 
-async function requireQuickToolSubmitter(req: Request) {
-  const clerkId = await requireAuth(req as any);
-  await connectDB();
-
-  // Admins as well as the two seats.
-  //
-  // This used to be superadmin *or* a sitting Regent/Vice Regent, which locked
-  // out every other admin — including the Treasurer and Scribe, who the officer
-  // election itself promotes to `role: "admin"`. An admin already has the run
-  // of the roster through `/api/members/{rollNo}` and could do all three of
-  // these by hand, one member at a time; refusing them the tool that does it in
-  // one pass protected nothing and just made the job longer.
-  const submitter = await Member.findOne({
-    clerkId,
-    $or: [
-      { role: { $in: ["superadmin", "admin"] } },
-      { isECouncil: true, ecouncilPosition: { $in: ["Regent", "Vice Regent"] } },
-    ],
-  }).lean<{ rollNo?: string; fName?: string; lName?: string; ecouncilPosition?: string; role?: string }>();
-
-  if (!submitter) {
-    const error = new Error(
-      "You don't have access to submit this quick tool. It must be done by an admin, the Regent, or the Vice Regent."
-    ) as Error & { statusCode?: number };
-    error.statusCode = 403;
-    throw error;
-  }
-
-  return { clerkId, submitter };
-}
 
 function buildElectionAssignments(assignments: Partial<Record<ElectionPosition, string>>) {
   const normalized: Partial<Record<ElectionPosition, string>> = {};
@@ -91,7 +61,7 @@ export async function POST(req: Request) {
 
   if (body.action === "purgeCommittees") {
     try {
-      const { clerkId, submitter } = await requireQuickToolSubmitter(req);
+      const { clerkId, submitter } = await requireChapterToolSubmitter(req);
       const regentOrViceRegent = submitter.ecouncilPosition || "";
       await connectDB();
 
@@ -194,7 +164,7 @@ export async function POST(req: Request) {
 
   let actor;
   try {
-    actor = await requireQuickToolSubmitter(req);
+    actor = await requireChapterToolSubmitter(req);
   } catch (err: any) {
     logger.warn({ err }, "Unauthorized quick tools request");
     return NextResponse.json(

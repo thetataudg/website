@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import Vote from "@/lib/models/Vote";
+import VotePresence from "@/lib/models/VotePresence";
 import logger from "@/lib/logger";
 
 // Ballot review is available to E-Council and chapter administrators. This
@@ -45,24 +46,46 @@ export async function GET(req: Request) {
     if (!vote || Array.isArray(vote)) {
       return NextResponse.json({ error: "Vote not found" }, { status: 404 });
     }
-    
+
+    // Where each member voted from, and deliberately nothing about what they
+    // chose — see `VotePresence`. This is the same class of fact as the roll's
+    // own voted / proxy / no-ballot, which is why it can be shown beside a
+    // name at all.
+    const presence = await VotePresence.find({ voteId })
+      .select("clerkId distanceMeters accuracyMeters outside")
+      .lean();
+    const presenceByMember = new Map<string, any>(
+      presence.map((p: any) => [p.clerkId, p])
+    );
+
+    // The roll used to re-scan the whole `votes[]` array once per member,
+    // which on a pledge vote is thousands of rows times the size of the
+    // chapter. One pass, indexed by member, instead.
+    const proxyVoters = new Set<string>();
+    const submitters = new Set<string>();
+    for (const v of vote.votes as any[]) {
+      if (!v?.clerkId) continue;
+      submitters.add(v.clerkId);
+      if (v.proxy === true) proxyVoters.add(v.clerkId);
+    }
+    const invalidated = new Set<string>(vote.invalidatedBallots || []);
+
     // Build voter status for each member
     const voterList = activeMembers.map(member => {
-      const memberVotes = vote.votes.filter((v: any) => v.clerkId === member.clerkId);
-      const isInvalidated = vote.invalidatedBallots?.includes(member.clerkId);
+      const isInvalidated = invalidated.has(member.clerkId);
 
       // Determine if any of the member's ballots are marked as proxy
-      const hasProxy = memberVotes.some((v: any) => v.proxy === true);
+      const hasProxy = proxyVoters.has(member.clerkId);
 
       // status can be 'voted', 'proxy', or 'no-ballot'
       let status: 'voted' | 'no-ballot' | 'proxy' = 'no-ballot';
 
-      if (memberVotes.length > 0 && !isInvalidated) {
+      if (submitters.has(member.clerkId) && !isInvalidated) {
         // If any of the submitted ballots were proxy, mark as proxy
         status = hasProxy ? 'proxy' : 'voted';
-      } else if (isInvalidated) {
-        status = 'no-ballot';
       }
+
+      const seen = presenceByMember.get(member.clerkId);
 
       return {
         clerkId: member.clerkId,
@@ -71,14 +94,29 @@ export async function GET(req: Request) {
         status,
         isInvalidated,
         isProxy: hasProxy,
+        // null when the member declined location, voted from the website
+        // before this existed, or E-Council set no anchor to measure against.
+        distanceMeters: seen?.distanceMeters ?? null,
+        accuracyMeters: seen?.accuracyMeters ?? null,
+        // Outside the boundary. An approved proxy is outside on purpose, so
+        // the client pairs this with `isProxy` before calling it a problem.
+        outsideBoundary: !!seen?.outside,
       };
     });
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       voterList,
       voteType: vote.type,
       voteEnded: vote.ended,
-      voterListVerified: vote.voterListVerified || false
+      voterListVerified: vote.voterListVerified || false,
+      // So the roll can say "outside the 200 m boundary" rather than just
+      // "outside", and can stay quiet when there is no boundary at all.
+      anchor: vote.votingLocation?.lat != null
+        ? {
+            label: vote.votingLocation.label || null,
+            radiusMeters: vote.votingLocation.radiusMeters || 200,
+          }
+        : null,
     });
   } catch (err: any) {
     logger.error({ err }, "Failed to get voter list");

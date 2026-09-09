@@ -100,8 +100,8 @@ export function PollManagerMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this poll?</AlertDialogTitle>
             <AlertDialogDescription>
-              {poll.title} will be cancelled and everyone&apos;s answers are
-              cleared from view. This can&apos;t be undone.
+              {poll.title} and everyone&apos;s answers are deleted for good. This
+              can&apos;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -110,7 +110,7 @@ export function PollManagerMenu({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 try {
-                  await pollApi.cancel(poll._id);
+                  await pollApi.remove(poll._id);
                   toast.success("Poll deleted");
                   (onDeleted ?? onChanged)?.();
                 } catch (e: any) {

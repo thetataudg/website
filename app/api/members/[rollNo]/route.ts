@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
+import { normalizePhone } from "@/lib/phone";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { maybePresignUrl } from "@/lib/garage";
 import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
@@ -106,6 +107,16 @@ export async function PATCH(
       );
     }
   }
+  // Normalized rather than trusted: this route `$set`s the update object
+  // wholesale, so an unnormalized value would land in the document as typed.
+  if ("phone" in updates) {
+    const normalizedPhone = normalizePhone(updates.phone);
+    if (!normalizedPhone.ok) {
+      return NextResponse.json({ error: normalizedPhone.error }, { status: 400 });
+    }
+    updates.phone = normalizedPhone.e164;
+  }
+
   if (typeof updates.rollNo === "string") {
     updates.rollNo = updates.rollNo.trim();
     if (!updates.rollNo) {

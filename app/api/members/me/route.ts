@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import PendingMember from "@/lib/models/PendingMember";
 import logger from "@/lib/logger";
+import { normalizePhone } from "@/lib/phone";
 import { maybePresignUrl } from "@/lib/garage";
 import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
 
@@ -25,6 +26,7 @@ interface MemberUpdateResult {
 type PendingMemberDoc = {
   _id?: { toString: () => string };
   rollNo?: string;
+  phone?: string | null;
   isECouncil?: boolean;
   ecouncilPosition?: string;
   status?: string;
@@ -52,7 +54,7 @@ export async function GET(req: Request) {
   await connectDB();
   const member = await Member.findOne({ clerkId })
     .select(
-      "rollNo profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId familyLine committees previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf accountDeletionRequestedAt"
+      "rollNo phone email profilePicUrl resumeUrl role status isECouncil ecouncilPosition needsProfileReview needsPermissionReview isCommitteeHead headline pronouns majors minors gradYear bio hometown skills funFacts projects work awards customSections socialLinks discordId familyLine committees previousECouncilRoles previousCommitteesChaired previousCommitteesMemberOf accountDeletionRequestedAt"
     )
     .lean() as any;
 
@@ -62,6 +64,8 @@ export async function GET(req: Request) {
             {
                 memberId: member._id?.toString(),
                 rollNo: member.rollNo,
+                phone: member.phone ?? null,
+                email: member.email ?? null,
                 profilePicUrl: await maybePresignUrl(member.profilePicUrl),
                 resumeUrl: await maybePresignUrl(member.resumeUrl),
                 role: member.role,
@@ -98,6 +102,7 @@ export async function GET(req: Request) {
                 pending: true,
         pendingId: pending._id?.toString(),
         rollNo: pending.rollNo,
+        phone: pending.phone ?? null,
         role: "member",
         status: "Pending",
         isECouncil: pending.isECouncil,
@@ -169,6 +174,15 @@ export async function PATCH(req: Request) {
   assignIf("familyLine", updates.familyLine);
   assignIf("bio", updates.bio);
   assignIf("hometown", updates.hometown);
+  // Normalized before it is assigned. This update runs with `strict: false`,
+  // so whatever lands in `sanitized` is written verbatim.
+  if (updates.phone !== undefined) {
+    const normalizedPhone = normalizePhone(updates.phone);
+    if (!normalizedPhone.ok) {
+      return NextResponse.json({ error: normalizedPhone.error }, { status: 400 });
+    }
+    sanitized.phone = normalizedPhone.e164;
+  }
   assignIf("skills", ensureArray(updates.skills));
   assignIf("funFacts", ensureArray(updates.funFacts));
   assignIf("projects", ensureArray(updates.projects));
