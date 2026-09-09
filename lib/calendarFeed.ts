@@ -113,7 +113,7 @@ export function buildICS(events: FeedEvent[], calendarName = "Theta Tau ΔΓ") {
         : new Date(start.getTime() + 60 * 60 * 1000);
 
     lines.push("BEGIN:VEVENT");
-    lines.push(`UID:${event._id?.toString?.() ?? String(event._id)}@thetatau-dg.org`);
+    lines.push(`UID:${event._id?.toString?.() ?? String(event._id)}@ttdg.org`);
     lines.push(`DTSTAMP:${formatUTC(new Date(event.updatedAt ?? Date.now()))}`);
     lines.push(`DTSTART:${formatUTC(start)}`);
     lines.push(`DTEND:${formatUTC(finish)}`);

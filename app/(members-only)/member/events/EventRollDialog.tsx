@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MapPin, Pencil, Undo2, UserPlus, Users } from "lucide-react";
+import { MapPin, Pencil, Undo2, UserPlus, Users, X } from "lucide-react";
 
 import { describeCheckInSource } from "@/lib/checkinSource";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +111,12 @@ export function EventRollDialog({
     }
   }
 
+  /// Which attendee is one click away from being removed. A single press
+  /// arms the row rather than deleting it: this list is the attendance record
+  /// an officer marks GEM against, and a mis-tap on a phone should not quietly
+  /// take somebody off it.
+  const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
+
   async function undo(memberId: string) {
     if (!event?._id) return;
     setBusy(true);
@@ -122,6 +128,7 @@ export function EventRollDialog({
       });
       if (response.ok) {
         setUndoableId(null);
+        setConfirmingId(null);
         await onRefresh(event._id);
       }
     } finally {
@@ -261,6 +268,43 @@ export function EventRollDialog({
                               <Undo2 className="size-4" aria-hidden="true" />
                               Undo
                             </Button>
+                          ) : entry.memberId?._id ? (
+                            confirmingId === entry.memberId._id ? (
+                              <span className="flex shrink-0 items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => void undo(entry.memberId._id)}
+                                >
+                                  Remove
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => setConfirmingId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </span>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                disabled={busy}
+                                aria-label={`Remove ${entry.memberId?.fName ?? ""} ${
+                                  entry.memberId?.lName ?? ""
+                                } from attendance`}
+                                onClick={() => setConfirmingId(entry.memberId._id)}
+                              >
+                                <X className="size-4" aria-hidden="true" />
+                              </Button>
+                            )
                           ) : null}
                         </span>
                       </div>

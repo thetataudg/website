@@ -128,8 +128,8 @@ export default function AntiHazingPage() {
           </h2>
           <p className="mt-4 text-base text-white/80">
             If you have a concern about hazing or safety, contact us at{" "}
-            <a className="underline underline-offset-4" href="mailto:general@thetatau-dg.org">
-              general@thetatau-dg.org
+            <a className="underline underline-offset-4" href="mailto:general@ttdg.org">
+              general@ttdg.org
             </a>
             . We take every report seriously.
           </p>

@@ -67,18 +67,18 @@ export function fromAddressFor(category: string): string {
 /// Routed by category rather than one global address, because "I think my dues
 /// are wrong" and "when is the next event" are questions for different people.
 const REPLY_TO: Record<string, string> = {
-  dues: "treasurer@thetatau-dg.org",
-  plan: "treasurer@thetatau-dg.org",
-  reimbursement: "treasurer@thetatau-dg.org",
-  events: "general@thetatau-dg.org",
-  availability: "general@thetatau-dg.org",
-  donation: "treasurer@thetatau-dg.org",
-  invitation: "general@thetatau-dg.org",
-  auth: "general@thetatau-dg.org",
-  general: "general@thetatau-dg.org",
+  dues: "treasurer@ttdg.org",
+  plan: "treasurer@ttdg.org",
+  reimbursement: "treasurer@ttdg.org",
+  events: "general@ttdg.org",
+  availability: "general@ttdg.org",
+  donation: "treasurer@ttdg.org",
+  invitation: "general@ttdg.org",
+  auth: "general@ttdg.org",
+  general: "general@ttdg.org",
 };
 
-const REPLY_FALLBACK = "general@thetatau-dg.org";
+const REPLY_FALLBACK = "general@ttdg.org";
 
 export function replyToFor(category: string): string {
   // A single override wins for every category, for a staging deploy that

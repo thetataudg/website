@@ -52,7 +52,7 @@ const Footer = () => {
                 <li>
                   <a
                     className="underline underline-offset-4"
-                    href="mailto:general@thetatau-dg.org"
+                    href="mailto:general@ttdg.org"
                   >
                     Email Us
                   </a>
@@ -142,7 +142,7 @@ const Footer = () => {
             <a href="https://www.instagram.com/thetataudg/" target="_blank">
               Instagram
             </a>
-            <a href="mailto:general@thetatau-dg.org">Email</a>
+            <a href="mailto:general@ttdg.org">Email</a>
             <a href="https://github.com/roenw/ThetaTau-Website" target="_blank">
               GitHub
             </a>

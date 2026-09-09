@@ -129,8 +129,8 @@ export default function DEIPage() {
           </h2>
           <p className="mt-4 text-base text-white/80">
             We welcome input that helps us grow. Contact us at{" "}
-            <a className="underline underline-offset-4" href="mailto:general@thetatau-dg.org">
-              general@thetatau-dg.org
+            <a className="underline underline-offset-4" href="mailto:general@ttdg.org">
+              general@ttdg.org
             </a>{" "}
             with any questions or suggestions.
           </p>

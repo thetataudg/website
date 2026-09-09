@@ -61,7 +61,7 @@ const organizationJsonLd = {
     addressRegion: "AZ",
     addressCountry: "US",
   },
-  email: "general@thetatau-dg.org",
+  email: "general@ttdg.org",
   sameAs: ["https://www.instagram.com/thetataudg/"],
 };
 
