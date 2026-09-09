@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Pencil,
   Search,
+  MonitorSmartphone,
   ShieldCheck,
   Trash2,
   UserCog,
@@ -21,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -70,6 +72,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoadingState from "../../../components/LoadingState";
 import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
 import MemberEditorModal from "./MemberEditorModal";
+import SessionsPanel from "./SessionsPanel";
 import QuickToolsModal from "./QuickToolsModal";
 
 export interface MemberData {
@@ -215,6 +218,12 @@ export default function MembersList({
       (currentUser?.isECouncil &&
         ["Regent", "Vice Regent"].includes(currentUser.ecouncilPosition))
   );
+  /// Sessions are administrators only, not the wider chapter-tools group: a
+  /// signed-in device list is every brother's location and hardware, and
+  /// revoking one signs a person out of a meeting they may be voting in.
+  const isChapterAdmin = Boolean(
+    me?.role === "superadmin" || me?.role === "admin"
+  );
 
   async function handleSave(updates: Partial<MemberData>) {
     if (!editing) return;
@@ -305,7 +314,12 @@ export default function MembersList({
       ) : null}
 
       <Tabs defaultValue="members" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:w-[28rem]">
+        <TabsList
+          className={cn(
+            "grid w-full",
+            isChapterAdmin ? "grid-cols-3 sm:w-[36rem]" : "grid-cols-2 sm:w-[28rem]"
+          )}
+        >
           <TabsTrigger value="members" className="gap-2">
             <Users className="size-4" />
             Members
@@ -314,6 +328,12 @@ export default function MembersList({
             <UserCog className="size-4" />
             Chapter tools
           </TabsTrigger>
+          {isChapterAdmin ? (
+            <TabsTrigger value="sessions" className="gap-2">
+              <MonitorSmartphone className="size-4" />
+              Sessions
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="members" className="space-y-6">
@@ -503,6 +523,12 @@ export default function MembersList({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isChapterAdmin ? (
+          <TabsContent value="sessions">
+            <SessionsPanel canRevoke={isChapterAdmin} />
+          </TabsContent>
+        ) : null}
       </Tabs>
 
       {showQuickTools ? (

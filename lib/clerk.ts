@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { NextRequest } from "next/server";
 import Member from "@/lib/models/Member";
+import { recordPresence } from "@/lib/presence";
 
 export class UnauthorizedError extends Error {
   statusCode = 401;
@@ -29,6 +30,7 @@ export async function requireRole(
     throw new ForbiddenError();
   }
 
+  await recordPresence(userId);
   return member;
 }
 
@@ -51,18 +53,24 @@ export async function requireOfficer(req: NextRequest) {
   const isAdmin = member.role === "admin" || member.role === "superadmin";
   if (!isAdmin && !member.isECouncil) throw new ForbiddenError();
 
+  await recordPresence(userId);
   return member;
 }
 
 export async function getUserIdFromRequest(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  await recordPresence(userId);
   return userId;
 }
 
+/// Every authenticated route funnels through here, which is why the presence
+/// stamp lives in the guards rather than in middleware: middleware runs on the
+/// edge, where there is no database connection to write to.
 export async function requireAuth(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  await recordPresence(userId);
   return userId;
 }
 
@@ -75,6 +83,7 @@ export async function requireAdmin(req: NextRequest): Promise<string> {
     throw new ForbiddenError("User is not an admin");
   }
 
+  await recordPresence(userId);
   return userId;
 }
 

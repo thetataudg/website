@@ -87,6 +87,23 @@ const MemberSchema = new Schema(
     },
     needsProfileReview: { type: Boolean, required: true, default: true },
     needsPermissionReview: { type: Boolean, required: true, default: true },
+    /// When this member last made an authenticated request, and from what.
+    ///
+    /// Written by `lib/presence.ts` off the user agent of any call that passes
+    /// through one of the `require*` guards, so it covers the whole app rather
+    /// than only the members who granted push. `lastSeenAt` is the most recent
+    /// request from anywhere; the platform-specific stamps are kept separately
+    /// because "opened the app today" and "opened the website today" are
+    /// different questions, and a member who does both would otherwise have
+    /// whichever they touched last overwrite the other.
+    lastSeenAt: { type: Date, default: null },
+    lastSeenPlatform: {
+      type: String,
+      enum: ["ios", "web", "unknown", ""],
+      default: "",
+    },
+    lastSeenIosAt: { type: Date, default: null },
+    lastSeenWebAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -98,6 +115,9 @@ MemberSchema.index(
     partialFilterExpression: { clerkId: { $type: "string" } },
   }
 );
+
+/// The admin device console sorts the roster by iPhone recency.
+MemberSchema.index({ lastSeenIosAt: -1 });
 
 MemberSchema.index(
   { discordId: 1 },

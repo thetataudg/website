@@ -1,0 +1,220 @@
+/*
+ * Surface and motion for the sign-in and sign-up pages.
+ *
+ * Kept in a module rather than in members.css: nothing else in the app needs
+ * these keyframes, and the members-area stylesheet is explicitly shared with
+ * the onboard layout.
+ *
+ * The easing below is the same curve throughout — fast out of the gate, long
+ * settle — so the page reads as one movement rather than a set of unrelated
+ * effects. Every animation is decorative; the whole file is disabled under
+ * `prefers-reduced-motion`, and the page is fully usable without it.
+ */
+
+.stage {
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A very quiet wash behind the card, warmed towards the chapter's red. Flat
+   * background plus flat card gave the card nothing to sit against, which is
+   * what made the page read as a form floating in space. */
+  background:
+    radial-gradient(
+      60rem 40rem at 50% -10%,
+      hsl(var(--primary) / 0.07),
+      transparent 70%
+    ),
+    hsl(var(--background));
+}
+
+/*
+ * The card. Bordered and lifted rather than borderless, because the form needs
+ * an edge to end at — on a wide monitor an unbounded column of fields drifts
+ * in the middle of an empty screen with nothing holding it.
+ */
+.card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 6px);
+  box-shadow:
+    0 1px 2px hsl(var(--foreground) / 0.04),
+    0 12px 32px -12px hsl(var(--foreground) / 0.14);
+}
+
+/* Entrance ------------------------------------------------------------- */
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes markIn {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mark {
+  animation: markIn 520ms var(--ease-out-soft) both;
+}
+
+/*
+ * Staggered so the eye is led down the form instead of having the whole card
+ * arrive at once. The delays are small; past about 60ms per row this starts
+ * to feel like waiting rather than polish.
+ */
+.rise {
+  animation: riseIn 420ms var(--ease-out-soft) both;
+}
+
+.d1 { animation-delay: 60ms; }
+.d2 { animation-delay: 110ms; }
+.d3 { animation-delay: 160ms; }
+.d4 { animation-delay: 210ms; }
+
+/* Step changes --------------------------------------------------------- */
+
+/*
+ * Applied to the form wrapper with a `key` on the step, so React remounts it
+ * and the animation replays. Slightly quicker than the entrance: the member is
+ * already looking at the card and only needs to notice that it changed.
+ */
+.step {
+  animation: riseIn 300ms var(--ease-out-soft) both;
+}
+
+/* Alerts --------------------------------------------------------------- */
+
+@keyframes alertIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.alert {
+  animation: alertIn 240ms var(--ease-out-soft) both;
+}
+
+/* Microinteractions ---------------------------------------------------- */
+
+/*
+ * Lift on hover, press on click. The press is deliberately faster than the
+ * lift (90ms against 180ms) because a button that is slow to acknowledge a
+ * click feels broken, while one that is slow to relax feels smooth.
+ */
+.press {
+  transition:
+    transform 180ms var(--ease-out-soft),
+    box-shadow 180ms var(--ease-out-soft),
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.press:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -8px hsl(var(--foreground) / 0.35);
+}
+
+.press:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 90ms;
+}
+
+.press:disabled {
+  transform: none;
+  box-shadow: none;
+}
+
+/* The provider mark leans in slightly as the button is hovered. */
+.providerMark {
+  transition: transform 220ms var(--ease-out-soft);
+}
+
+.press:hover:not(:disabled) .providerMark {
+  transform: scale(1.08);
+}
+
+/* Text links: an underline that grows from the left rather than blinking on. */
+.quietLink {
+  position: relative;
+  background: transparent;
+  padding: 0;
+  transition: color 150ms ease;
+}
+
+.quietLink::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms var(--ease-out-soft);
+}
+
+.quietLink:hover::after,
+.quietLink:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.quietLink:hover {
+  color: hsl(var(--foreground));
+}
+
+/* Inputs settle into focus rather than snapping. */
+.field input {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+/* Reduced motion -------------------------------------------------------- */
+
+/*
+ * Everything above is ornament. Under reduced motion the page still renders
+ * identically, it simply arrives rather than animates — including the hover
+ * transforms, which are the part most likely to provoke discomfort.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .mark,
+  .rise,
+  .step,
+  .alert {
+    animation: none;
+  }
+
+  .press,
+  .providerMark,
+  .quietLink::after,
+  .field input {
+    transition: none;
+  }
+
+  .press:hover:not(:disabled),
+  .press:active:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .quietLink::after {
+    transform: scaleX(1);
+  }
+}
