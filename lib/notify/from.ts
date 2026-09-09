@@ -31,6 +31,10 @@ const SENDERS: Record<string, Sender> = {
   plan: { local: "dues", name: "Theta Tau Treasury" },
   reimbursement: { local: "dues", name: "Theta Tau Treasury" },
   events: { local: "events", name: "Theta Tau Events" },
+  // "When can we meet?" polls. Its own mailbox rather than events@ because the
+  // conversation is a different one: a poll nag is a request for the member to
+  // do something now, not an announcement about something already scheduled.
+  availability: { local: "availability", name: "Theta Tau Scheduling" },
   // Gifts get their own mailbox. A donor is usually an alumnus or a stranger
   // with no other relationship to the chapter's mail, and a thank-you arriving
   // from "Theta Tau Treasury" reads like a bill from an organisation they do
@@ -67,6 +71,7 @@ const REPLY_TO: Record<string, string> = {
   plan: "treasurer@thetatau-dg.org",
   reimbursement: "treasurer@thetatau-dg.org",
   events: "general@thetatau-dg.org",
+  availability: "general@thetatau-dg.org",
   donation: "treasurer@thetatau-dg.org",
   invitation: "general@thetatau-dg.org",
   auth: "general@thetatau-dg.org",

@@ -18,6 +18,7 @@ import { ensureMemberEmails } from "@/lib/notify/emails";
 import { notifyMany } from "@/lib/notify";
 import { announce } from "@/lib/notify/announce";
 import logger from "@/lib/logger";
+import { pruneDeviceTokens, type DevicePruneReport } from "@/lib/devicePrune";
 
 export interface CronReport {
   ranAt: string;
@@ -31,6 +32,7 @@ export interface CronReport {
     staleCount: number;
     staleCents: number;
   };
+  devices: DevicePruneReport;
 }
 
 /// How long in-person money may sit without an owner before it is a problem
@@ -250,6 +252,9 @@ export async function advancePlans(now = new Date(), scope?: any[]) {
 }
 
 export async function runDuesCron(now = new Date()): Promise<CronReport> {
+  // Before the reminders, not after: a send that goes to a phone retired
+  // thirty seconds earlier is a round trip to Apple for nothing.
+  const devices = await pruneDeviceTokens(now);
   const credit = await reconcileCredit();
   const plans = await advancePlans(now);
   const unassigned = await sweepUnassignedPayments(now);
@@ -296,6 +301,7 @@ export async function runDuesCron(now = new Date()): Promise<CronReport> {
     credit,
     emails,
     unassigned,
+    devices,
   };
 }
 

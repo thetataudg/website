@@ -58,6 +58,20 @@ export const TRANSACTIONAL_TEMPLATES = [
   "event_published",
   "event_starting_soon",
   "event_started",
+  // Availability polls. The nag looks like a reminder, but it must not travel
+  // the reminder cooldown: that key is (memberId, template) only, so two open
+  // polls would mute each other's chases. These bypass the global cooldown and
+  // `lib/availability/remind.ts` owns the real per-poll cadence instead.
+  // A vote opening. Transactional for the same reason the calendar entries
+  // are: it reports a fact about one vote that can only be true once, and the
+  // reminder cooldown is keyed on the template alone, so a chapter running a
+  // pledge vote and an election in one night would announce the first and
+  // swallow the second.
+  "vote_opened",
+  "availability_requested",
+  "availability_reminder",
+  "availability_final_call",
+  "availability_closed",
 ] as const;
 
 export type ReminderTemplate = (typeof REMINDER_TEMPLATES)[number];
@@ -95,6 +109,21 @@ export interface TemplateContext {
   eventWhen?: string;
   eventLocation?: string;
   eventId?: string;
+  /// Availability polls. `deadlineLabel` is formatted in Phoenix by the caller
+  /// for the same reason `dueLabel` is; the counts are "3 of 8 have answered".
+  /// `pollPath` is the site-relative link, prebuilt by the caller because the
+  /// poll grid lives under its committee and only the caller knows which.
+  /// A vote that just opened. `voteTitle` is already resolved to something
+  /// printable by the caller, because only it knows that an Election carries a
+  /// title and a Pledge vote does not.
+  voteTitle?: string;
+  voteId?: string;
+  pollId?: string;
+  pollPath?: string;
+  pollTitle?: string;
+  deadlineLabel?: string;
+  respondedCount?: number;
+  inviteeCount?: number;
 }
 
 export interface RenderedMessage {
@@ -106,7 +135,7 @@ export interface RenderedMessage {
   push: string;
   emailSubject: string;
   link: string;
-  category: "dues" | "reimbursement" | "plan" | "event" | "general";
+  category: "dues" | "reimbursement" | "plan" | "event" | "availability" | "general";
   /// What the email's button says. Optional, and usually left unset: the
   /// wording is derived from `link` by `ctaLabelFor` so the button can never
   /// promise somewhere it does not go. Set it only when the action deserves
@@ -144,6 +173,7 @@ const DUES_PAGE_LABELS: Record<RenderedMessage["category"], string> = {
   // dues page. Present because the Record is total, and a wrong-but-harmless
   // label beats widening the type to allow a missing one.
   event: "Open your dues",
+  availability: "Open your dues",
   general: "Open your dues",
 };
 
@@ -176,6 +206,7 @@ const CTA_BY_CATEGORY: Record<RenderedMessage["category"], string> = {
   plan: "Open your payment plan",
   reimbursement: "Open your reimbursements",
   event: "Open the event",
+  availability: "Open the poll",
   general: "Open the portal",
 };
 
@@ -214,6 +245,10 @@ export function renderTemplate(
   const eventLink = context.eventId
     ? `/member/events/${encodeURIComponent(context.eventId)}`
     : "/member/events";
+  // Deep-links to the one poll's grid, which lives under its committee. The
+  // caller builds the path because only it knows the committee; we fall back
+  // to the committees dashboard.
+  const pollLink = context.pollPath || "/member/committees";
 
   switch (template) {
     case "assigned":
@@ -301,6 +336,98 @@ export function renderTemplate(
         emailSubject: `Started: ${context.eventName || "your event"}`,
         link: eventLink,
         category: "event",
+      };
+    }
+
+    case "vote_opened": {
+      const what = context.voteTitle?.trim() || "A vote";
+      return {
+        title: "Voting is open",
+        // Never names the pledge or rushee being voted on. The vote page is
+        // behind a login and this line is not: it lands on a lock screen in a
+        // room that may contain the person it is about.
+        body: `${what} is open. Cast your ballot before it closes.`,
+        push: `${what} is open. Cast your ballot before it closes.`,
+        emailSubject: `Voting is open: ${what}`,
+        link: "/member/vote",
+        // "general", matching the proxy-request notice, which is the other
+        // vote-shaped message the chapter sends. A "vote" category would mean
+        // a new value in the Notification enum and in two exhaustive label
+        // tables, to group two messages a member sees a handful of times a
+        // year.
+        category: "general",
+      };
+    }
+
+    // --- availability polls ---
+    //
+    // Same house style as the calendar copy: plain commas, no em dashes, it
+    // lands on a lock screen. `pollLink` deep-links to the grid so the nag and
+    // the thing it is nagging about are one tap apart.
+    case "availability_requested": {
+      const poll = context.pollTitle || "a meeting";
+      const closes =
+        context.deadlineLabel && context.deadlineLabel !== "soon"
+          ? `The poll closes ${context.deadlineLabel}.`
+          : "The poll closes soon.";
+      return {
+        title: `When can you meet? ${poll}`,
+        body: `${poll} needs your availability. Mark the times you are free and the group will pick a slot that works for the most people. ${closes}`,
+        push: `Mark your availability for ${poll}. ${closes}`,
+        emailSubject: `When can you meet? ${poll}`,
+        link: pollLink,
+        category: "availability",
+      };
+    }
+
+    case "availability_reminder": {
+      const poll = context.pollTitle || "a meeting";
+      const answered =
+        context.respondedCount !== undefined && context.inviteeCount !== undefined
+          ? `${context.respondedCount} of ${context.inviteeCount} ${
+              context.respondedCount === 1 ? "person has" : "people have"
+            } filled in ${poll}`
+          : `Most people have filled in ${poll}`;
+      const closes =
+        context.deadlineLabel && context.deadlineLabel !== "soon"
+          ? ` It closes ${context.deadlineLabel}.`
+          : "";
+      return {
+        title: `Still need your availability for ${poll}`,
+        body: `${answered}, and you have not yet.${closes} It only takes a minute.`,
+        push: `${answered}. Yours is still missing.`,
+        emailSubject: `Still waiting on your availability for ${poll}`,
+        link: pollLink,
+        category: "availability",
+      };
+    }
+
+    case "availability_final_call": {
+      const poll = context.pollTitle || "a meeting";
+      const when =
+        context.deadlineLabel && context.deadlineLabel !== "soon"
+          ? context.deadlineLabel
+          : "soon";
+      return {
+        title: `Last call: ${poll}`,
+        body: `${poll} closes ${when}. Add your availability now, or a time gets picked without you.`,
+        push: `${poll} closes ${when}. Last call to add your availability.`,
+        emailSubject: `Closing soon: ${poll}`,
+        link: pollLink,
+        category: "availability",
+      };
+    }
+
+    case "availability_closed": {
+      const poll = context.pollTitle || "The meeting poll";
+      const set = context.eventWhen ? `, and the meeting is set for ${context.eventWhen}` : "";
+      return {
+        title: `${poll} is closed`,
+        body: `Thanks for your availability. ${poll} is closed${set}.`,
+        push: `${poll} is closed${set}.`,
+        emailSubject: `${poll} is closed`,
+        link: context.eventId ? eventLink : pollLink,
+        category: "availability",
       };
     }
 

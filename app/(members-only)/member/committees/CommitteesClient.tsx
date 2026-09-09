@@ -2,8 +2,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { EventFormDialog } from "../events/EventFormDialog";
 import CommitteeAttendance from "./CommitteeAttendance";
+import MyAvailabilityPanel from "./_polls/MyAvailabilityPanel";
 import {
   CalendarPlus,
   Crown,
@@ -259,6 +261,8 @@ export default function CommitteesClient({
         }
       />
 
+      <MyAvailabilityPanel />
+
       {error && (
         <Alert variant="warning" role="alert">
           <TriangleAlert aria-hidden="true" />
@@ -347,14 +351,12 @@ export default function CommitteesClient({
               <li key={committee._id} className="h-full min-w-0">
                 <Card className="h-full transition-colors hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
                   <CardContent className="h-full p-4">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setSelected(committee)}
-                      className="h-full min-h-40 w-full flex-col items-stretch justify-start whitespace-normal p-0 text-left hover:bg-transparent"
+                    <Link
+                      href={`/member/committees/${committee._id}`}
+                      className="flex h-full min-h-40 w-full flex-col items-stretch justify-start whitespace-normal p-0 text-left"
                     >
                       <span className="sr-only">
-                        {`See the member list for ${committee.name}`}
+                        {`Open the ${committee.name} dashboard`}
                       </span>
                       <span className="flex w-full items-start justify-between gap-3">
                         <span className="min-w-0 text-lg font-semibold leading-snug text-foreground">
@@ -384,7 +386,7 @@ export default function CommitteesClient({
                           <span className="min-w-0 break-words leading-snug">{headLabel}</span>
                         </span>
                       </span>
-                    </Button>
+                    </Link>
                   </CardContent>
                 </Card>
               </li>

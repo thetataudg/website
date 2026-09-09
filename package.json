@@ -15,6 +15,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "check:dues": "esbuild scripts/check-dues-logic.ts --bundle --platform=node --format=cjs --outfile=.dues-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .dues-check.cjs; rc=$?; rm -f .dues-check.cjs; exit $rc",
+    "check:availability": "esbuild scripts/check-availability.ts --bundle --platform=node --format=cjs --outfile=.availability-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .availability-check.cjs; rc=$?; rm -f .availability-check.cjs; exit $rc",
     "check:history": "esbuild scripts/check-history-db.ts --bundle --platform=node --format=cjs --outfile=.history-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .history-check.cjs dotenv_config_path=.env; rc=$?; rm -f .history-check.cjs; exit $rc",
     "check:notify": "esbuild scripts/check-notify-db.ts --bundle --platform=node --format=cjs --outfile=.notify-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .notify-check.cjs dotenv_config_path=.env; rc=$?; rm -f .notify-check.cjs; exit $rc",
     "check:announce": "esbuild scripts/check-announce-db.ts --bundle --platform=node --format=cjs --outfile=.announce-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .announce-check.cjs dotenv_config_path=.env; rc=$?; rm -f .announce-check.cjs; exit $rc",

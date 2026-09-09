@@ -5,6 +5,7 @@ import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { isCalendarColor, nextCalendarColor } from "@/lib/calendarColors";
+import { pruneInactiveCommitteeMembers } from "@/lib/committeeMembership";
 
 /**
  * Gives a colour to any committee created before committees had colours.
@@ -53,6 +54,10 @@ export async function GET(req: Request) {
     }
 
     await backfillColors();
+    // Self-healing: anyone who has since gone Alumni/Removed/Deceased comes off
+    // the rosters here, so a stale entry disappears the next time the directory
+    // is opened rather than needing a migration.
+    await pruneInactiveCommitteeMembers();
 
     const committees = await Committee.find(filter)
       .populate("committeeHeadId", "fName lName rollNo")

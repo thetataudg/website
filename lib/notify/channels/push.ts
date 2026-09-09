@@ -38,10 +38,19 @@ function base64url(input: Buffer | string): string {
 
 /// The .p8 file, either inline in the env var or with its newlines escaped —
 /// which is what happens to it in every hosting dashboard on earth.
+///
+/// The surrounding quotes are stripped for the same reason. A PEM is the one
+/// secret people paste with quotes around it, because it is the one secret
+/// that contains newlines and every guide shows it wrapped. `process.env`
+/// hands those quotes straight through, OpenSSL rejects a key that begins with
+/// one, and the failure surfaces three layers away as "no provider token" on
+/// every notification the chapter sends. That is exactly what happened here:
+/// APNS_KEY_P8 was the only quoted value out of fifty-three.
 function privateKey(): string | null {
   const raw = process.env.APNS_KEY_P8;
   if (!raw) return null;
-  return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+  const unquoted = raw.trim().replace(/^(["'])([\s\S]*)\1$/, "$2");
+  return unquoted.includes("\\n") ? unquoted.replace(/\\n/g, "\n") : unquoted;
 }
 
 function providerToken(): string | null {
