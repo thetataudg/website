@@ -8,6 +8,7 @@
 
 import logger from "@/lib/logger";
 import { getClerkUser } from "@/lib/clerk";
+import { recordSystemSend } from "@/lib/mail/budget";
 import { fromAddressFor, replyToFor } from "@/lib/notify/from";
 import {
   EmailContent,
@@ -143,6 +144,7 @@ export async function sendMembershipDecisionEmail(args: {
       return { sent: false, skipped: `resend ${res.status}` };
     }
 
+    await recordSystemSend();
     logger.info({ decision: args.decision, clerkId: args.clerkId }, "Membership decision emailed");
     return { sent: true };
   } catch (err) {

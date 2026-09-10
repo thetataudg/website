@@ -21,6 +21,7 @@ import {
 } from "@/lib/notify/emailTemplate";
 import { siteUrl } from "@/lib/siteUrl";
 import logger from "@/lib/logger";
+import { recordSystemSend } from "@/lib/mail/budget";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -148,6 +149,7 @@ export async function sendDonationThankYou(
     await Donation.findByIdAndUpdate(donation._id, {
       receiptSentAt: new Date(),
     });
+    await recordSystemSend();
     logger.info(
       { donationId: String(donation._id) },
       "Donation thank-you sent"

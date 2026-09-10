@@ -31,7 +31,8 @@
     "check:wallet-images": "esbuild scripts/check-wallet-images.ts --bundle --platform=node --format=cjs --outfile=.wallet-images-check.cjs --tsconfig=tsconfig.json --log-level=error && node .wallet-images-check.cjs; rc=$?; rm -f .wallet-images-check.cjs; exit $rc",
     "check:sessions": "esbuild scripts/check-sessions.ts --bundle --platform=node --format=cjs --outfile=.sessions-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .sessions-check.cjs dotenv_config_path=.env; rc=$?; rm -f .sessions-check.cjs; exit $rc",
     "check:phones": "esbuild scripts/check-phone-sync.ts --bundle --platform=node --format=cjs --outfile=.phones-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .phones-check.cjs; rc=$?; rm -f .phones-check.cjs; exit $rc",
-    "check:newsletters": "esbuild scripts/check-newsletters.ts --bundle --platform=node --format=cjs --outfile=.newsletters-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .newsletters-check.cjs; rc=$?; rm -f .newsletters-check.cjs; exit $rc"
+    "check:newsletters": "esbuild scripts/check-newsletters.ts --bundle --platform=node --format=cjs --outfile=.newsletters-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .newsletters-check.cjs; rc=$?; rm -f .newsletters-check.cjs; exit $rc",
+    "optimize:images": "node scripts/optimize-images.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
@@ -52,11 +53,13 @@
     "@radix-ui/react-navigation-menu": "^1.2.22",
     "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-progress": "^1.1.16",
+    "@radix-ui/react-scroll-area": "^1.2.18",
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-separator": "^1.1.15",
     "@radix-ui/react-slider": "^1.4.7",
     "@radix-ui/react-slot": "^1.3.3",
     "@radix-ui/react-tabs": "^1.1.21",
+    "@radix-ui/react-tooltip": "^1.2.16",
     "@stripe/react-stripe-js": "^6.8.2",
     "@stripe/stripe-js": "^9.14.0",
     "@zxing/browser": "^0.1.5",
@@ -74,6 +77,7 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^1.34.0",
     "luxon": "^3.7.2",
+    "marked": "^18.0.12",
     "mongodb": "^7.0.0",
     "mongoose": "^8.13.2",
     "next": "^14.2.4",
@@ -85,12 +89,16 @@
     "react-dom": "^18",
     "react-easy-crop": "^5.5.6",
     "react-icons": "^5.0.1",
+    "react-resizable-panels": "^2.1.9",
     "reactflow": "^11.11.4",
+    "sanitize-html": "^2.17.5",
     "sharp": "^0.34.5",
     "sonner": "^2.0.8",
     "stripe": "^22.6.0",
     "tailwind-merge": "^3.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
   },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
@@ -99,6 +107,8 @@
     "@types/pngjs": "^6.0.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/sanitize-html": "^2.16.1",
+    "@types/turndown": "^5.0.6",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.1.0",

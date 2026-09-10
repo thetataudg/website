@@ -5,8 +5,11 @@ import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
 import PendingList from "./PendingList";
+import { listPendingMailRequests } from "@/lib/mail/requests";
+import { mailDomain } from "@/lib/mail/address";
 
 interface PendingRequest {
+  placeholderMatch?: { rollNo: string; fName: string; lName: string } | null;
   requestType?: "access" | "deletion";
   _id: string;
   clerkId: string;
@@ -58,7 +61,25 @@ export default async function PendingPage() {
   }
 
   const rawRequests = await PendingMember.find({ status: "pending" }).lean();
+
+  // Placeholder profiles (no account yet) whose roll matches a request, so
+  // the reviewer can see that approving will claim that profile.
+  const placeholders = await Member.find({
+    rollNo: { $in: rawRequests.map((r: any) => r.rollNo) },
+    clerkId: { $not: { $type: "string" } },
+  })
+    .select("rollNo fName lName")
+    .lean<any[]>();
+  const placeholderByRoll = new Map(placeholders.map((p) => [p.rollNo, p]));
+
   const requests: PendingRequest[] = rawRequests.map((r: any) => ({
+    placeholderMatch: placeholderByRoll.has(r.rollNo)
+      ? {
+          rollNo: r.rollNo,
+          fName: placeholderByRoll.get(r.rollNo).fName,
+          lName: placeholderByRoll.get(r.rollNo).lName,
+        }
+      : null,
     requestType: r.requestType || "access",
     _id: r._id.toString(),
     clerkId: r.clerkId,
@@ -92,5 +113,13 @@ export default async function PendingPage() {
         : {},
   }));
 
-  return <PendingList initialRequests={requests} />;
+  const mailRequests = await listPendingMailRequests();
+
+  return (
+    <PendingList
+      initialRequests={requests}
+      initialMailRequests={mailRequests}
+      mailDomain={mailDomain()}
+    />
+  );
 }

@@ -31,6 +31,7 @@ yarn-error.log*
 # local env files
 .env*.local
 .env.backup-before-bucket-fix
+.env.backup-before-mongo-host
 
 # local secrets that should never be committed
 secrets/

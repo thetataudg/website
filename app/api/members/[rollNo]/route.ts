@@ -10,6 +10,7 @@ import { clerkClient } from "@clerk/clerk-sdk-node";
 import { maybePresignUrl } from "@/lib/garage";
 import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
 import { detachMemberFromCommittees } from "@/lib/committeeMembership";
+import MailAccount from "@/lib/models/MailAccount";
 
 const MEMBER_SECRET_HEADER = process.env.MEMBER_API_SECRET_HEADER || "x-api-secret";
 const MEMBER_SECRET_QUERY_PARAM = process.env.MEMBER_API_SECRET_QUERY_PARAM || "secret";
@@ -232,6 +233,18 @@ export async function PATCH(
   // Committees are for actives. Graduating (or removing) someone strips them
   // from every roster and head slot, so they stop showing on the directory,
   // the PDF and the phone with no way to take them off by hand.
+  // Chapter mail follows membership: a Removed or Deceased member's mailbox is
+  // frozen (no sending, inbound dropped), and thawed if the status comes back.
+  if ("status" in updates && updates.status) {
+    const frozen = ["Removed", "Deceased"].includes(updates.status);
+    await MailAccount.updateOne(
+      { memberId: updatedMember._id, status: frozen ? "active" : "suspended" },
+      { $set: { status: frozen ? "suspended" : "active" } }
+    ).catch((err) =>
+      logger.warn({ err, rollNo: params.rollNo }, "Failed to update chapter mailbox status")
+    );
+  }
+
   if ("status" in updates && updates.status && updates.status !== "Active") {
     await detachMemberFromCommittees(updatedMember._id).catch((err) =>
       logger.warn(

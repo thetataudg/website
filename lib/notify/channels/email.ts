@@ -15,6 +15,7 @@ import {
 } from "@/lib/notify/emailTemplate";
 import { ctaLabelFor } from "@/lib/notify/templates";
 import { formatCents } from "@/lib/financeEvents";
+import { recordSystemSend } from "@/lib/mail/budget";
 import type { Channel, DeliveryRequest, DeliveryResult } from "./types";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -128,6 +129,7 @@ export const emailChannel: Channel = {
         );
         return { channel: "email", delivered: false, skipped: `resend ${res.status}` };
       }
+      await recordSystemSend();
       return { channel: "email", delivered: true };
     } catch (err: any) {
       logger.warn({ err, rollNo: request.recipient.rollNo }, "Dues email failed to send");

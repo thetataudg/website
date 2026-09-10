@@ -6,6 +6,17 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   reactStrictMode: true,
   transpilePackages: ["geist"],
+  images: {
+    // AVIF first: roughly half the bytes of WebP for photos, and every
+    // browser that can't take it falls back to WebP automatically.
+    formats: ["image/avif", "image/webp"],
+    // Files in /public never change under the same name, so an optimized copy
+    // can be cached for a year instead of Next's 60-second default.
+    minimumCacheTTL: 60 * 60 * 24 * 365,
+    // Tops out at 2560: nothing on the site renders wider, and the originals
+    // are resized to that ceiling by `npm run optimize:images`.
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2560],
+  },
   experimental: {
     optimizePackageImports: [
       "react-icons",

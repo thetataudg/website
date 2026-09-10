@@ -8,6 +8,7 @@ import { ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoadingState from "../../components/LoadingState";
+import { usePendingRequestCount } from "../../components/usePendingRequestCount";
 import { PageContainer } from "../../components/shell/PageShell";
 
 const ADMIN_TABS = [
@@ -61,11 +62,12 @@ export default function AdminLayout({
     };
   }, []);
 
-  if (loading) return <LoadingState message="Loading admin console..." />;
-
   const isAdmin = Boolean(
     me && (me.role === "admin" || me.role === "superadmin")
   );
+  const pendingCount = usePendingRequestCount(isAdmin);
+
+  if (loading) return <LoadingState message="Loading admin console..." />;
   const isPrivileged = Boolean(isAdmin || me?.isECouncil);
 
   if (!isPrivileged) {
@@ -105,8 +107,16 @@ export default function AdminLayout({
                 className="shrink-0 px-4 text-muted-foreground no-underline"
                 asChild
               >
-                <Link href={tab.href} className="no-underline">
+                <Link href={tab.href} className="flex items-center gap-2 no-underline">
                   {tab.label}
+                  {tab.href === "/member/admin/pending" && pendingCount > 0 && (
+                    <span
+                      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-destructive-foreground"
+                      aria-label={`${pendingCount} pending`}
+                    >
+                      {pendingCount > 99 ? "99+" : pendingCount}
+                    </span>
+                  )}
                 </Link>
               </TabsTrigger>
             ))}
