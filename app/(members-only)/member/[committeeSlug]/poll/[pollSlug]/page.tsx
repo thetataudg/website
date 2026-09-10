@@ -3,9 +3,7 @@
 // into Discord; the id route is what the app actually renders.
 import { redirect } from "next/navigation";
 import { connectDB } from "@/lib/db";
-import AvailabilityPoll from "@/lib/models/AvailabilityPoll";
-import Committee from "@/lib/models/Committee";
-import { slugify } from "@/lib/availability/slug";
+import { resolvePollSlug } from "@/lib/availability/slug";
 
 export const dynamic = "force-dynamic";
 
@@ -16,28 +14,12 @@ export default async function SharedPollPage({
 }) {
   await connectDB();
 
-  let committeeId: string | null = null;
-  if (params.committeeSlug !== "chapter") {
-    const committees = await Committee.find().select("_id name").lean<any[]>();
-    const match = committees.find(
-      (c) => slugify(c.name || "") === params.committeeSlug
-    );
-    if (!match) redirect("/member/committees");
-    committeeId = String(match._id);
-  }
-
-  const poll = await AvailabilityPoll.findOne({
-    slug: params.pollSlug,
-    committeeId,
-  })
-    .select("_id committeeId")
-    .lean<any>();
-
-  if (!poll) redirect("/member/committees");
+  const found = await resolvePollSlug(params.committeeSlug, params.pollSlug);
+  if (!found) redirect("/member/committees");
 
   redirect(
-    poll.committeeId
-      ? `/member/committees/${poll.committeeId}/polls/${poll._id}`
-      : `/member/committees/polls/${poll._id}`
+    found.committeeId
+      ? `/member/committees/${found.committeeId}/polls/${found.pollId}`
+      : `/member/committees/polls/${found.pollId}`
   );
 }

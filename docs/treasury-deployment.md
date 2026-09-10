@@ -23,7 +23,7 @@ moment their keys exist, with no code change and no redeploy logic.
 |---|---|---|
 | `RESEND_API_KEY` | Email. Without it the email channel stays inert. | — (channel off) |
 | `ALERTS_EMAIL_DOMAIN` | Sending domain | `alerts.ttdg.org` |
-| `CHAPTER_REPLY_TO` | Overrides every `Reply-To` at once — use on staging so it can't mail real officers | per-category (treasurer@ / general@thetatau-dg.org) |
+| `CHAPTER_REPLY_TO` | Overrides every `Reply-To` at once — use on staging so it can't mail real officers | per-category (treasurer@ / general@ttdg.org) |
 | `APNS_KEY_ID` | Push | — (channel off) |
 | `APNS_KEY_P8` | Push — the `.p8` contents | — (channel off) |
 | `APNS_TEAM_ID` | Push | `WVQ9Z7S7RR` |

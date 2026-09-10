@@ -30,7 +30,7 @@ export default function Socials() {
             </svg>
           </a>
           <a
-            href="mailto:general@thetatau-dg.org"
+            href="mailto:general@ttdg.org"
             className="text-neutral-500 hover:text-neutral-900"
           >
             <svg

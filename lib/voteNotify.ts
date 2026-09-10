@@ -81,6 +81,7 @@ export async function announceVoteOpened(
         // without warning, and cannot be seen from outside the app. A push
         // that waits for a Focus to end is a push that arrives after the
         // ballot box is shut.
+        channels: ["push"],
         timeSensitive: true,
       }))
     );

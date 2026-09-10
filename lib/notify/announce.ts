@@ -5,7 +5,7 @@
 // The routing rule, in one place so it can't drift between twenty routes:
 //
 //   - The active Treasurer hears about **everything**, whoever caused it.
-//     Their email copy goes to treasurer@thetatau-dg.org.
+//     Their email copy goes to treasurer@ttdg.org.
 //   - The member hears when somebody **else** moved their ledger. They don't
 //     get told about their own submission — they just made it, and the screen
 //     already said so.

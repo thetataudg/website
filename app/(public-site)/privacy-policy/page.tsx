@@ -145,8 +145,8 @@ export default function PrivacyPolicy() {
           <p className="mt-4 text-base text-white/80">
             If you have questions about this policy or want to request updates to
             your information, contact us at{" "}
-            <a className="underline underline-offset-4" href="mailto:general@thetatau-dg.org">
-              general@thetatau-dg.org
+            <a className="underline underline-offset-4" href="mailto:general@ttdg.org">
+              general@ttdg.org
             </a>
             .
           </p>

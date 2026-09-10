@@ -303,7 +303,7 @@ export default function SignInWorkspace({
         ? "Choose a new password"
         : step === "code"
           ? "Check your email"
-          : "Chapter Tools";
+          : "Welcome back";
 
   const subheading =
     step === "code"
@@ -312,7 +312,7 @@ export default function SignInWorkspace({
         ? "We'll email you a code to set a new one."
         : step === "reset"
           ? "Enter the code we emailed you, then your new password."
-          : "Theta Tau, Delta Gamma";
+          : "Sign in to Delta Gamma Chapter Tools";
 
   return (
     <AuthCard
@@ -367,46 +367,7 @@ export default function SignInWorkspace({
         <div key={step} className={styles.step}>
           {step === "password" ? (
             <form onSubmit={handlePassword} className="space-y-4">
-              <div className={`${styles.rise} ${styles.d2} grid gap-2`}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={`${styles.press} w-full gap-2`}
-                  onClick={() => handleProvider("oauth_google")}
-                  disabled={busy}
-                >
-                  {pendingProvider === "oauth_google" ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <GoogleMark className={`${styles.providerMark} size-4`} />
-                  )}
-                  Continue with Google
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={`${styles.press} w-full gap-2`}
-                  onClick={() => handleProvider("oauth_apple")}
-                  disabled={busy}
-                >
-                  {pendingProvider === "oauth_apple" ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <AppleMark className={`${styles.providerMark} size-4`} />
-                  )}
-                  Continue with Apple
-                </Button>
-              </div>
-
-              <div
-                className={`${styles.rise} ${styles.d3} flex items-center gap-3`}
-              >
-                <span className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground">or</span>
-                <span className="h-px flex-1 bg-border" />
-              </div>
-
-              <div className={`${styles.rise} ${styles.d3} ${styles.field} space-y-2`}>
+              <div className={`${styles.rise} ${styles.d2} ${styles.field} space-y-2`}>
                 <Label htmlFor="identifier">Email address or username</Label>
                 <Input
                   id="identifier"
@@ -420,7 +381,7 @@ export default function SignInWorkspace({
                 />
               </div>
 
-              <div className={`${styles.rise} ${styles.d4} ${styles.field} space-y-2`}>
+              <div className={`${styles.rise} ${styles.d3} ${styles.field} space-y-2`}>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
                   <button
@@ -480,6 +441,51 @@ export default function SignInWorkspace({
                 ) : null}
                 Sign in
               </Button>
+
+              <div
+                className={`${styles.rise} ${styles.d5} flex items-center gap-3 pt-1`}
+              >
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">
+                  Or continue with
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* Icon-only, as in login-04. The label is still there for
+                * screen readers and as the hover tooltip. */}
+              <div className={`${styles.rise} ${styles.d5} grid grid-cols-2 gap-3`}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={`${styles.press} w-full`}
+                  onClick={() => handleProvider("oauth_apple")}
+                  disabled={busy}
+                  title="Continue with Apple"
+                >
+                  {pendingProvider === "oauth_apple" ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <AppleMark className={`${styles.providerMark} size-4`} />
+                  )}
+                  <span className="sr-only">Continue with Apple</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={`${styles.press} w-full`}
+                  onClick={() => handleProvider("oauth_google")}
+                  disabled={busy}
+                  title="Continue with Google"
+                >
+                  {pendingProvider === "oauth_google" ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <GoogleMark className={`${styles.providerMark} size-4`} />
+                  )}
+                  <span className="sr-only">Continue with Google</span>
+                </Button>
+              </div>
             </form>
           ) : null}
 

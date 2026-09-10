@@ -73,6 +73,7 @@ export async function GET(
         },
         myResponseSlots: mine?.slots ?? [],
         sharePath: sharePath || null,
+        committeeName: ctx.committee?.name ?? null,
         accentColor,
       },
       { status: 200 }

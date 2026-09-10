@@ -76,7 +76,7 @@ async function main() {
     const treasury = await treasuryRecipients();
     check("finance has one internal recipient", treasury.length, 1);
     check("that recipient is the Treasurer", String(treasury[0]?.memberId), String(officerMember._id));
-    check("treasury email uses the shared mailbox", treasury[0]?.email, "treasurer@thetatau-dg.org");
+    check("treasury email uses the shared mailbox", treasury[0]?.email, "treasurer@ttdg.org");
 
     // --- 1. a member acts: officers hear, the member does not ---
     console.log("\nA member files a payment claim");

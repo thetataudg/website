@@ -5,6 +5,7 @@
 // breaks). The slug is a nicety for a head pasting a link into Discord, so it
 // only has to be good enough to resolve back to one poll within a committee.
 import AvailabilityPoll from "@/lib/models/AvailabilityPoll";
+import Committee from "@/lib/models/Committee";
 
 const COMBINING_MARKS = new RegExp("[\\u0300-\\u036f]", "g");
 
@@ -18,6 +19,29 @@ export function slugify(input: string): string {
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) || "poll"
   );
+}
+
+/// The poll behind a shared link. "chapter" is the committee slug for
+/// chapter-wide polls. Callers connect to the database first.
+export async function resolvePollSlug(
+  committeeSlug: string,
+  pollSlug: string
+): Promise<{ pollId: string; committeeId: string | null } | null> {
+  let committeeId: string | null = null;
+  if (committeeSlug !== "chapter") {
+    const committees = await Committee.find().select("_id name").lean<any[]>();
+    const match = committees.find(
+      (c) => slugify(c.name || "") === committeeSlug
+    );
+    if (!match) return null;
+    committeeId = String(match._id);
+  }
+
+  const poll = await AvailabilityPoll.findOne({ slug: pollSlug, committeeId })
+    .select("_id")
+    .lean<any>();
+  if (!poll) return null;
+  return { pollId: String(poll._id), committeeId };
 }
 
 /// A poll slug unique within its committee (or within the chapter-wide set for

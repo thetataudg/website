@@ -398,8 +398,8 @@ function VoterRow({
       ? null
       : offSite
       ? vague
-        ? `Possibly off-site — ${formatDistance(voter.distanceMeters)} away, weak fix`
-        : `Off-site — ${formatDistance(voter.distanceMeters)} from ${
+        ? `Possibly off-site: ${formatDistance(voter.distanceMeters)} away, weak fix`
+        : `Off-site: ${formatDistance(voter.distanceMeters)} from ${
             anchor.label || "the meeting"
           }`
       : voter.outsideBoundary

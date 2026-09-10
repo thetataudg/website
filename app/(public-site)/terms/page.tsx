@@ -108,7 +108,7 @@ export default function TermsOfService() {
           Your Responsibilities & Our Commitments
         </h2>
         <p className="mt-4 max-w-3xl text-lg text-[#1b0f0f]/80">
-          This page governs how you interact with thetatau-dg.org and the services
+          This page governs how you interact with ttdg.org and the services
           we provide, including automated data sync to Discord, Clerk-authenticated
           dashboards, and recruitment forms. Following these terms helps keep the
           chapter community secure and accessible.
@@ -138,9 +138,9 @@ export default function TermsOfService() {
             Questions about these terms? Reach out to{" "}
             <a
               className="underline underline-offset-4"
-              href="mailto:general@thetatau-dg.org"
+              href="mailto:general@ttdg.org"
             >
-              general@thetatau-dg.org
+              general@ttdg.org
             </a>
             . You can also contact any executive council officer through the
             main chapter website.

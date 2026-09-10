@@ -26,7 +26,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 function siteUrl() {
   const configured =
     process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
-  return (configured || "https://thetatau-dg.org").replace(/\/$/, "");
+  return (configured || "https://ttdg.org").replace(/\/$/, "");
 }
 
 /// Turns a rendered message into the shape the layout wants.

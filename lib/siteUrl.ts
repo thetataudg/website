@@ -4,7 +4,7 @@
 //
 // Before this existed, four files each guessed on their own: the public layout
 // preferred NEXT_PUBLIC_SITE_URL, the sitemap did the same but re-implemented
-// it, the notification emails hardcoded https://thetatau-dg.org, and the
+// it, the notification emails hardcoded https://ttdg.org, and the
 // brother-profile metadata reached for a NEXT_PUBLIC_BASE_URL that is set
 // nowhere and fell back to https://thetatauasu.org — a domain two moves ago.
 // Canonical tags, sitemap entries, and Open Graph URLs all have to agree or

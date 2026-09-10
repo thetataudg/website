@@ -5,6 +5,7 @@ import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { normalizePhone } from "@/lib/phone";
+import { sendMembershipDecisionEmail } from "@/lib/membershipDecisionEmail";
 
 const memberStatusOptions = ["Active", "Alumni", "Removed", "Deceased"];
 // Roles a reviewer may assign from the pending-approval screen. "superadmin" is
@@ -234,7 +235,21 @@ export async function PATCH(
       approvedBy: admin.clerkId,
     });
 
-    return NextResponse.json({ status: "approved" }, { status: 200 });
+    // After the member exists, and awaited rather than fired and forgotten:
+    // this route runs in a serverless function, and a floating promise is not
+    // guaranteed to survive the response. It never throws, so a mail failure
+    // cannot undo an approval that has already happened.
+    const notified = await sendMembershipDecisionEmail({
+      clerkId: pending.clerkId,
+      firstName: pending.fName,
+      decision: "approved",
+      comments: reviewComments,
+    });
+
+    return NextResponse.json(
+      { status: "approved", emailed: notified.sent },
+      { status: 200 }
+    );
   } else {
     // Keep the Clerk session and request long enough for the applicant to see
     // the decision. They may then sign out or explicitly delete the request
@@ -252,6 +267,16 @@ export async function PATCH(
       comments: reviewComments,
     });
 
-    return NextResponse.json({ status: "rejected" }, { status: 200 });
+    const notified = await sendMembershipDecisionEmail({
+      clerkId: pending.clerkId,
+      firstName: pending.fName,
+      decision: "rejected",
+      comments: reviewComments,
+    });
+
+    return NextResponse.json(
+      { status: "rejected", emailed: notified.sent },
+      { status: 200 }
+    );
   }
 }

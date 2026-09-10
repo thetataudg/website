@@ -277,11 +277,11 @@ check("the subdomain is the default", alertsDomain(), "alerts.ttdg.org");
 // exactly the moment a member most wants a human.
 // The From mailboxes live on a subdomain with receiving disabled, so without a
 // Reply-To a member hitting reply is typing into a void.
-check("dues replies reach the treasurer", replyToFor("dues"), "treasurer@thetatau-dg.org");
-check("so do plan replies", replyToFor("plan"), "treasurer@thetatau-dg.org");
-check("and reimbursement replies", replyToFor("reimbursement"), "treasurer@thetatau-dg.org");
-check("events go elsewhere", replyToFor("events"), "general@thetatau-dg.org");
-check("an unknown category still reaches a human", replyToFor("whatever"), "general@thetatau-dg.org");
+check("dues replies reach the treasurer", replyToFor("dues"), "treasurer@ttdg.org");
+check("so do plan replies", replyToFor("plan"), "treasurer@ttdg.org");
+check("and reimbursement replies", replyToFor("reimbursement"), "treasurer@ttdg.org");
+check("events go elsewhere", replyToFor("events"), "general@ttdg.org");
+check("an unknown category still reaches a human", replyToFor("whatever"), "general@ttdg.org");
 check("never back to the send-only subdomain", replyToFor("dues").includes("alerts."), false);
 
 console.log("\nevery template routes to a real mailbox");

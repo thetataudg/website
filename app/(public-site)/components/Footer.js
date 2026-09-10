@@ -11,7 +11,7 @@ const socialLinks = [
   },
   {
     label: "Email",
-    href: "mailto:general@thetatau-dg.org",
+    href: "mailto:general@ttdg.org",
     icon: FaEnvelope,
   },
   {
@@ -33,56 +33,56 @@ const Footer = () => {
         <div className="mx-auto w-full max-w-[1400px] px-6 pb-2 pt-8 sm:px-10 sm:pt-10">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <Link href="/" className="flex items-center gap-4">
-            <Image
-              src="/crest-transparent.png"
-              width={56}
-              height={56}
-              alt="Theta Tau crest"
-              className="h-12 w-12"
-            />
-            <div>
-              <p className={`${bungee.className} text-lg uppercase tracking-[0.2em] text-[#cf3640]`}>
-                Theta Tau
-              </p>
-              <p className="text-sm text-[#f8ead4]/80">Delta Gamma Chapter at Arizona State University</p>
-              <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-[#f8ead4]/58">
-                Copyright © 2026 Theta Tau Delta Gamma. All rights reserved.
-              </p>
-            </div>
-          </Link>
+              <Image
+                src="/crest-transparent.png"
+                width={56}
+                height={56}
+                alt="Theta Tau crest"
+                className="h-12 w-12"
+              />
+              <div>
+                <p className={`${bungee.className} text-lg uppercase tracking-[0.2em] text-[#cf3640]`}>
+                  Theta Tau
+                </p>
+                <p className="text-sm text-[#f8ead4]/80">Delta Gamma Chapter at Arizona State University</p>
+                <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-[#f8ead4]/58">
+                  Copyright © 2026 Theta Tau Delta Gamma. All rights reserved.
+                </p>
+              </div>
+            </Link>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              {socialLinks.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <a
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                {socialLinks.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      target={item.href.startsWith("http") ? "_blank" : undefined}
+                      rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+                      aria-label={item.label}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#f5d79a]/35 bg-[#120a0a]/65 text-[#f8ead4] transition hover:-translate-y-[1px] hover:border-[#f5d79a] hover:bg-[#1f1111]"
+                    >
+                      <Icon className="h-4 w-4" />
+                    </a>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {legalLinks.map((item) => (
+                  <Link
                     key={item.label}
                     href={item.href}
-                    target={item.href.startsWith("http") ? "_blank" : undefined}
-                    rel={item.href.startsWith("http") ? "noreferrer" : undefined}
-                    aria-label={item.label}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#f5d79a]/35 bg-[#120a0a]/65 text-[#f8ead4] transition hover:-translate-y-[1px] hover:border-[#f5d79a] hover:bg-[#1f1111]"
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f8ead4]/92 transition hover:border-[#f5d79a]/70 hover:text-[#f5d79a]"
                   >
-                    <Icon className="h-4 w-4" />
-                  </a>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {legalLinks.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f8ead4]/92 transition hover:border-[#f5d79a]/70 hover:text-[#f5d79a]"
-                >
-                  {item.label}
-                </Link>
-              ))}
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
         </div>
 
         <div className="mt-6 border-t border-white/10">
