@@ -80,6 +80,65 @@
 .d2 { animation-delay: 110ms; }
 .d3 { animation-delay: 160ms; }
 .d4 { animation-delay: 210ms; }
+.d5 { animation-delay: 260ms; }
+.d6 { animation-delay: 310ms; }
+
+/* Photo ----------------------------------------------------------------- */
+
+/*
+ * The photo half of the card. It fades in and settles from a slight zoom,
+ * slower than the form so it reads as the backdrop arriving rather than
+ * another row, then drifts in a touch while the card is hovered.
+ */
+@keyframes mediaIn {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.media {
+  min-height: 34rem;
+}
+
+/* A warm wash at the foot of the photo, towards the chapter's red, so the
+ * image belongs to the page instead of sitting on it. */
+.media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    hsl(var(--primary) / 0.28),
+    transparent 45%
+  );
+}
+
+/* One of the two photo layers. They swap opacity to cross-fade; a fade is not
+ * motion, so it stays on under reduced motion. */
+.slot {
+  position: absolute;
+  inset: 0;
+  transition: opacity 1400ms ease-in-out;
+}
+
+.mediaImage {
+  animation: mediaIn 900ms var(--ease-out-soft) both;
+  transition: transform 1200ms var(--ease-out-soft);
+}
+
+.card:hover .mediaImage {
+  transform: scale(1.03);
+}
+
+:global(.dark) .mediaImage {
+  filter: brightness(0.75);
+}
 
 /* Step changes --------------------------------------------------------- */
 
@@ -197,12 +256,18 @@
   .mark,
   .rise,
   .step,
-  .alert {
+  .alert,
+  .mediaImage {
     animation: none;
+  }
+
+  .card:hover .mediaImage {
+    transform: none;
   }
 
   .press,
   .providerMark,
+  .mediaImage,
   .quietLink::after,
   .field input {
     transition: none;
