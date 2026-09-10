@@ -135,7 +135,7 @@ export interface RenderedMessage {
   push: string;
   emailSubject: string;
   link: string;
-  category: "dues" | "reimbursement" | "plan" | "event" | "availability" | "general";
+  category: "dues" | "reimbursement" | "plan" | "event" | "availability" | "general" | "mail";
   /// What the email's button says. Optional, and usually left unset: the
   /// wording is derived from `link` by `ctaLabelFor` so the button can never
   /// promise somewhere it does not go. Set it only when the action deserves
@@ -175,6 +175,7 @@ const DUES_PAGE_LABELS: Record<RenderedMessage["category"], string> = {
   event: "Open your dues",
   availability: "Open your dues",
   general: "Open your dues",
+  mail: "Open your dues",
 };
 
 /// Most specific path first, since these are prefix matches and
@@ -195,6 +196,7 @@ const CTA_BY_PATH: ReadonlyArray<readonly [string, string]> = [
   ["/member/brothers", "Open the roster"],
   ["/member/gem", "Open your GEM standing"],
   ["/member/profile", "Open your profile"],
+  ["/member/mail", "Open Chapter Mail"],
   ["/member", "Open the portal"],
 ] as const;
 
@@ -208,6 +210,7 @@ const CTA_BY_CATEGORY: Record<RenderedMessage["category"], string> = {
   event: "Open the event",
   availability: "Open the poll",
   general: "Open the portal",
+  mail: "Open Chapter Mail",
 };
 
 export function ctaLabelFor(

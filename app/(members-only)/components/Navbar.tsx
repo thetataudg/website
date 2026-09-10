@@ -32,6 +32,7 @@ import {
 import AccountMenu from "./AccountMenu";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
+import { usePendingRequestCount } from "./usePendingRequestCount";
 
 type UserData = {
   rollNo: string | null;
@@ -64,6 +65,8 @@ type NavItem = {
   href: string;
   active: boolean;
   children?: NavChild[];
+  /** Shows a small dot: something here is waiting on the viewer. */
+  badge?: boolean;
 };
 
 /* Gap between top-level nav items (NavigationMenuList uses space-x-1 = 4px)
@@ -210,6 +213,8 @@ export default function MemberNavbar() {
   const isAdmin =
     !!userData &&
     (userData.role === "admin" || userData.role === "superadmin");
+  // Account, deletion and email requests waiting for an admin.
+  const pendingRequests = usePendingRequestCount(isAdmin);
   const canSeeGem = Boolean(userData?.memberId);
   /* Admin is a single link now, not a dropdown. Admins land on the roster (the
    * tab strip there covers everything, GEM included); E-Council members who are
@@ -246,6 +251,7 @@ export default function MemberNavbar() {
         label: "Admin",
         href: adminHref,
         active: isActive("/member/admin"),
+        badge: pendingRequests > 0,
       });
     }
 
@@ -333,7 +339,7 @@ export default function MemberNavbar() {
         href: "#",
         active: false,
         children: [
-          { key: "more-soon", label: "Coming Soon", href: "#" },
+          { key: "more-mail", label: "Chapter Mail", href: "/member/mail" },
           {
             key: "more-merch",
             label: "Merchandise",
@@ -352,6 +358,7 @@ export default function MemberNavbar() {
   }, [
     isActive,
     isWaiting,
+    pendingRequests,
     profileHref,
     isPrivilegedUser,
     adminHref,
@@ -488,6 +495,7 @@ export default function MemberNavbar() {
                       active={item.active}
                     >
                       {item.label}
+                      {item.badge && <PendingDot />}
                     </DesktopLink>
                   )
                 )}
@@ -508,6 +516,7 @@ export default function MemberNavbar() {
               {navItems.map((item) => (
                 <span key={item.key} className={navItemBase}>
                   {item.label}
+                  {item.badge && <PendingDot />}
                   {item.children && (
                     <ChevronDown className="relative top-px ml-1 size-3" />
                   )}
@@ -581,6 +590,7 @@ export default function MemberNavbar() {
                       onNavigate={closeMobile}
                     >
                       {item.label}
+                      {item.badge && <PendingDot />}
                     </MobileLink>
                   )
                 )}
@@ -626,6 +636,17 @@ const navItemState = (active: boolean) =>
       "text-foreground/80 hover:text-foreground hover:bg-accent";
 
 /* ---------- desktop helpers ---------- */
+
+/** The "something is waiting" marker next to a nav label. */
+function PendingDot() {
+  return (
+    <span
+      className="ml-1.5 inline-block size-2 shrink-0 rounded-full bg-destructive"
+      role="status"
+      aria-label="Requests waiting for review"
+    />
+  );
+}
 
 function DesktopLink({
   href,

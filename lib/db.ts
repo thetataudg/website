@@ -46,9 +46,15 @@ export async function connectDB(): Promise<Connection> {
 
   if (!cached.promise) {
     cached.promise = mongoose
-      .connect(uri, { bufferCommands: false })
+      // Fail in seconds rather than hanging a request for the driver's default
+      // 30s when the host is unreachable.
+      .connect(uri, { bufferCommands: false, serverSelectionTimeoutMS: 8000 })
       .then((mongoose) => mongoose.connection)
       .catch((err) => {
+        // Forget the failed attempt. Caching the rejected promise meant one
+        // bad connect (a DNS blip, the database restarting) poisoned every
+        // request until the server was restarted.
+        cached.promise = null;
         throw new Error(`MongoDB connection error: ${err.message}`);
       });
   }

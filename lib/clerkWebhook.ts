@@ -19,12 +19,24 @@ export type ClerkWebhookHeaders = {
   signature: string | null;
 };
 
+export type SvixHeaders = ClerkWebhookHeaders;
+
 export function verifyClerkWebhook(
   rawBody: string,
   headers: ClerkWebhookHeaders,
   secret: string | undefined
 ): { ok: true } | { ok: false; reason: string } {
   if (!secret) return { ok: false, reason: "No CLERK_WEBHOOK_SECRET configured" };
+  return verifySvixWebhook(rawBody, headers, secret);
+}
+
+/// Resend delivers through Svix too, so its webhooks verify the same way.
+export function verifySvixWebhook(
+  rawBody: string,
+  headers: SvixHeaders,
+  secret: string | undefined
+): { ok: true } | { ok: false; reason: string } {
+  if (!secret) return { ok: false, reason: "No signing secret configured" };
   const { id, timestamp, signature } = headers;
   if (!id || !timestamp || !signature) {
     return { ok: false, reason: "Missing svix-id, svix-timestamp, or svix-signature" };

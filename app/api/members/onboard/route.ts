@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, getClerkUser } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
+import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { normalizePhone } from "@/lib/phone";
 
@@ -75,6 +76,16 @@ export async function POST(req: NextRequest) {
     if (await PendingMember.exists({ clerkId })) {
       return NextResponse.json(
         { error: "You have already submitted your profile." },
+        { status: 409 }
+      );
+    }
+
+    // A profile with no account behind it is a placeholder waiting to be
+    // claimed, and approval merges into it. Only a roll someone has already
+    // claimed is a conflict.
+    if (await Member.exists({ rollNo: String(rollNo).trim(), clerkId: { $type: "string" } })) {
+      return NextResponse.json(
+        { error: "That roll number already belongs to an account. Ask an officer if it's yours." },
         { status: 409 }
       );
     }

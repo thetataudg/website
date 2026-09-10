@@ -1,12 +1,13 @@
 // app/(members-only)/member/admin/pending/PendingList.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BriefcaseBusiness,
   Check,
   CircleAlert,
   ClipboardList,
+  Info,
   Link2,
   Plus,
   ShieldCheck,
@@ -14,6 +15,10 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import type { MailRequestRow } from "@/lib/mail/requests";
+import { announcePendingRequestsChanged } from "../../../components/usePendingRequestCount";
 
 import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
 import { LoadingSpinner } from "../../../components/LoadingState";
@@ -88,6 +93,7 @@ const REVIEW_SECTIONS: Array<{
 
 interface PendingRequest {
   requestType?: "access" | "deletion";
+  placeholderMatch?: { rollNo: string; fName: string; lName: string } | null;
   _id: string;
   clerkId: string;
   rollNo: string;
@@ -132,16 +138,34 @@ interface PendingRequest {
 
 interface Props {
   initialRequests: PendingRequest[];
+  initialMailRequests: MailRequestRow[];
+  mailDomain: string;
 }
 
-export default function PendingList({ initialRequests }: Props) {
+type Row =
+  | { kind: "member"; submittedAt: string; request: PendingRequest }
+  | { kind: "email"; submittedAt: string; request: MailRequestRow };
+
+export default function PendingList({ initialRequests, initialMailRequests, mailDomain }: Props) {
   const [requests, setRequests] = useState<PendingRequest[]>(initialRequests);
+  const [mailRequests, setMailRequests] = useState<MailRequestRow[]>(initialMailRequests);
   const [selected, setSelected] = useState<PendingRequest | null>(null);
+  const [selectedMail, setSelectedMail] = useState<MailRequestRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<ReviewSection>("profile");
   const [confirmReject, setConfirmReject] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const rows = useMemo<Row[]>(
+    () =>
+      [
+        ...requests.map((request) => ({ kind: "member" as const, submittedAt: request.submittedAt, request })),
+        ...mailRequests.map((request) => ({ kind: "email" as const, submittedAt: request.submittedAt, request })),
+      ].sort((a, b) => new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime()),
+    [requests, mailRequests]
+  );
 
   const [form, setForm] = useState({
     rollNo: "",
@@ -314,17 +338,26 @@ export default function PendingList({ initialRequests }: Props) {
     });
   };
 
-  async function review(id: string, action: "approve" | "reject") {
+  /// True when the request was handled. A failure used to close the dialog as
+  /// if it had worked; now it stays open with the reason on screen.
+  async function review(id: string, action: "approve" | "reject", reviewComments?: string): Promise<boolean> {
     const res = await fetch(`/api/members/pending/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, reviewComments: reviewComments?.trim() || undefined }),
     });
+    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      console.error("Failed to review:", await res.text());
-      return;
+      const message = body?.error || "The request couldn't be updated.";
+      setError(message);
+      toast.error(message);
+      return false;
     }
+    if (body?.merged) toast.success("Approved and linked to their existing profile.");
+    else toast.success(action === "approve" ? "Request approved." : "Request rejected.");
     setRequests((rs) => rs.filter((r) => r._id !== id));
+    announcePendingRequestsChanged();
+    return true;
   }
 
   const buildUpdates = () => {
@@ -387,8 +420,7 @@ export default function PendingList({ initialRequests }: Props) {
     setProcessing(true);
     setError(null);
     if (selected.requestType === "deletion") {
-      await review(selected._id, "approve");
-      setSelected(null);
+      if (await review(selected._id, "approve")) setSelected(null);
       setProcessing(false);
       return;
     }
@@ -403,8 +435,7 @@ export default function PendingList({ initialRequests }: Props) {
       setProcessing(false);
       return;
     }
-    await review(selected._id, "approve");
-    setSelected(null);
+    if (await review(selected._id, "approve")) setSelected(null);
     setProcessing(false);
   };
 
@@ -412,24 +443,25 @@ export default function PendingList({ initialRequests }: Props) {
     if (!selected) return;
     setProcessing(true);
     setError(null);
-    await review(selected._id, "reject");
-    setSelected(null);
+    if (await review(selected._id, "reject", rejectReason)) setSelected(null);
+    setRejectReason("");
     setProcessing(false);
   };
 
 
   return (
     <PageContainer className="max-w-7xl space-y-6">
+      <Toaster />
       <PageHeader
         title="Account requests"
-        description="Review requests to join the roster or remove an existing account."
+        description="Review requests to join the roster, get a chapter email, or remove an existing account."
       />
 
       <Card className="overflow-hidden">
         <CardHeader className="border-b">
           <CardTitle>Pending requests</CardTitle>
           <CardDescription>
-            {requests.length} request{requests.length === 1 ? "" : "s"} awaiting
+            {rows.length} request{rows.length === 1 ? "" : "s"} awaiting
             review.
           </CardDescription>
         </CardHeader>
@@ -447,9 +479,9 @@ export default function PendingList({ initialRequests }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.length ? (
-                requests.map((r) => (
-                  <TableRow key={r._id}>
+              {rows.length ? (
+                rows.map(({ kind, request: r }) => (
+                  <TableRow key={`${kind}-${r._id}`}>
                     <TableCell className="pl-6 font-mono text-sm">
                       #{r.rollNo}
                     </TableCell>
@@ -457,7 +489,11 @@ export default function PendingList({ initialRequests }: Props) {
                       {r.fName} {r.lName}
                     </TableCell>
                     <TableCell className="hidden text-sm sm:table-cell">
-                      {r.requestType === "deletion" ? "Delete account" : "Request access"}
+                      {kind === "email"
+                        ? "Email access"
+                        : r.requestType === "deletion"
+                          ? "Delete account"
+                          : "Request access"}
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
                       {r.submittedAt
@@ -468,7 +504,11 @@ export default function PendingList({ initialRequests }: Props) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => openModal(r)}
+                        onClick={() =>
+                          kind === "email"
+                            ? setSelectedMail(r as MailRequestRow)
+                            : openModal(r as PendingRequest)
+                        }
                       >
                         Review
                         <span className="sr-only">{` #${r.rollNo} ${r.fName} ${r.lName}`}</span>
@@ -527,6 +567,18 @@ export default function PendingList({ initialRequests }: Props) {
                 <CircleAlert className="size-4" />
                 <AlertTitle>Unable to save</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            {selected.requestType !== "deletion" && selected.placeholderMatch ? (
+              <Alert className="m-4 mb-0 sm:mx-6">
+                <Info className="size-4" />
+                <AlertTitle>Existing profile found</AlertTitle>
+                <AlertDescription>
+                  Approving will link this account to the existing profile for{" "}
+                  {selected.placeholderMatch.fName} {selected.placeholderMatch.lName} (#
+                  {selected.placeholderMatch.rollNo}), keeping its family tree, committee and dues history.
+                </AlertDescription>
               </Alert>
             ) : null}
 
@@ -1245,6 +1297,17 @@ export default function PendingList({ initialRequests }: Props) {
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {selected?.requestType !== "deletion" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="reject-reason">Reason (included in the email)</Label>
+              <Textarea
+                id="reject-reason"
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+          )}
           <AlertDialogFooter className="sm:justify-center">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
@@ -1259,7 +1322,126 @@ export default function PendingList({ initialRequests }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MailRequestDialog
+        request={selectedMail}
+        domain={mailDomain}
+        onClose={() => setSelectedMail(null)}
+        onDone={(id) => {
+          setMailRequests((rs) => rs.filter((r) => r._id !== id));
+          setSelectedMail(null);
+        }}
+      />
     </PageContainer>
+  );
+}
+
+/** Review for a chapter email request: the address, optionally corrected, and a decision. */
+function MailRequestDialog({
+  request,
+  domain,
+  onClose,
+  onDone,
+}: {
+  request: MailRequestRow | null;
+  domain: string;
+  onClose: () => void;
+  onDone: (id: string) => void;
+}) {
+  const [localPart, setLocalPart] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [lastId, setLastId] = useState<string | null>(null);
+
+  if (request && request._id !== lastId) {
+    setLastId(request._id);
+    setLocalPart(request.localPart);
+    setReason("");
+    setError(null);
+  }
+
+  async function decide(action: "approve" | "reject") {
+    if (!request) return;
+    setBusy(action);
+    setError(null);
+    const res = await fetch(`/api/mail/requests/${request._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, localPart, reviewComments: reason }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) {
+      setError(body?.error || "The request couldn't be updated.");
+      return;
+    }
+    toast.success(action === "approve" ? `Approved ${body.address}` : "Request denied.");
+    announcePendingRequestsChanged();
+    onDone(request._id);
+  }
+
+  return (
+    <Dialog open={Boolean(request)} onOpenChange={(open) => !open && !busy && onClose()}>
+      {request && (
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Email access for #{request.rollNo} {request.fName} {request.lName}
+            </DialogTitle>
+            <DialogDescription>
+              {request.memberStatus} member. Correct the address if needed, then approve or deny.
+            </DialogDescription>
+          </DialogHeader>
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <CircleAlert className="size-4" />
+              <AlertTitle>Unable to save</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-4">
+            <Field label="Address" htmlFor="mail-local">
+              <div className="flex h-10 items-center overflow-hidden rounded-md border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
+                <input
+                  id="mail-local"
+                  value={localPart}
+                  onChange={(e) => setLocalPart(e.target.value.replace(/\s/g, "").toLowerCase())}
+                  className="h-full min-w-0 flex-1 bg-transparent pl-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  maxLength={30}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <span className="shrink-0 select-none pr-3 text-sm text-muted-foreground">@{domain}</span>
+              </div>
+            </Field>
+            <Field label="Note to the member (optional)" htmlFor="mail-reason">
+              <Textarea id="mail-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+            </Field>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="outline" onClick={onClose} disabled={Boolean(busy)}>
+              Close
+            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => decide("reject")}
+                disabled={Boolean(busy)}
+              >
+                {busy === "reject" ? <LoadingSpinner size="sm" /> : <X className="size-4" />}
+                Deny
+              </Button>
+              <Button onClick={() => decide("approve")} disabled={Boolean(busy) || !localPart}>
+                {busy === "approve" ? <LoadingSpinner size="sm" /> : <Check className="size-4" />}
+                Approve
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }
 

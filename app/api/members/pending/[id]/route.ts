@@ -39,7 +39,6 @@ export async function PATCH(
       admin = await requireRole(req, ["superadmin", "admin"]);
     } catch (err: any) {
       logger.warn({ err }, "Unauthorized review attempt");
-      console.log("PATCH body:", body, "secret:", secret, "ENV_SECRET:", ENV_SECRET);
       return NextResponse.json(
         { error: err.message },
         { status: err.statusCode }
@@ -193,7 +192,7 @@ export async function PATCH(
   }
 
   if (action === "approve") {
-    await Member.create({
+    const profile: Record<string, any> = {
       clerkId: pending.clerkId,
       rollNo: pending.rollNo,
       fName: pending.fName,
@@ -226,12 +225,48 @@ export async function PATCH(
       role: pending.preferredRole || "member",
       needsProfileReview: false,
       needsPermissionReview: false,
-    });
+    };
+
+    // An officer may already have made a profile for this roll number, most
+    // often an alumnus added to the family tree before they had an account.
+    // Claim that profile instead of creating a second one: bigs, littles,
+    // committees, dues and event history all point at its _id, and a new
+    // document would orphan every one of them.
+    const existing = await Member.findOne({ rollNo: pending.rollNo });
+    let merged = false;
+    if (existing && existing.clerkId) {
+      return NextResponse.json(
+        { error: `Roll #${pending.rollNo} already belongs to an account.` },
+        { status: 409 }
+      );
+    }
+    if (existing) {
+      const isBlank = (value: any) =>
+        value === undefined ||
+        value === null ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0) ||
+        (value instanceof Map && value.size === 0) ||
+        (typeof value === "object" && !Array.isArray(value) && !(value instanceof Map) && Object.keys(value).length === 0);
+      for (const [key, value] of Object.entries(profile)) {
+        if (!isBlank(value)) existing.set(key, value);
+      }
+      const union = (a: any[] = [], b: any[] = []) =>
+        Array.from(new Map([...a, ...b].map((v) => [String(v), v])).values());
+      existing.set("bigs", union(existing.bigs, pending.bigs));
+      existing.set("littles", union(existing.littles, pending.littles));
+      existing.set("committees", union(existing.committees, pending.committees));
+      await existing.save();
+      merged = true;
+    } else {
+      await Member.create({ ...profile, bigs: pending.bigs ?? [], littles: pending.littles ?? [] });
+    }
 
     await PendingMember.findByIdAndDelete(params.id);
     logger.info({
-      event: "Pending request approved and deleted",
+      event: merged ? "Pending request merged into placeholder profile" : "Pending request approved and deleted",
       pendingId: params.id,
+      rollNo: pending.rollNo,
       approvedBy: admin.clerkId,
     });
 
@@ -247,7 +282,7 @@ export async function PATCH(
     });
 
     return NextResponse.json(
-      { status: "approved", emailed: notified.sent },
+      { status: "approved", merged, emailed: notified.sent },
       { status: 200 }
     );
   } else {

@@ -1,5 +1,6 @@
 import { findClerkEmailTemplate, renderClerkEmail } from "./clerkEmailTemplates";
 import { fromAddressFor, replyToFor } from "./from";
+import { recordSystemSend } from "@/lib/mail/budget";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -67,6 +68,7 @@ export async function sendClerkEmail(
     try {
       messageId = JSON.parse(responseBody)?.id ?? null;
     } catch {}
+    await recordSystemSend();
     return { sent: true, messageId };
   } catch {
     return { sent: false, reason: "Resend request failed" };

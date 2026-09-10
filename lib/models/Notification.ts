@@ -25,7 +25,7 @@ const NotificationSchema = new Schema(
     link: { type: String, default: "" },
     category: {
       type: String,
-      enum: ["dues", "reimbursement", "plan", "event", "availability", "general"],
+      enum: ["dues", "reimbursement", "plan", "event", "availability", "general", "mail"],
       default: "dues",
     },
     amountCents: { type: Number, default: null },

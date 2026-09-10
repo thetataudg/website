@@ -31,6 +31,10 @@ const AvatarImage = React.forwardRef<
     // non-square profile photo sideways to fit the circle rather than cropping
     // it. Portrait headshots came out visibly squashed.
     className={cn("aspect-square h-full w-full object-cover", className)}
+    // Avatars come in dozens (roster, committees, the bell). Off-screen ones
+    // wait until they scroll into view, and decoding stays off the main thread.
+    loading="lazy"
+    decoding="async"
     {...props}
   />
 ))

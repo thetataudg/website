@@ -25,7 +25,11 @@ const HOLD_MS = 6000;
 /// finished fading out.
 const FADE_MS = 1600;
 
-const photoSrc = (n: number) => `/login/login-${n}.png`;
+// These files were corrected in place after their first optimized variants
+// had already been cached. Keep a revision in the URL so Next and the browser
+// cannot serve the older sideways copies on either auth page.
+const PHOTO_REVISION = "upright-20260910";
+const photoSrc = (n: number) => `/login/login-${n}.png?v=${PHOTO_REVISION}`;
 
 /// Every photo once, in a random order. A new pass never opens on the photo
 /// that just showed, so the seam between passes can't repeat one.
