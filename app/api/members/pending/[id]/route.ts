@@ -279,6 +279,7 @@ export async function PATCH(
       firstName: pending.fName,
       decision: "approved",
       comments: reviewComments,
+      status: profile.status,
     });
 
     return NextResponse.json(

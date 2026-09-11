@@ -230,6 +230,12 @@ export async function PATCH(
 
   await markWalletPassUpdatedForMember(updatedMember._id.toString());
 
+  // A status change moves them between actives@ and alumni@ (or off both).
+  if ("status" in updates && updates.status) {
+    const { syncGroupsAfterStatusChange } = await import("@/lib/googleGroups");
+    await syncGroupsAfterStatusChange("member status change");
+  }
+
   // Committees are for actives. Graduating (or removing) someone strips them
   // from every roster and head slot, so they stop showing on the directory,
   // the PDF and the phone with no way to take them off by hand.

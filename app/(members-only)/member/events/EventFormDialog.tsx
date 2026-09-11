@@ -75,6 +75,8 @@ export interface EventFormValues {
   eventType: string;
   status: string;
   visibleToAlumni: boolean;
+  emailActives: boolean;
+  emailAlumni: boolean;
   chapterWide: boolean;
   recurrenceEnabled: boolean;
   recurrenceFrequency: string;
@@ -98,6 +100,8 @@ function blankForm(defaults?: Partial<EventFormValues>): EventFormValues {
     eventType: "event",
     status: "scheduled",
     visibleToAlumni: true,
+    emailActives: false,
+    emailAlumni: false,
     chapterWide: false,
     recurrenceEnabled: false,
     recurrenceFrequency: "weekly",
@@ -132,6 +136,8 @@ function formFor(event: any, defaults?: Partial<EventFormValues>): EventFormValu
     eventType: event.eventType || (event.committeeId ? "event" : "chapter"),
     status: event.status || "scheduled",
     visibleToAlumni: !!event.visibleToAlumni,
+    emailActives: false,
+    emailAlumni: false,
     chapterWide: event.eventType === "chapter" || !event.committeeId,
     recurrenceEnabled: !!(event.recurrence?.enabled || event.recurrenceEnabled),
     recurrenceFrequency:
@@ -216,8 +222,9 @@ export function EventFormDialog({
     setSaving(true);
     setError(null);
 
+    const { emailActives, emailAlumni, ...fields } = form;
     const payload: Record<string, unknown> = {
-      ...form,
+      ...fields,
       startTime: toArizonaIso(form.startTime),
       endTime: toArizonaIso(form.endTime),
       locationKind: form.locationKind,
@@ -237,6 +244,7 @@ export function EventFormDialog({
       },
     };
     if (editing) payload.applyToSeries = scope === "series" ? "series" : "single";
+    else payload.emailGroups = { actives: emailActives, alumni: emailAlumni && form.visibleToAlumni };
 
     try {
       const response = await fetch(editing ? `/api/events/${event._id}` : "/api/events", {
@@ -575,12 +583,48 @@ export function EventFormDialog({
                 <Checkbox
                   id="event-alumni"
                   checked={form.visibleToAlumni}
-                  onCheckedChange={(checked) => set("visibleToAlumni", checked === true)}
+                  onCheckedChange={(checked) => {
+                    const on = checked === true;
+                    set("visibleToAlumni", on);
+                    if (!on) set("emailAlumni", false);
+                  }}
                 />
                 <Label htmlFor="event-alumni" className="font-normal">
                   Visible to alumni
                 </Label>
               </div>
+
+              {!editing ? (
+                <div className="space-y-3 rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="event-email-actives"
+                      checked={form.emailActives}
+                      onCheckedChange={(checked) => set("emailActives", checked === true)}
+                    />
+                    <Label htmlFor="event-email-actives" className="font-normal">
+                      Email actives
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="event-email-alumni"
+                      checked={form.emailAlumni && form.visibleToAlumni}
+                      disabled={!form.visibleToAlumni}
+                      onCheckedChange={(checked) => set("emailAlumni", checked === true)}
+                    />
+                    <Label
+                      htmlFor="event-email-alumni"
+                      className={`font-normal ${form.visibleToAlumni ? "" : "text-muted-foreground"}`}
+                    >
+                      Email alumni
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    One email to the group now and 30 minutes before it starts.
+                  </p>
+                </div>
+              ) : null}
 
               <div className="flex items-center gap-2">
                 <Checkbox

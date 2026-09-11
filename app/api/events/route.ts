@@ -102,6 +102,7 @@ export async function POST(req: Request) {
       gemCategory,
       status,
       visibleToAlumni,
+      emailGroups: body.emailGroups ?? null,
       recurrence,
       actorId: member?._id ?? null,
     });

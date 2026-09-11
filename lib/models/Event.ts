@@ -66,6 +66,13 @@ const EventSchema = new Schema(
       default: "scheduled",
     },
     visibleToAlumni: { type: Boolean, default: true },
+    /// Chapter Google Groups that get one email when the event is created and
+    /// again 30 minutes before it starts. Chosen by whoever creates it, off by
+    /// default. Alumni only counts when the event is visible to alumni.
+    emailGroups: {
+      actives: { type: Boolean, default: false },
+      alumni: { type: Boolean, default: false },
+    },
     /// Notification guards. Each is the timestamp of the one announcement of
     /// its kind, and each is set *before* the send rather than after, so a
     /// retried request or a second cron tick that overlaps the first cannot

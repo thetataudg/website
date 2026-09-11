@@ -12,6 +12,7 @@ import { chapterRecipients } from "@/lib/notify/audience";
 import { newsletterPath } from "@/lib/newsletterTypes";
 import { siteUrl } from "@/lib/siteUrl";
 import type { RenderedMessage } from "@/lib/notify/templates";
+import { sendGroupEmail } from "@/lib/notify/groupEmail";
 
 export interface NewsletterAnnouncement {
   title: string;
@@ -45,7 +46,6 @@ export async function announceNewsletter(
     const recipients = await chapterRecipients();
     if (!recipients.length) {
       logger.warn({ slug: input.slug }, "No chapter recipients for newsletter");
-      return 0;
     }
 
     const link = newsletterPath(input.slug);
@@ -87,12 +87,27 @@ export async function announceNewsletter(
         ].filter((line) => line.trim().length > 0),
         // Says why this landed in their inbox, which is what a broadcast owes
         // the reader and a receipt does not.
-        footnote: "You're getting this because you're an active member of the chapter.",
+        footnote: "You're getting this because you're on the chapter newsletter list.",
         // The subject is the headline, so repeating it in the preview line
         // would waste the one bit of extra room the inbox gives.
         preheader: input.summary || `Published by the ${input.authorName}.`,
       },
     };
+
+    // The email goes once, to newsletter@ttdg.org. Members get the push.
+    await sendGroupEmail({
+      groups: ["newsletter"],
+      category: message.category,
+      subject: message.emailSubject,
+      content: {
+        ...message.email,
+        title: message.email!.title ?? message.title,
+        paragraphs: message.email!.paragraphs ?? [message.body],
+        ctaLabel: message.ctaLabel,
+        ctaHref: `${siteUrl()}${link}`,
+      },
+      idempotencyKey: `newsletter/${input.slug}`,
+    });
 
     let sent = 0;
     // Serial rather than Promise.all. Sixty simultaneous APNs streams and
@@ -107,6 +122,7 @@ export async function announceNewsletter(
           message,
           amountCents: null,
           sentBy: input.actorId ?? null,
+          channels: ["push"],
           // Not a movement on anybody's ledger. Auditing this would write a
           // `reminder_sent` row onto sixty financial timelines for an article.
           audit: false,

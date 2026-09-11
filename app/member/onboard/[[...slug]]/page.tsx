@@ -10,8 +10,15 @@ interface Params {
   slug?: string[];
 }
 
-export default async function OnboardPage({ params }: { params: Params }) {
+export default async function OnboardPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams?: { from?: string };
+}) {
   const slug = params.slug?.[0];
+  const fromAlumni = searchParams?.from === "alumni";
   const { userId } = await auth();
 
   if (!userId) {
@@ -19,7 +26,11 @@ export default async function OnboardPage({ params }: { params: Params }) {
     // surface as /sign-up and /sign-in, and it carries no third-party footer.
     // On success it lands back here, where `userId` is now set and the
     // invitation form below takes over.
-    return <SignUpWorkspace redirectUrl="/member/onboard" />;
+    return (
+      <SignUpWorkspace
+        redirectUrl={fromAlumni ? "/member/onboard?from=alumni" : "/member/onboard"}
+      />
+    );
   }
 
   const clerk = await getClerk();
@@ -57,5 +68,5 @@ export default async function OnboardPage({ params }: { params: Params }) {
     );
   }
 
-  return <OnboardForm invitedEmail={invitedEmail} />;
+  return <OnboardForm invitedEmail={invitedEmail} defaultAlumni={fromAlumni} />;
 }

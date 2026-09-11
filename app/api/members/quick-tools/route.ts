@@ -5,6 +5,7 @@ import logger from "@/lib/logger";
 import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
 import { detachMemberFromCommittees } from "@/lib/committeeMembership";
+import { syncGroupsAfterStatusChange } from "@/lib/googleGroups";
 
 export const runtime = "nodejs";
 
@@ -371,6 +372,9 @@ export async function POST(req: Request) {
       },
       "Quick tools graduations completed"
     );
+
+    // Graduates move from actives@ to alumni@.
+    await syncGroupsAfterStatusChange("graduations");
 
     return NextResponse.json({
       status: "ok",

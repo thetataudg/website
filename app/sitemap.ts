@@ -19,6 +19,8 @@ const routes: Array<{
   { path: "/about", priority: 0.8, changeFrequency: "monthly" },
   { path: "/brothers", priority: 0.8, changeFrequency: "weekly" },
   { path: "/mobile", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/alumni", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/alumni/stay-connected", priority: 0.5, changeFrequency: "monthly" },
   { path: "/pillars", priority: 0.6, changeFrequency: "yearly" },
   { path: "/donate", priority: 0.6, changeFrequency: "monthly" },
   { path: "/regionals", priority: 0.6, changeFrequency: "monthly" },

@@ -16,6 +16,7 @@ import {
   getSignedMinutesUrl,
 } from "@/lib/minutesStorage";
 import { formatMeetingDateKey } from "@/lib/minutes";
+import { announceMinutes } from "@/lib/minutesNotify";
 
 const isAdminOrScribe = (member: any) =>
   member &&
@@ -252,6 +253,9 @@ export async function POST(req: Request) {
       createdBy: member._id,
       hidden: false,
     });
+
+    // One email to minutes@ttdg.org. Never throws.
+    await announceMinutes(created);
 
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
