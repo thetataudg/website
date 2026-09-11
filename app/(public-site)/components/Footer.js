@@ -22,6 +22,7 @@ const socialLinks = [
 ];
 
 const legalLinks = [
+  { label: "Alumni", href: "/alumni" },
   { label: "Privacy", href: "/privacy-policy" },
   { label: "Terms", href: "/terms" },
 ];

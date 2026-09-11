@@ -106,7 +106,8 @@ async function fetchServiceAccountFromS3(
   return tryParseServiceAccount(contents);
 }
 
-async function loadServiceAccount() {
+/// Shared with the Google Groups sync, which signs in as the same account.
+export async function loadServiceAccount() {
   if (cachedCredentials) return cachedCredentials;
   if (credentialsLoadPromise) return credentialsLoadPromise;
 

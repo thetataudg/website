@@ -11,7 +11,13 @@ export const dynamic = "force-dynamic";
 export default function SignUpPage({
   searchParams,
 }: {
-  searchParams: { redirect_url?: string };
+  searchParams: { redirect_url?: string; from?: string };
 }) {
-  return <SignUpWorkspace redirectUrl={searchParams?.redirect_url || undefined} />;
+  // /alumni links here with ?from=alumni; carrying it to onboarding pre-checks
+  // "I'm an alum" there. An explicit redirect_url still wins.
+  const fallback =
+    searchParams?.from === "alumni" ? "/member/onboard?from=alumni" : undefined;
+  return (
+    <SignUpWorkspace redirectUrl={searchParams?.redirect_url || fallback} />
+  );
 }

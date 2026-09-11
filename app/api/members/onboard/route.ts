@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     resumeUrl = "",
     profilePicUrl = "",
     socialLinks = {},
+    alumni = false,
   } = await req.json();
 
   if (!rollNo || !gradYear) {
@@ -119,7 +120,9 @@ export async function POST(req: NextRequest) {
     profilePicUrl,
     socialLinks,
     status: "pending",
-    preferredStatus: "Active",
+    // Only a suggestion: the reviewing officer sees it pre-filled on the
+    // Status select and can change it before approving.
+    preferredStatus: alumni === true ? "Alumni" : "Active",
     preferredRole: "member",
   });
 

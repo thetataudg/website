@@ -66,6 +66,10 @@ export async function ensureFutureOccurrences(parentId: any) {
       recurrence: { enabled: false },
       status: "scheduled",
       visibleToAlumni: parent.visibleToAlumni,
+      emailGroups: {
+        actives: parent.emailGroups?.actives === true,
+        alumni: parent.emailGroups?.alumni === true,
+      },
       attendees: [],
       recurrenceParentId: parentId,
     });

@@ -18,7 +18,10 @@ import logger from "@/lib/logger";
 import { notifyMany } from "@/lib/notify";
 import { eventRecipients } from "@/lib/notify/audience";
 import { ARIZONA_ZONE } from "@/lib/recurrence";
+import { renderTemplate } from "@/lib/notify/templates";
 import type { NotifyTemplate, TemplateContext } from "@/lib/notify/templates";
+import { sendGroupEmail, type ChapterGroup } from "@/lib/notify/groupEmail";
+import { absoluteUrl } from "@/lib/siteUrl";
 
 /// How far ahead the reminder goes out.
 export const STARTING_SOON_LEAD_MS = 30 * 60 * 1000;
@@ -48,10 +51,54 @@ interface EventAnnouncement {
   actorId?: any | null;
 }
 
+/// The groups the creator chose to email. Alumni only if they can see it.
+function eventEmailGroups(event: any): ChapterGroup[] {
+  const groups: ChapterGroup[] = [];
+  if (event?.emailGroups?.actives === true) groups.push("actives");
+  if (event?.emailGroups?.alumni === true && event?.visibleToAlumni === true) {
+    groups.push("alumni");
+  }
+  return groups;
+}
+
+/// One email to the chosen groups, for creation and the 30 minute warning.
+/// "Started" is push only: it lands 30 minutes after the warning already did.
+async function emailEventGroups(
+  event: any,
+  template: NotifyTemplate,
+  context: Partial<TemplateContext>
+): Promise<void> {
+  if (template !== "event_published" && template !== "event_starting_soon") return;
+  const groups = eventEmailGroups(event);
+  if (!groups.length) return;
+  const message = renderTemplate(template, { ...context, amountCents: 0 } as TemplateContext);
+  await sendGroupEmail({
+    groups,
+    category: "events",
+    subject: message.emailSubject,
+    content: {
+      eyebrow: template === "event_published" ? "New event" : "Starting soon",
+      title: message.title,
+      paragraphs: [message.body],
+      ctaLabel: "Open the event",
+      ctaHref: absoluteUrl(message.link),
+      preheader: message.push,
+    },
+    idempotencyKey: `${template}/${String(event?._id || "")}`,
+  });
+}
+
 /// One event, one moment, everybody who can see it.
 async function announceEvent(input: EventAnnouncement): Promise<number> {
   const { event, template, actorId } = input;
   try {
+    await emailEventGroups(event, template, {
+      eventName: String(event?.name || "").trim(),
+      eventWhen: eventWhenLabel(event?.startTime ? new Date(event.startTime) : null),
+      eventLocation: String(event?.location || "").trim(),
+      eventId: String(event?._id || ""),
+    });
+
     // `visibleToAlumni` defaults true on the schema, but an event created
     // before that field existed has no value at all. Reading a missing flag as
     // "alumni too" would quietly widen every legacy event's audience, so the
@@ -83,6 +130,10 @@ async function announceEvent(input: EventAnnouncement): Promise<number> {
         // Nobody's ledger moved. A finance event stamped onto a member for a
         // calendar entry would put a chapter meeting in their payment history.
         audit: false,
+        // Members get the push, which opens the event in the app or on the
+        // site. Email goes once to the chosen groups instead of once per
+        // member, which had used up the whole Resend budget.
+        channels: ["push"],
         // Thirty minutes of warning is only useful if it arrives through a
         // Focus mode, which is exactly the case Apple reserves this level for.
         timeSensitive: template === "event_starting_soon",

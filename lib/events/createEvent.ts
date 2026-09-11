@@ -30,6 +30,9 @@ export interface CreateEventInput {
   gemCategory?: string | null;
   status?: string;
   visibleToAlumni?: boolean;
+  /// Which chapter groups get an email about this event. Both off unless the
+  /// creator turns them on.
+  emailGroups?: { actives?: boolean; alumni?: boolean } | null;
   recurrence?: {
     enabled?: boolean;
     frequency?: string;
@@ -72,6 +75,12 @@ export async function createEvent(input: CreateEventInput) {
   const normalizedGemCategory = normalizeGemCategory(input.gemCategory);
   const normalizedRecurrence = normalizeRecurrence(input.recurrence);
   const where = normalizeWhere(input);
+  const visibleToAlumni = input.visibleToAlumni ?? true;
+  // Alumni can't be emailed about an event they can't see.
+  const emailGroups = {
+    actives: input.emailGroups?.actives === true,
+    alumni: input.emailGroups?.alumni === true && visibleToAlumni,
+  };
 
   const eventDoc = {
     name: input.name.trim(),
@@ -86,7 +95,8 @@ export async function createEvent(input: CreateEventInput) {
     gemCategory: normalizedGemCategory,
     recurrence: normalizedRecurrence,
     status: input.status ?? "scheduled",
-    visibleToAlumni: input.visibleToAlumni ?? true,
+    visibleToAlumni,
+    emailGroups,
     ...where,
     attendees: [],
   };
@@ -110,10 +120,12 @@ export async function createEvent(input: CreateEventInput) {
           eventType: normalizedEventType,
           recurrence: normalizedRecurrence,
           gemCategory: normalizedGemCategory,
+          emailGroups,
         },
       }
     );
     event.recurrence = normalizedRecurrence;
+    event.emailGroups = emailGroups;
   }
 
   if (committeeId) {

@@ -51,17 +51,24 @@ async function addressFor(clerkId: string): Promise<string | null> {
 function contentFor(
   decision: MembershipDecision,
   firstName: string,
-  comments: string
+  comments: string,
+  status?: string
 ): EmailContent {
   const greeting = firstName ? `${firstName}, ` : "";
 
   if (decision === "approved") {
+    // Alumni don't pay dues or vote, and what they mostly came for is the
+    // minutes and newsletters, which start arriving on the next group sync.
+    const whatOpens =
+      status === "Alumni"
+        ? `Welcome back. You'll now get chapter meeting minutes and newsletters by email, and you can see alumni events and the brother directory. More at ${siteUrl()}/alumni/stay-connected.`
+        : "Everything opens up from here: the calendar, check-in, dues, voting and the brother directory.";
     return {
       eyebrow: "Membership",
       title: "You're in",
       paragraphs: [
         `${greeting}your access request has been approved. Your profile is live on the chapter roster, and you can sign in on the app or the website now.`,
-        "Everything opens up from here: the calendar, check-in, dues, voting and the brother directory.",
+        whatOpens,
       ].concat(comments ? [`A note from the officer who reviewed it: ${comments}`] : []),
       ctaLabel: "Open the member portal",
       ctaHref: `${siteUrl()}/member`,
@@ -98,6 +105,8 @@ export async function sendMembershipDecisionEmail(args: {
   firstName?: string;
   decision: MembershipDecision;
   comments?: string;
+  /// The member status approval assigned. "Alumni" gets its own copy.
+  status?: string;
 }): Promise<DecisionEmailResult> {
   if (!process.env.RESEND_API_KEY) {
     return { sent: false, skipped: "resend not configured" };
@@ -112,7 +121,8 @@ export async function sendMembershipDecisionEmail(args: {
   const content = contentFor(
     args.decision,
     String(args.firstName || "").trim(),
-    String(args.comments || "").trim()
+    String(args.comments || "").trim(),
+    args.status
   );
 
   try {

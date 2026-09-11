@@ -18,6 +18,7 @@ import {
 } from "../../../(members-only)/components/shell/FormSections";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -47,10 +48,13 @@ type FormAlert = { type: "success" | "destructive"; message: string } | null;
 
 export default function OnboardForm({
   invitedEmail,
+  defaultAlumni = false,
 }: {
   invitedEmail: string;
+  defaultAlumni?: boolean;
 }) {
   const { user, isLoaded } = useUser();
+  const [alumni, setAlumni] = useState(defaultAlumni);
 
   const [form, setForm] = useState({
     rollNo: "",
@@ -195,6 +199,7 @@ export default function OnboardForm({
       work: form.work,
       awards: form.awards,
       customSections: form.customSections,
+      alumni,
       socialLinks: {
         github: form.github.trim(),
         linkedin: form.linkedin.trim(),
@@ -287,6 +292,17 @@ export default function OnboardForm({
                 </dd>
               </div>
             </dl>
+            <label
+              htmlFor="onboard-alumni"
+              className="mt-5 flex cursor-pointer items-center gap-3 text-sm font-medium text-foreground"
+            >
+              <Checkbox
+                id="onboard-alumni"
+                checked={alumni}
+                onCheckedChange={(value) => setAlumni(value === true)}
+              />
+              I&apos;m an alum (graduated)
+            </label>
           </CardContent>
         </Card>
 
