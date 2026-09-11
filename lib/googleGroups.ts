@@ -67,6 +67,15 @@ function keepList(): Set<string> {
   );
 }
 
+/// Chapter mailboxes (regent@, treasurer@, scribe@ and the rest) are officer
+/// seats, not people, so no member status puts them in actives@ or alumni@.
+/// Whoever added one to a group meant it, and the sync leaves it there.
+function isChapterMailbox(email: string): boolean {
+  const domain = (process.env.CHAPTER_EMAIL_DOMAIN || "ttdg.org").trim().toLowerCase();
+  const groups = GROUPS.map((group) => norm(groupAddress(group)));
+  return email.endsWith(`@${domain}`) && !groups.includes(email);
+}
+
 interface GroupMember {
   email: string;
   role: string;
@@ -155,7 +164,13 @@ function planFor(group: ChapterGroup, current: GroupMember[], roster: SiteRoster
     add: Array.from(desired).filter((email) => !currentEmails.has(email)).sort(),
     remove: current
       .map((member) => member.email)
-      .filter((email) => !desired.has(email) && !protectedEmails.has(email) && removable(email))
+      .filter(
+        (email) =>
+          !desired.has(email) &&
+          !protectedEmails.has(email) &&
+          !isChapterMailbox(email) &&
+          removable(email)
+      )
       .sort(),
     errors: [],
   };
