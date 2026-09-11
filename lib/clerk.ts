@@ -78,8 +78,10 @@ export async function requireAdmin(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
 
+  // `role` is the only admin flag on Member. This used to read `isAdmin`,
+  // which doesn't exist, so it turned away every admin.
   const member = await Member.findOne({ clerkId: userId });
-  if (!member || !member.isAdmin) {
+  if (!member || (member.role !== "admin" && member.role !== "superadmin")) {
     throw new ForbiddenError("User is not an admin");
   }
 
