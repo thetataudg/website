@@ -55,6 +55,81 @@ function readRoll(value: unknown): string {
   return String(value ?? "").trim().replace(/^#/, "");
 }
 
+export interface AirtableEmailRow {
+  roll: string;
+  /** Lowercased, trimmed, or "" when the cell is blank. */
+  personal: string;
+  asu: string;
+}
+
+/// Every member's personal and ASU email, keyed by roll number.
+///
+/// Feeds the Google Groups sync, which mails actives at their ASU address and
+/// alumni at their personal one. Same guard as the phone read: a column name
+/// that doesn't match comes back as blank on every row, which would read as
+/// "nobody has an email" and empty the groups, so a missing column throws.
+export async function fetchAirtableEmails(): Promise<Map<string, AirtableEmailRow>> {
+  const config = airtableConfig();
+  if (!config) {
+    throw new AirtableError("Airtable isn't configured on this server.", 503);
+  }
+  const personalField = process.env.AIRTABLE_PERSONAL_EMAIL_FIELD || "Personal Email";
+  const asuField = process.env.AIRTABLE_ASU_EMAIL_FIELD || "ASU Email";
+  const endpoint = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.table)}`;
+  const rows = new Map<string, AirtableEmailRow>();
+  const seen = { personal: false, asu: false };
+  let offset: string | undefined;
+  let pages = 0;
+  let records = 0;
+
+  do {
+    const url = new URL(endpoint);
+    url.searchParams.set("pageSize", "100");
+    for (const field of [config.rollField, personalField, asuField]) {
+      url.searchParams.append("fields[]", field);
+    }
+    if (offset) url.searchParams.set("offset", offset);
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${config.pat}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new AirtableError(`Airtable returned ${res.status} while reading member emails.`);
+    }
+    const json = (await res.json()) as {
+      records?: Array<{ id: string; fields?: Record<string, unknown> }>;
+      offset?: string;
+    };
+
+    for (const record of json.records ?? []) {
+      records += 1;
+      const fields = record.fields ?? {};
+      if (personalField in fields) seen.personal = true;
+      if (asuField in fields) seen.asu = true;
+      const roll = readRoll(fields[config.rollField]);
+      if (!roll) continue;
+      rows.set(roll, {
+        roll,
+        personal: String(fields[personalField] ?? "").trim().toLowerCase(),
+        asu: String(fields[asuField] ?? "").trim().toLowerCase(),
+      });
+    }
+
+    offset = json.offset;
+    pages += 1;
+    if (offset) await sleep(250);
+  } while (offset && pages < 200);
+
+  if (records > 0 && (!seen.personal || !seen.asu)) {
+    throw new AirtableError(
+      `Airtable returned no "${!seen.personal ? personalField : asuField}" column. Check the column name in the base; it is case and space sensitive.`,
+      502
+    );
+  }
+  return rows;
+}
+
 export async function fetchAirtableMembers(): Promise<AirtableMemberRow[]> {
   const config = airtableConfig();
   if (!config) {

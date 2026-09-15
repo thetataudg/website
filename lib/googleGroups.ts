@@ -19,6 +19,7 @@ import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { loadServiceAccount } from "@/lib/calendar";
 import { ensureMemberEmails } from "@/lib/notify/emails";
+import { fetchAirtableEmails } from "@/lib/airtable";
 import { groupAddress, type ChapterGroup } from "@/lib/notify/groupEmail";
 import { alertsDomain } from "@/lib/notify/from";
 
@@ -105,7 +106,27 @@ interface SiteRoster {
   known: Set<string>;
 }
 
+const isAsu = (email: string) => email.endsWith("@asu.edu");
+
+/// Roll numbers that are never mailed, like the hidden Super Admin account.
+function skippedRolls(): Set<string> {
+  return new Set(
+    (process.env.GROUPS_SYNC_SKIP_ROLLS || "000-ADMIN").split(",").map((roll) => roll.trim()).filter(Boolean)
+  );
+}
+
+/// Status comes from the site; the address comes from Airtable by roll.
+///
+/// Actives get their ASU email, since that's the one they check for chapter
+/// business. Alumni get their personal email, since an ASU address stops
+/// working after graduation. An ASU address is only used for an alum who has
+/// nothing else. Each falls back to the site sign-in email when Airtable has
+/// nothing.
 async function siteRoster(): Promise<SiteRoster> {
+  // Thrown, not swallowed: without Airtable every active would fall back to
+  // their sign-in email and the sync would swap the whole list back.
+  const airtable = await fetchAirtableEmails();
+
   const withAccounts = await Member.find({
     status: { $in: ["Active", "Alumni"] },
     clerkId: { $type: "string" },
@@ -114,16 +135,35 @@ async function siteRoster(): Promise<SiteRoster> {
     .lean<any[]>();
   await ensureMemberEmails(withAccounts.map((member) => member._id)).catch(() => undefined);
 
-  const members = await Member.find({ email: { $type: "string" } })
-    .select("status email")
-    .lean<any[]>();
+  const members = await Member.find({}).select("status email rollNo").lean<any[]>();
   const roster: SiteRoster = { active: new Set(), alumni: new Set(), known: new Set() };
+  const skip = skippedRolls();
+
+  // Every address Airtable holds for anyone, whatever their status, counts as
+  // known. That is what lets an alum's old ASU address, or an active's old
+  // personal one, be cleaned out of a group.
+  for (const row of Array.from(airtable.values())) {
+    if (row.personal) roster.known.add(row.personal);
+    if (row.asu) roster.known.add(row.asu);
+  }
+
   for (const member of members) {
-    const email = norm(member.email);
-    if (!email) continue;
-    roster.known.add(email);
-    if (member.status === "Active") roster.active.add(email);
-    if (member.status === "Alumni") roster.alumni.add(email);
+    const signIn = norm(member.email);
+    if (signIn) roster.known.add(signIn);
+    const roll = String(member.rollNo ?? "").trim();
+    if (skip.has(roll)) continue;
+    const row = airtable.get(roll);
+
+    if (member.status === "Active") {
+      const address = row?.asu || row?.personal || signIn;
+      if (address) roster.active.add(address);
+    } else if (member.status === "Alumni") {
+      // A non-ASU address first. An alum with nothing but an ASU address on
+      // file still gets it, since some keep forwarding after graduation.
+      const candidates = [row?.personal, signIn, row?.asu].filter(Boolean) as string[];
+      const address = candidates.find((email) => !isAsu(email)) ?? candidates[0];
+      if (address) roster.alumni.add(address);
+    }
   }
   return roster;
 }

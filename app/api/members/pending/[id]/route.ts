@@ -5,7 +5,7 @@ import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { normalizePhone } from "@/lib/phone";
-import { sendMembershipDecisionEmail } from "@/lib/membershipDecisionEmail";
+import { sendMembershipDecisionEmail } from "@/lib/membershipEmails";
 
 const memberStatusOptions = ["Active", "Alumni", "Removed", "Deceased"];
 // Roles a reviewer may assign from the pending-approval screen. "superadmin" is

@@ -6,6 +6,8 @@ import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { normalizePhone } from "@/lib/phone";
+import { sendAccessRequestQueuedEmail } from "@/lib/membershipEmails";
+import { notifyOfficersOfAccessRequest } from "@/lib/membershipNotify";
 
 export async function POST(req: NextRequest) {
   let clerkId: string;
@@ -131,7 +133,27 @@ export async function POST(req: NextRequest) {
       clerkId,
       rollNo,
     });
-    return NextResponse.json({ id: pending._id }, { status: 201 });
+
+    // Both sides of the queue get told, and both are awaited rather than fired
+    // and forgotten: this runs in a serverless function, where a floating
+    // promise is not guaranteed to survive the response. Neither one throws,
+    // so a mail or push failure cannot undo a request that is already saved.
+    //
+    // Run together because they are independent and each costs a round trip to
+    // a different service.
+    const [queued, announced] = await Promise.all([
+      sendAccessRequestQueuedEmail({ clerkId, firstName: fName }),
+      notifyOfficersOfAccessRequest({
+        firstName: fName,
+        lastName: lName,
+        rollNo: String(rollNo).trim(),
+      }),
+    ]);
+
+    return NextResponse.json(
+      { id: pending._id, emailed: queued.sent, officersNotified: announced.notified },
+      { status: 201 }
+    );
   } catch (err: any) {
     logger.error({ err }, "Onboard submission failed");
     return NextResponse.json({ error: "Server error" }, { status: 500 });

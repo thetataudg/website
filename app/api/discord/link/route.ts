@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
+import PendingMember from "@/lib/models/PendingMember";
 import logger from "@/lib/logger";
 import { createHmac } from "node:crypto";
 import { requireAuth } from "@/lib/clerk";
-import { normalizeDiscordRedirect } from "@/lib/discordLink";
+import { findDiscordLinkTarget, normalizeDiscordRedirect } from "@/lib/discordLink";
 
 const DISCORD_LINK_CLIENT_ID = process.env.DISCORD_LINK_CLIENT_ID;
 const DISCORD_LINK_REDIRECT_URI = process.env.DISCORD_LINK_REDIRECT_URI;
@@ -38,18 +39,36 @@ export async function GET(req: Request) {
   }
 
   await connectDB();
-  const memberRecord = await Member.findOne({ clerkId }).lean();
-  const member = Array.isArray(memberRecord) ? memberRecord[0] : memberRecord;
-  if (!member) {
-    logger.warn({ clerkId }, "Discord link requested but member profile missing");
-    return NextResponse.json({ error: "Member record missing" }, { status: 404 });
+  // A pending applicant counts here: onboarding asks for the Discord link
+  // before anyone has reviewed the request, so insisting on a Member row made
+  // that screen's required step impossible to complete.
+  const lookup = await findDiscordLinkTarget(clerkId, { Member, PendingMember });
+  if (!lookup.ok) {
+    // A declined request gets 403 and its own wording. Reusing the 404 would
+    // tell someone whose request was turned down to go and finish it, which
+    // is both wrong and a loop with no exit.
+    const declined = lookup.reason === "rejected";
+    logger.warn(
+      { clerkId, reason: lookup.reason },
+      declined
+        ? "Discord link refused: access request was declined"
+        : "Discord link requested but no member or pending profile exists"
+    );
+    return NextResponse.json(
+      {
+        error: declined
+          ? "Your access request was not approved, so Discord can't be linked."
+          : "Finish creating your profile before linking Discord.",
+      },
+      { status: declined ? 403 : 404 }
+    );
   }
 
   const url = new URL(req.url);
   const redirectTo = normalizeDiscordRedirect(url.searchParams.get("redirectTo"));
   const payload = JSON.stringify({
     clerkId,
-    memberId: member._id?.toString() || "",
+    memberId: lookup.target.id,
     redirectTo,
     expiresAt: Date.now() + STATE_TTL_MS,
   });

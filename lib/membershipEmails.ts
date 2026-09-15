@@ -1,10 +1,15 @@
-// lib/membershipDecisionEmail.ts
+// lib/membershipEmails.ts
 //
-// Tells an applicant what happened to their access request.
+// The two emails an applicant gets about their access request: one when it
+// lands in the queue, one when it is decided.
 //
 // Until now a decision was silent: the request simply changed state, and the
 // applicant found out only if they happened to reopen the app. Approval in
 // particular is news somebody is waiting on.
+//
+// The queued email closes the other end of the same gap. Submitting the
+// onboarding form showed a modal and then nothing ever again, so an applicant
+// who closed the tab had no evidence they had applied at all.
 
 import logger from "@/lib/logger";
 import { getClerkUser } from "@/lib/clerk";
@@ -20,9 +25,15 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 export type MembershipDecision = "approved" | "rejected";
 
-export type DecisionEmailResult =
+/// Shared by both sends. `skipped` is a reason, not an error: a missing
+/// address or an unconfigured Resend is something a caller reports, never
+/// something that undoes the request the email was describing.
+export type MembershipEmailResult =
   | { sent: true }
   | { sent: false; skipped: string };
+
+/// The old name, kept so the decision route's call site reads unchanged.
+export type DecisionEmailResult = MembershipEmailResult;
 
 function siteUrl() {
   const configured =
@@ -125,6 +136,85 @@ export async function sendMembershipDecisionEmail(args: {
     args.status
   );
 
+  return deliver({
+    to,
+    subject:
+      args.decision === "approved"
+        ? "Your Theta Tau membership is approved"
+        : "An update on your Theta Tau access request",
+    content,
+    kind: `decision:${args.decision}`,
+    clerkId: args.clerkId,
+  });
+}
+
+/**
+ * Tell an applicant their request is in the queue.
+ *
+ * Sent the moment the onboarding form is accepted, so the only acknowledgement
+ * is no longer a modal the applicant can close and never see again. It names
+ * the two things somebody in a queue actually wants to know: that it arrived,
+ * and that nothing further is expected of them.
+ *
+ * Never throws, for the same reason the decision email does not: the request
+ * row is already written by the time this runs, and a mail failure must not
+ * turn a successful submission into an error.
+ */
+export async function sendAccessRequestQueuedEmail(args: {
+  clerkId?: string;
+  firstName?: string;
+}): Promise<MembershipEmailResult> {
+  if (!process.env.RESEND_API_KEY) {
+    return { sent: false, skipped: "resend not configured" };
+  }
+  if (!args.clerkId) {
+    return { sent: false, skipped: "no clerk account on the request" };
+  }
+
+  const to = await addressFor(args.clerkId);
+  if (!to) return { sent: false, skipped: "no email address" };
+
+  const firstName = String(args.firstName || "").trim();
+  const greeting = firstName ? `${firstName}, ` : "";
+
+  return deliver({
+    to,
+    subject: "We have your Theta Tau access request",
+    content: {
+      eyebrow: "Membership",
+      title: "Request received",
+      paragraphs: [
+        `${greeting}your access request is in the queue. An officer reviews these by hand, so it will not be instant, and you will get an email either way once somebody has looked at it.`,
+        // Said plainly because the most common thing an applicant does while
+        // waiting is submit again, assuming the first one failed.
+        "There is nothing else for you to do right now.",
+      ],
+      ctaLabel: "Check your request",
+      ctaHref: `${siteUrl()}/member`,
+      footnote:
+        "If something on the form was wrong, reply to this message and an officer can fix it before they review.",
+      preheader: "Your Theta Tau access request is waiting for an officer to review.",
+    },
+    kind: "queued",
+    clerkId: args.clerkId,
+  });
+}
+
+/**
+ * The one place either email actually goes out.
+ *
+ * Shared so the two messages cannot drift on sender, reply-to, or whether the
+ * send is counted against the daily budget — the last of which is easy to
+ * forget in a copy and silently over-spends the chapter's mail allowance.
+ */
+async function deliver(args: {
+  to: string;
+  subject: string;
+  content: EmailContent;
+  /// Log label only, so a failure says which of the two messages it was.
+  kind: string;
+  clerkId: string;
+}): Promise<MembershipEmailResult> {
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
@@ -134,31 +224,28 @@ export async function sendMembershipDecisionEmail(args: {
       },
       body: JSON.stringify({
         from: fromAddressFor("auth"),
-        to: [to],
+        to: [args.to],
         reply_to: replyToFor("auth"),
-        subject:
-          args.decision === "approved"
-            ? "Your Theta Tau membership is approved"
-            : "An update on your Theta Tau access request",
-        html: renderEmailHtml(content),
-        text: renderEmailText(content),
+        subject: args.subject,
+        html: renderEmailHtml(args.content),
+        text: renderEmailText(args.content),
       }),
     });
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       logger.warn(
-        { status: res.status, detail: detail.slice(0, 300), decision: args.decision },
-        "Resend rejected a membership decision email"
+        { status: res.status, detail: detail.slice(0, 300), kind: args.kind },
+        "Resend rejected a membership email"
       );
       return { sent: false, skipped: `resend ${res.status}` };
     }
 
     await recordSystemSend();
-    logger.info({ decision: args.decision, clerkId: args.clerkId }, "Membership decision emailed");
+    logger.info({ kind: args.kind, clerkId: args.clerkId }, "Membership email sent");
     return { sent: true };
   } catch (err) {
-    logger.warn({ err, decision: args.decision }, "Failed to send membership decision email");
+    logger.warn({ err, kind: args.kind }, "Failed to send a membership email");
     return { sent: false, skipped: "send failed" };
   }
 }
