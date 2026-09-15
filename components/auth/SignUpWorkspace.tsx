@@ -67,10 +67,14 @@ export default function SignUpWorkspace({
     setNotice("");
 
     try {
+      // Username is optional in Clerk, and an empty string is not the same as
+      // leaving it out: Clerk validates "" and rejects it. Omit the key unless
+      // somebody actually typed one.
+      const chosenUsername = username.trim();
       await signUp.create({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        username: username.trim(),
+        ...(chosenUsername ? { username: chosenUsername } : {}),
         emailAddress: email.trim(),
         password,
       });
@@ -261,12 +265,11 @@ export default function SignUpWorkspace({
               </div>
 
               <div className={`${styles.rise} ${styles.d3} ${styles.field} space-y-2`}>
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">Username (optional)</Label>
                 <Input
                   id="username"
                   name="username"
                   autoComplete="username"
-                  required
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                 />

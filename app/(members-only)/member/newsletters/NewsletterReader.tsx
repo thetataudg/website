@@ -91,6 +91,7 @@ export default function NewsletterReader({
         {letter.coverImageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
+            decoding="async"
             src={letter.coverImageUrl}
             alt={letter.coverAlt}
             className="mt-6 aspect-[16/9] w-full rounded-xl bg-muted object-cover"

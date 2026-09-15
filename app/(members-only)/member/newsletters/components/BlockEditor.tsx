@@ -608,6 +608,8 @@ function BlockBody({
           {block.imageUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
+              loading="lazy"
+              decoding="async"
               src={block.imageUrl}
               alt={block.alt || "Newsletter picture"}
               className="max-h-72 w-full rounded-md object-cover"
@@ -681,6 +683,8 @@ function BlockBody({
               <div key={index} className="group relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
+                  loading="lazy"
+                  decoding="async"
                   src={image.imageUrl}
                   alt={image.alt || ""}
                   className="aspect-[4/3] w-full rounded-md object-cover"

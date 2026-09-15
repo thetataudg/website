@@ -48,6 +48,11 @@ interface PendingRequest {
   }>;
   customSections?: Array<{ title?: string; body?: string }>;
   socialLinks?: Record<string, string>;
+  // What the applicant asked for on the onboarding form. The review dialog
+  // pre-fills its Status and Role selects from these, so dropping them here
+  // silently showed every alum as Active.
+  preferredStatus?: "Active" | "Alumni" | "Removed" | "Deceased";
+  preferredRole?: "superadmin" | "admin" | "member";
 }
 
 export default async function PendingPage() {
@@ -111,6 +116,8 @@ export default async function PendingPage() {
           ? Object.fromEntries(r.socialLinks)
           : r.socialLinks
         : {},
+    preferredStatus: r.preferredStatus,
+    preferredRole: r.preferredRole,
   }));
 
   const mailRequests = await listPendingMailRequests();

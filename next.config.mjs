@@ -50,6 +50,39 @@ const nextConfig = {
     });
     return config;
   },
+  async headers() {
+    // Files under /public are served with `max-age=0` by default, so every
+    // photo on the site was re-fetched on every visit. Nothing here is
+    // generated per request, so the browser can hold on to it.
+    const week = 60 * 60 * 24 * 7;
+    const month = 60 * 60 * 24 * 30;
+    const year = 60 * 60 * 24 * 365;
+    return [
+      {
+        // Most of these keep their name when they are replaced (rush posters
+        // get swapped every semester), so they revalidate rather than being
+        // pinned. Stale-while-revalidate still paints the repeat visit
+        // instantly and refreshes in the background.
+        source: "/:path*.:ext(jpg|jpeg|png|webp|avif|gif|svg|ico)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: `public, max-age=${week}, stale-while-revalidate=${month}`,
+          },
+        ],
+      },
+      {
+        // The login photos are the exception: AuthCard appends
+        // ?v=PHOTO_REVISION, so a replaced photo arrives under a new URL and
+        // this can be pinned outright. Listed after the rule above because
+        // every matching rule is applied and the last one wins on a key.
+        source: "/login/:file*",
+        headers: [
+          { key: "Cache-Control", value: `public, max-age=${year}, immutable` },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {
