@@ -11,6 +11,7 @@ import {
 } from "react-icons/fa";
 import { pageMetadata } from "@/lib/seo";
 import HomeRevealEffects from "../components/HomeRevealEffects";
+import StepShot from "./StepShot";
 import { bungee } from "../../fonts";
 
 // Carries through sign-up to /member/onboard, where it pre-checks "I'm an
@@ -27,53 +28,91 @@ export const metadata: Metadata = pageMetadata({
 
 const uses = [
   {
-    title: "Events",
-    copy: "See what the chapter has coming up and RSVP to the ones open to alumni.",
-    icon: FaCalendarCheck,
-  },
-  {
     title: "Meeting minutes",
-    copy: "A summary of every chapter meeting, sent to your inbox and filed on the site.",
+    copy: "A written summary of every chapter meeting, sent to your inbox and kept on the site so you can read back through them.",
     icon: FaFileAlt,
   },
   {
     title: "Newsletters",
-    copy: "Every issue the chapter puts out, delivered by email.",
+    copy: "Every issue the chapter puts out, delivered by email when it goes out.",
     icon: FaNewspaper,
   },
   {
+    title: "Events",
+    copy: "See what the chapter has coming up, and RSVP to the events that are open to alumni.",
+    icon: FaCalendarCheck,
+  },
+  {
     title: "Brother directory",
-    copy: "Find the brothers you pledged with and the ones who came after you.",
+    copy: "Look up the brothers you pledged with, and the ones who came after you.",
     icon: FaUsers,
   },
   {
     title: "Family tree",
-    copy: "Your bigs, your littles, and the whole line since the chapter started.",
+    copy: "Your bigs, your littles, and every line in the chapter since it started.",
     icon: FaSitemap,
   },
   {
     title: "Chapter email",
-    copy: "Request a ttdg.org address to keep using as an alum.",
+    copy: "Ask for a ttdg.org address you can keep using as an alum.",
     icon: FaEnvelope,
   },
 ];
 
-const steps = [
+// Each screenshot is a real capture of ttdg.org. A step with no `shot` renders
+// full width instead of leaving an empty column.
+const steps: {
+  title: string;
+  copy: string;
+  detail?: string;
+  shot?: { src: string; alt: string; width: number; height: number; caption: string };
+}[] = [
   {
     title: "Create an account",
-    copy: "Sign up with your name, email, and a password, or continue with Google or Apple.",
+    copy: "Go to the sign-up page and fill in your name, your email address, and a password. If you would rather not keep track of another password, use the Continue with Google or Continue with Apple button at the top and sign in the way you already do.",
+    detail: "Use whichever email address you actually check. That is where every chapter email gets sent.",
+    shot: {
+      src: "/alumni/step-1-create-account.webp",
+      alt: "The Theta Tau sign-up page, with buttons to continue with Google or Apple above fields for first name, last name, email address, and password.",
+      width: 1200,
+      height: 1133,
+      caption: "Step one: ttdg.org/sign-up",
+    },
   },
   {
-    title: "Fill out your profile",
-    copy: "Your roll number, graduation year, and pledge class are how officers confirm you're a brother. Check the box that says you're an alum.",
+    title: "Confirm your email address",
+    copy: "We send a six digit code to the address you entered. Open that email and type the code into the box on the screen. If it has not turned up after a minute, look in your spam folder, or use the link to send a new code.",
+    shot: {
+      src: "/alumni/step-2-verify-email.webp",
+      alt: "A screen reading Check your email, with a box for the six digit verification code and a button that says Verify and continue.",
+      width: 1200,
+      height: 737,
+      caption: "Step two: the code we email you",
+    },
   },
   {
-    title: "Wait for approval",
-    copy: "An officer reviews your request, usually within a few days.",
+    title: "Tell us who you are",
+    copy: "Next comes a short form. Your roll number and a phone number are the only two things we have to have. Add your pledge class and graduation year as well if you remember them, since that is how an officer confirms you are a brother.",
+    detail: "Make sure the box that says you are an alum is checked. Coming to this page from the button above ticks it for you. You can ignore the Discord box unless you want to join the chapter server.",
+    shot: {
+      src: "/alumni/step-3-your-details.webp",
+      alt: "The onboarding form, showing the name and email taken from sign-in and a checked box reading I am an alum, graduated.",
+      width: 1200,
+      height: 743,
+      caption: "Step three: the profile form",
+    },
   },
   {
-    title: "Check your email",
-    copy: "Once you're approved we email you. Sign in and you're caught up.",
+    title: "Wait for an officer to approve you",
+    copy: "Your request goes into a queue that a real person reviews by hand, so it is not instant. Until then your account shows as pending and the member tools stay locked. Nothing else is needed from you.",
+    detail: "Once you are approved, you are added to the minutes and newsletter lists automatically. There is no second form to fill out.",
+    shot: {
+      src: "/alumni/step-4-awaiting-approval.webp",
+      alt: "The member home page showing a status of Pending, the words Awaiting approval, and a list of locked member tools.",
+      width: 1200,
+      height: 740,
+      caption: "Step four: what you see while you wait",
+    },
   },
 ];
 
@@ -83,28 +122,29 @@ export default function AlumniPage() {
       <HomeRevealEffects />
 
       {/* Hero */}
-      <section className="relative isolate overflow-hidden px-6 pb-20 pt-[clamp(8rem,18svh,11rem)]">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 -top-40 h-[720px] bg-[radial-gradient(60%_55%_at_50%_0%,rgba(179,32,42,0.42),transparent_70%)]"
+      <section className="relative isolate min-h-[68vh] w-full overflow-hidden">
+        <Image
+          src="/grad-sp26.jpeg"
+          alt="Delta Gamma brothers at graduation"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
         />
-        <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center text-center reveal">
-          <Image
-            src="/crest-transparent.png"
-            alt=""
-            width={96}
-            height={96}
-            className="h-20 w-20 sm:h-24 sm:w-24"
-          />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/70 to-[#120a0a]" />
+        <div className="relative z-10 flex min-h-[68vh] flex-col items-start justify-end px-6 pb-14 pt-[clamp(7rem,16svh,10rem)] sm:px-12">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+            Delta Gamma Chapter
+          </p>
           <h1
-            className={`${bungee.className} mt-6 text-[2.6rem] leading-[1.06] text-[#f8ead4] sm:text-6xl lg:text-7xl`}
+            className={`${bungee.className} mt-3 text-[2.6rem] leading-[1.06] text-[#f8ead4] sm:text-6xl lg:text-7xl`}
           >
             Welcome back,
             <span className="block text-[#cf3640]">alumni.</span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg text-white/80 sm:text-xl">
-            Graduating doesn&apos;t end your time with Delta Gamma. A website
-            account keeps you close to the chapter you helped build.
+          <p className="mt-5 max-w-2xl text-lg text-white/85 sm:text-xl">
+            Graduating does not end your time with Delta Gamma. A free account
+            on this site keeps you close to the chapter you helped build.
           </p>
           <div className="mt-8 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
             <Link
@@ -124,12 +164,19 @@ export default function AlumniPage() {
       </section>
 
       {/* What the site is for */}
-      <section className="mx-auto w-full max-w-[1180px] px-6 pb-24 pt-4 reveal">
+      <section className="mx-auto w-full max-w-[1180px] px-6 pb-24 pt-20 reveal">
+        <p className="text-center text-sm uppercase tracking-[0.3em] text-[#e2ab16]">
+          What you get
+        </p>
         <h2
-          className={`${bungee.className} mx-auto max-w-3xl text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
+          className={`${bungee.className} mx-auto mt-4 max-w-3xl text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
         >
-          What the site is for
+          What this site is for
         </h2>
+        <p className="mx-auto mt-5 max-w-2xl text-center text-lg text-white/70">
+          One account covers all of it. There is nothing to pay and nothing to
+          install.
+        </p>
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {uses.map((use) => {
             const Icon = use.icon;
@@ -144,7 +191,9 @@ export default function AlumniPage() {
                 <h3 className={`${bungee.className} mt-5 text-xl text-[#f5d79a]`}>
                   {use.title}
                 </h3>
-                <p className="mt-3 text-base text-white/65">{use.copy}</p>
+                <p className="mt-3 text-base leading-relaxed text-white/65">
+                  {use.copy}
+                </p>
               </div>
             );
           })}
@@ -152,32 +201,104 @@ export default function AlumniPage() {
       </section>
 
       {/* How to get started */}
-      <section className="mx-auto w-full max-w-3xl px-6 pb-24 reveal">
-        <h2
-          className={`${bungee.className} text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
-        >
-          How to get started
-        </h2>
-        <ol className="mt-12 space-y-5">
-          {steps.map((step, index) => (
-            <li
-              key={step.title}
-              className="flex gap-5 rounded-[26px] border border-white/10 bg-[#1b0f0f] px-6 py-6"
+      <section className="border-y border-white/10 bg-[#170c0c] py-20">
+        <div className="mx-auto w-full max-w-[1180px] px-6">
+          <div className="reveal">
+            <p className="text-center text-sm uppercase tracking-[0.3em] text-[#e2ab16]">
+              Step by step
+            </p>
+            <h2
+              className={`${bungee.className} mx-auto mt-4 max-w-3xl text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
             >
-              <span
-                className={`${bungee.className} flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b3202a] text-lg text-[#f8ead4]`}
-              >
-                {index + 1}
-              </span>
-              <div>
-                <h3 className="text-lg font-semibold text-[#f5d79a]">
-                  {step.title}
-                </h3>
-                <p className="mt-1 text-base text-white/70">{step.copy}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+              How to get started
+            </h2>
+            <p className="mx-auto mt-5 max-w-2xl text-center text-lg text-white/70">
+              Four steps, about five minutes. Here is exactly what each screen
+              looks like.
+            </p>
+          </div>
+
+          <ol className="mt-16 space-y-16">
+            {steps.map((step, index) => (
+              <li key={step.title} className="reveal">
+                <div
+                  className={`grid items-center gap-10 ${
+                    step.shot ? "lg:grid-cols-2" : ""
+                  }`}
+                >
+                  <div
+                    className={
+                      step.shot
+                        ? index % 2 === 1
+                          ? "lg:order-2"
+                          : ""
+                        : "mx-auto max-w-3xl"
+                    }
+                  >
+                    <div className="flex items-center gap-4">
+                      <span
+                        className={`${bungee.className} flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#b3202a] text-xl text-[#f8ead4]`}
+                      >
+                        {index + 1}
+                      </span>
+                      <h3
+                        className={`${bungee.className} text-2xl text-[#f5d79a] sm:text-3xl`}
+                      >
+                        {step.title}
+                      </h3>
+                    </div>
+                    <p className="mt-5 text-lg leading-relaxed text-white/80">
+                      {step.copy}
+                    </p>
+                    {step.detail ? (
+                      <p className="mt-4 border-l-2 border-[#e2ab16]/50 pl-4 text-base leading-relaxed text-white/60">
+                        {step.detail}
+                      </p>
+                    ) : null}
+                  </div>
+                  {step.shot ? (
+                    <StepShot
+                      src={step.shot.src}
+                      alt={step.shot.alt}
+                      width={step.shot.width}
+                      height={step.shot.height}
+                      caption={step.shot.caption}
+                    />
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="reveal mt-16 flex justify-center">
+            <Link
+              href={ALUMNI_SIGN_UP}
+              className="tt-button-primary tt-button-plain inline-flex items-center justify-center"
+            >
+              Start step one
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Help */}
+      <section className="mx-auto w-full max-w-3xl px-6 py-20 text-center reveal">
+        <h2
+          className={`${bungee.className} text-2xl leading-tight text-[#f5d79a] sm:text-3xl`}
+        >
+          Stuck anywhere along the way?
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-white/70">
+          Email{" "}
+          <a
+            href="mailto:general@ttdg.org"
+            className="font-semibold text-[#e2ab16] underline"
+          >
+            general@ttdg.org
+          </a>{" "}
+          and tell us where you got stuck. A brother will write back and walk you
+          through it.
+        </p>
       </section>
 
       {/* Closing CTA */}
@@ -203,11 +324,7 @@ export default function AlumniPage() {
             Ready to reconnect?
           </h2>
           <p className="mt-5 text-lg text-[#3b1f1f]">
-            It takes a few minutes. Questions? Email{" "}
-            <a href="mailto:general@ttdg.org" className="font-semibold underline">
-              general@ttdg.org
-            </a>
-            .
+            It takes about five minutes, and it is free.
           </p>
           <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
             <Link

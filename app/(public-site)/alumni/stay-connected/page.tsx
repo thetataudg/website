@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  FaCalendarCheck,
-  FaCheckCircle,
-  FaFileAlt,
-  FaNewspaper,
-} from "react-icons/fa";
+import { FaCalendarCheck, FaFileAlt, FaNewspaper } from "react-icons/fa";
 import { pageMetadata } from "@/lib/seo";
 import HomeRevealEffects from "../../components/HomeRevealEffects";
 import { bungee } from "../../../fonts";
@@ -23,26 +18,56 @@ export const metadata: Metadata = pageMetadata({
 const deliveries = [
   {
     title: "Meeting minutes",
-    copy: "After each chapter meeting, the minutes land in your inbox. Every past meeting is also on the site.",
+    copy: "After every chapter meeting, a written summary of what was discussed and decided lands in your inbox. Every past set is kept on the site as well.",
+    cadence: "Weekly while school is in session",
     icon: FaFileAlt,
   },
   {
     title: "Newsletters",
-    copy: "Every issue, sent to you when it goes out.",
+    copy: "A longer look at what the chapter has been up to: new members, service projects, competitions, and where brothers have ended up.",
+    cadence: "A few times a year",
     icon: FaNewspaper,
   },
   {
-    title: "Events",
-    copy: "Events open to alumni show up on your calendar in the member portal, and some come with an email invite.",
+    title: "Event invitations",
+    copy: "Events that are open to alumni show up on your calendar in the member area, and the bigger ones come with an emailed invitation.",
+    cadence: "As they are scheduled",
     icon: FaCalendarCheck,
   },
 ];
 
+const howItWorks = [
+  {
+    title: "You create an account",
+    copy: "Sign up with the email address you actually check, and fill out the short form that follows.",
+  },
+  {
+    title: "An officer approves you",
+    copy: "A real person confirms you are a brother. You get an email when the request arrives, and another once it has been reviewed.",
+  },
+  {
+    title: "You are added to the lists",
+    copy: "Approval puts you on the minutes list and the newsletter list automatically. There is no second form and nothing to subscribe to.",
+  },
+];
+
 const troubleshooting = [
-  "Make sure your account has been approved. You'll have an approval email if it has.",
-  "Look in the inbox for the email you signed up with. That's the address we send to.",
-  "Check spam and the Promotions tab, and mark us as not spam.",
-  "Still nothing? Email general@ttdg.org and we'll sort it out.",
+  {
+    title: "Check that you were approved",
+    copy: "Approval is not automatic. If an officer has approved you, there is an email from us saying so. If you cannot find one, your request may still be waiting.",
+  },
+  {
+    title: "Check the right inbox",
+    copy: "We send to the exact address you signed up with. If you signed up with an old school address, that is where everything is going.",
+  },
+  {
+    title: "Look in spam and Promotions",
+    copy: "Mail from a new sender often lands there. Find one of our messages, mark it as not spam, and later ones should arrive normally.",
+  },
+  {
+    title: "Still nothing",
+    copy: "Write to general@ttdg.org, tell us the address you signed up with, and a brother will sort it out for you.",
+  },
 ];
 
 export default function StayConnectedPage() {
@@ -51,68 +76,149 @@ export default function StayConnectedPage() {
       <HomeRevealEffects />
 
       {/* Hero */}
-      <section className="relative isolate overflow-hidden px-6 pb-16 pt-[clamp(8rem,18svh,11rem)]">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 -top-40 h-[720px] bg-[radial-gradient(60%_55%_at_50%_0%,rgba(179,32,42,0.42),transparent_70%)]"
+      <section className="relative isolate min-h-[56vh] w-full overflow-hidden">
+        <Image
+          src="/everyone.jpg"
+          alt="Delta Gamma brothers together on A Mountain"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
         />
-        <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center text-center reveal">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/70 to-[#120a0a]" />
+        <div className="relative z-10 flex min-h-[56vh] flex-col items-start justify-end px-6 pb-14 pt-[clamp(7rem,16svh,10rem)] sm:px-12">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
+            For alumni
+          </p>
           <h1
-            className={`${bungee.className} text-[2.6rem] leading-[1.06] text-[#f8ead4] sm:text-6xl lg:text-7xl`}
+            className={`${bungee.className} mt-3 text-[2.6rem] leading-[1.06] text-[#f8ead4] sm:text-6xl lg:text-7xl`}
           >
             Stay in
             <span className="block text-[#cf3640]">the loop.</span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg text-white/80 sm:text-xl">
-            Minutes and newsletters go to members of the website. Once your
-            account is approved, you&apos;re added to both lists automatically.
+          <p className="mt-5 max-w-2xl text-lg text-white/85 sm:text-xl">
+            Minutes and newsletters go out to approved members of this site.
+            Once an officer approves your account, you are added to both lists
+            and the mail starts arriving on its own.
           </p>
         </div>
       </section>
 
-      {/* What you get */}
-      <section className="mx-auto w-full max-w-[1180px] px-6 pb-24 reveal">
+      {/* How it works */}
+      <section className="mx-auto w-full max-w-[1180px] px-6 pb-24 pt-20 reveal">
+        <p className="text-center text-sm uppercase tracking-[0.3em] text-[#e2ab16]">
+          Start here
+        </p>
         <h2
-          className={`${bungee.className} mx-auto max-w-3xl text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
+          className={`${bungee.className} mx-auto mt-4 max-w-3xl text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
         >
-          What you get once approved
+          How it works
         </h2>
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
-          {deliveries.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.title}
-                className="rounded-[26px] border border-white/10 bg-[#1b0f0f] px-7 py-8 shadow-[0_12px_24px_rgba(0,0,0,0.35)]"
+        <ol className="mt-14 grid gap-6 md:grid-cols-3">
+          {howItWorks.map((step, index) => (
+            <li
+              key={step.title}
+              className="rounded-[26px] border border-white/10 bg-[#1b0f0f] px-7 py-8"
+            >
+              <span
+                className={`${bungee.className} flex h-11 w-11 items-center justify-center rounded-full bg-[#b3202a] text-lg text-[#f8ead4]`}
               >
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#e2ab16]/10 text-[#e2ab16]">
-                  <Icon className="text-lg" />
-                </span>
-                <h3 className={`${bungee.className} mt-5 text-xl text-[#f5d79a]`}>
-                  {item.title}
-                </h3>
-                <p className="mt-3 text-base text-white/65">{item.copy}</p>
-              </div>
-            );
-          })}
+                {index + 1}
+              </span>
+              <h3 className={`${bungee.className} mt-5 text-xl text-[#f5d79a]`}>
+                {step.title}
+              </h3>
+              <p className="mt-3 text-base leading-relaxed text-white/65">
+                {step.copy}
+              </p>
+            </li>
+          ))}
+        </ol>
+        <p className="mx-auto mt-10 max-w-2xl text-center text-lg text-white/70">
+          Not signed up yet? The{" "}
+          <Link href="/alumni" className="font-semibold text-[#e2ab16] underline">
+            alumni page
+          </Link>{" "}
+          walks through every step with pictures.
+        </p>
+      </section>
+
+      {/* What arrives */}
+      <section className="border-y border-white/10 bg-[#170c0c] py-20">
+        <div className="mx-auto w-full max-w-[1180px] px-6 reveal">
+          <p className="text-center text-sm uppercase tracking-[0.3em] text-[#e2ab16]">
+            Once you are approved
+          </p>
+          <h2
+            className={`${bungee.className} mx-auto mt-4 max-w-3xl text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
+          >
+            What lands in your inbox
+          </h2>
+          <div className="mt-14 grid gap-6 md:grid-cols-3">
+            {deliveries.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="flex flex-col rounded-[26px] border border-white/10 bg-[#1b0f0f] px-7 py-8 shadow-[0_12px_24px_rgba(0,0,0,0.35)]"
+                >
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#e2ab16]/10 text-[#e2ab16]">
+                    <Icon className="text-lg" />
+                  </span>
+                  <h3
+                    className={`${bungee.className} mt-5 text-xl text-[#f5d79a]`}
+                  >
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 flex-1 text-base leading-relaxed text-white/65">
+                    {item.copy}
+                  </p>
+                  <p className="mt-5 border-t border-white/10 pt-4 text-sm uppercase tracking-[0.2em] text-white/40">
+                    {item.cadence}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
       {/* Troubleshooting */}
-      <section className="mx-auto w-full max-w-3xl px-6 pb-24 reveal">
+      <section className="mx-auto w-full max-w-3xl px-6 py-20 reveal">
+        <p className="text-center text-sm uppercase tracking-[0.3em] text-[#e2ab16]">
+          Troubleshooting
+        </p>
         <h2
-          className={`${bungee.className} text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
+          className={`${bungee.className} mt-4 text-center text-3xl leading-tight text-[#b3202a] sm:text-5xl`}
         >
           Not getting them?
         </h2>
-        <ul className="mt-10 space-y-4">
-          {troubleshooting.map((tip) => (
-            <li key={tip} className="flex items-start gap-3 text-lg text-white/75">
-              <FaCheckCircle className="mt-1.5 shrink-0 text-[#e2ab16]" aria-hidden="true" />
-              <span>{tip}</span>
+        <p className="mt-5 text-center text-lg text-white/70">
+          Work down this list in order. It is almost always one of the first
+          two.
+        </p>
+        <ol className="mt-12 space-y-5">
+          {troubleshooting.map((tip, index) => (
+            <li
+              key={tip.title}
+              className="flex gap-5 rounded-[26px] border border-white/10 bg-[#1b0f0f] px-6 py-6"
+            >
+              <span
+                className={`${bungee.className} flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e2ab16]/15 text-lg text-[#e2ab16]`}
+              >
+                {index + 1}
+              </span>
+              <div>
+                <h3 className="text-lg font-semibold text-[#f5d79a]">
+                  {tip.title}
+                </h3>
+                <p className="mt-2 text-base leading-relaxed text-white/70">
+                  {tip.copy}
+                </p>
+              </div>
             </li>
           ))}
-        </ul>
+        </ol>
       </section>
 
       {/* Closing CTA */}
@@ -130,6 +236,10 @@ export default function StayConnectedPage() {
           >
             No account yet?
           </h2>
+          <p className="mt-5 text-lg text-[#3b1f1f]">
+            That is the only thing standing between you and the next set of
+            minutes.
+          </p>
           <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
             <Link
               href="/sign-up?from=alumni"
@@ -138,10 +248,10 @@ export default function StayConnectedPage() {
               Get your account
             </Link>
             <Link
-              href="/member"
+              href="/sign-in"
               className="tt-button-secondary tt-button-plain inline-flex items-center justify-center text-center !border-[#b3202a] !text-[#b3202a] hover:!bg-[#b3202a] hover:!text-[#fdf7df]"
             >
-              Sign in
+              I already have one
             </Link>
           </div>
         </div>

@@ -392,6 +392,8 @@ export default function NewsletterBuilderPage() {
                 {draft.coverImageUrl ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
+                    loading="lazy"
+                    decoding="async"
                     src={draft.coverImageUrl}
                     alt={draft.coverAlt || "Cover"}
                     className="h-36 w-full rounded-md object-cover"

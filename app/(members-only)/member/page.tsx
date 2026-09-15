@@ -820,6 +820,8 @@ export default function Dashboard() {
               <div className="rounded-lg border border-border bg-white p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
+                  loading="lazy"
+                  decoding="async"
                   alt="Member check-in QR code"
                   className="size-56"
                   src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(

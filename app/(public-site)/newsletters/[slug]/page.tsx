@@ -169,6 +169,7 @@ export default async function NewsletterArticlePage({
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
+              decoding="async"
               src={letter.coverImageUrl}
               alt={letter.coverAlt}
               className="absolute inset-0 -z-10 h-full w-full object-cover"

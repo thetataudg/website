@@ -350,6 +350,7 @@ export default function BrotherProfile({
               <div className="overflow-hidden rounded-[22px] bg-black/30">
                 {member.profilePicUrl ? (
                   <img
+                    decoding="async"
                     src={member.profilePicUrl}
                     alt={`${member.fName} ${member.lName}`}
                     className="w-full object-cover"

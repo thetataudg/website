@@ -63,6 +63,13 @@ export default function AuthCard({
   // ground holds the space until the first photo fades in.
   const [slots, setSlots] = useState<[string | null, string | null]>([null, null]);
   const [front, setFront] = useState<0 | 1>(0);
+  // The photo is picked after mount to keep hydration stable, which means the
+  // browser cannot start it from the HTML. Marking just the opening one as
+  // priority gets it fetched eagerly and at high priority the moment a src
+  // exists, instead of waiting behind the lazy-loading pass. Every later photo
+  // is prefetched into the hidden layer well before it is shown, so none of
+  // them needs the same treatment.
+  const [primed, setPrimed] = useState(true);
   const frontRef = useRef<0 | 1>(0);
   const loaded = useRef<[boolean, boolean]>([false, false]);
   const queue = useRef<number[]>([]);
@@ -89,6 +96,7 @@ export default function AuthCard({
 
         frontRef.current = back;
         setFront(back);
+        setPrimed(false);
 
         // Once the old photo has faded out, start the next one loading in it.
         window.setTimeout(() => {
@@ -168,6 +176,8 @@ export default function AuthCard({
                     alt=""
                     fill
                     sizes="(min-width: 768px) 448px, 1px"
+                    priority={primed && i === 0}
+                    loading={primed && i === 0 ? "eager" : "lazy"}
                     className={`${styles.mediaImage} object-cover`}
                     onLoad={() => {
                       loaded.current[i as 0 | 1] = true;

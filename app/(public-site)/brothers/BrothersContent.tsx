@@ -403,6 +403,8 @@ export default function BrothersContent() {
                         <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
+                              loading="lazy"
+                              decoding="async"
                               src={member.profilePicUrl}
                               alt={`${member.fName} ${member.lName}`}
                               className="h-full w-full object-cover"
@@ -486,6 +488,8 @@ export default function BrothersContent() {
                         <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
+                              loading="lazy"
+                              decoding="async"
                               src={member.profilePicUrl}
                               alt={`${member.fName} ${member.lName}`}
                               className="h-full w-full object-cover"
@@ -571,6 +575,8 @@ export default function BrothersContent() {
                         <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
+                              loading="lazy"
+                              decoding="async"
                               src={member.profilePicUrl}
                               alt={`${member.fName} ${member.lName}`}
                               className="h-full w-full object-cover"
@@ -654,6 +660,8 @@ export default function BrothersContent() {
                         <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
+                              loading="lazy"
+                              decoding="async"
                               src={member.profilePicUrl}
                               alt={`${member.fName} ${member.lName}`}
                               className="h-full w-full object-cover"
@@ -743,6 +751,8 @@ export default function BrothersContent() {
                     <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
                       {member.profilePicUrl ? (
                         <img
+                          loading="lazy"
+                          decoding="async"
                           src={member.profilePicUrl}
                           alt={`${member.fName} ${member.lName}`}
                           className="h-full w-full object-cover"

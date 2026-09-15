@@ -159,6 +159,7 @@ export default async function NewslettersPage({
                       <div className="relative h-52 overflow-hidden lg:h-full lg:min-h-[16rem]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
+                          decoding="async"
                           src={lead.coverImageUrl}
                           alt={lead.coverAlt}
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
