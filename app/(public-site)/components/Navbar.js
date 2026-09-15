@@ -5,7 +5,6 @@ import React, { useState } from "react";
 import { FaBars, FaChevronDown, FaTimes } from "react-icons/fa";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
-import { SignInButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { bungee } from "../../fonts";
 
@@ -197,21 +196,21 @@ const Navbar = () => {
             </SignedIn>
             <SignedOut>
               <li>
-                <SignInButton
-                  signInForceRedirectUrl="/member"
-                  signInFallbackRedirectUrl="/member"
-                  signUpForceRedirectUrl="/member/onboard"
-                  signUpFallbackRedirectUrl="/member/onboard"
+                {/* A plain link, not Clerk's <SignInButton>. Wrapping a custom
+                  * child made Clerk clone it and spread the four redirect props
+                  * straight onto the DOM <button> — React warned about every
+                  * one of them, and none of them took effect, so signing in
+                  * from here landed on the public homepage. /sign-in already
+                  * defaults to /member, which is what those props were asking
+                  * for in the first place. */}
+                <Link
+                  href="/sign-in"
+                  className="inline-block rounded-full bg-gradient-to-r from-[#f5d79a] via-[#e2ab16] to-[#f5d79a] p-[1px]"
                 >
-                  <button
-                    type="button"
-                    className="rounded-full bg-gradient-to-r from-[#f5d79a] via-[#e2ab16] to-[#f5d79a] p-[1px]"
-                  >
-                    <span className="block rounded-full bg-[#140d0d] px-5 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#f8ead4] transition hover:bg-[#1d1212]">
-                      Sign In
-                    </span>
-                  </button>
-                </SignInButton>
+                  <span className="block rounded-full bg-[#140d0d] px-5 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#f8ead4] transition hover:bg-[#1d1212]">
+                    Sign In
+                  </span>
+                </Link>
               </li>
             </SignedOut>
           </ul>
@@ -306,22 +305,15 @@ const Navbar = () => {
               </SignedIn>
               <SignedOut>
                 <li>
-                  <SignInButton
-                    signInForceRedirectUrl="/member"
-                    signInFallbackRedirectUrl="/member"
-                    signUpForceRedirectUrl="/member/onboard"
-                    signUpFallbackRedirectUrl="/member/onboard"
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setNav(false)}
+                    className="inline-block rounded-full bg-gradient-to-r from-[#f5d79a] via-[#e2ab16] to-[#f5d79a] p-[1px]"
                   >
-                    <button
-                      type="button"
-                      onClick={() => setNav(false)}
-                      className="rounded-full bg-gradient-to-r from-[#f5d79a] via-[#e2ab16] to-[#f5d79a] p-[1px]"
-                    >
-                      <span className="block rounded-full bg-[#140d0d] px-6 py-2 text-sm font-bold uppercase tracking-[0.2em] text-[#f8ead4]">
-                        Sign In
-                      </span>
-                    </button>
-                  </SignInButton>
+                    <span className="block rounded-full bg-[#140d0d] px-6 py-2 text-sm font-bold uppercase tracking-[0.2em] text-[#f8ead4]">
+                      Sign In
+                    </span>
+                  </Link>
                 </li>
               </SignedOut>
             </ul>

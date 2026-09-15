@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { normalizeDiscordRedirect } from "@/lib/discordLink";
+import {
+  discordIdTakenByAnother,
+  normalizeDiscordRedirect,
+  pendingLinkFilter,
+} from "@/lib/discordLink";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
+import PendingMember from "@/lib/models/PendingMember";
 import logger from "@/lib/logger";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
@@ -164,26 +169,47 @@ export async function GET(req: Request) {
   }
 
   await connectDB();
-  const conflict = await Member.findOne({
-    discordId,
-    clerkId: { $ne: decoded.clerkId },
-  }).lean();
-  if (conflict) {
+  // Both collections, because a pending applicant can hold a Discord ID too.
+  // Approval copies `discordId` onto the Member, so a duplicate missed here
+  // would not fail now — it would fail at approval, against a sparse unique
+  // index, with nobody around who could explain it.
+  const taken = await discordIdTakenByAnother(discordId, decoded.clerkId, {
+    Member,
+    PendingMember,
+  });
+  if (taken) {
     return NextResponse.json(
       { error: "This Discord account is linked to another profile" },
       { status: 409 }
     );
   }
 
-  const updated = await Member.findOneAndUpdate(
+  // Member first for the same reason the start route looks there first: an
+  // approved profile outranks a pending row that has not been cleaned up.
+  let updated: unknown = await Member.findOneAndUpdate(
     { clerkId: decoded.clerkId },
     { discordId },
     { new: true }
   ).lean();
 
   if (!updated) {
+    // Filtered on status, not just clerkId: a request can be declined during
+    // the round trip to Discord, and the decision has to win over a handshake
+    // that started while it was still open.
+    updated = await PendingMember.findOneAndUpdate(
+      pendingLinkFilter(decoded.clerkId),
+      { discordId },
+      { new: true }
+    ).lean();
+  }
+
+  if (!updated) {
+    logger.warn(
+      { clerkId: decoded.clerkId },
+      "Discord callback found no linkable profile"
+    );
     return NextResponse.json(
-      { error: "Member profile not found during Discord link" },
+      { error: "We couldn't link Discord to your profile. Ask an officer if this keeps happening." },
       { status: 404 }
     );
   }

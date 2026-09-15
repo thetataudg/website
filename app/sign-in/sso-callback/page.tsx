@@ -13,9 +13,12 @@ import LoadingState from "../../(members-only)/components/LoadingState";
 export default function SsoCallbackPage() {
   return (
     <>
+      {/* Both /member: it forwards anyone without a profile to onboarding, so
+        * one destination serves a first-time member and a returning one, and
+        * there is no second rule here to fall out of step with the providers. */}
       <AuthenticateWithRedirectCallback
         signInFallbackRedirectUrl="/member"
-        signUpFallbackRedirectUrl="/member/onboard"
+        signUpFallbackRedirectUrl="/member"
       />
       <LoadingState message="Finishing sign-in..." />
     </>

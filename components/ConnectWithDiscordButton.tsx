@@ -63,6 +63,7 @@ export default function ConnectWithDiscordButton({
   ...rest
 }: ConnectWithDiscordButtonProps) {
   const [redirecting, setRedirecting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -73,15 +74,45 @@ export default function ConnectWithDiscordButton({
     return `${path}${query ? `?${query}` : ""}` || "/member";
   }, [pathname, searchParams, redirectTo]);
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  /**
+   * Asks the route for the Discord URL instead of navigating straight at it.
+   *
+   * A plain `window.location.href` meant any failure replaced the page with
+   * the route's raw JSON — `{"error":"Member record missing"}` on a white
+   * background, no styling and no way back. `mode=json` already existed for
+   * the iOS app; using it here keeps a failure inside the page, where it can
+   * be read and retried. The redirect on success is the same one the route
+   * would have issued.
+   */
+  const handleClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
     onClick?.(event);
     if (event.defaultPrevented) return;
     if (disabled || redirecting) return;
+
+    setError(null);
     setRedirecting(true);
-    if (typeof window !== "undefined") {
-      window.location.href = `/api/discord/link?redirectTo=${encodeURIComponent(
-        targetUrl
-      )}`;
+
+    try {
+      const response = await fetch(
+        `/api/discord/link?mode=json&redirectTo=${encodeURIComponent(targetUrl)}`,
+        { cache: "no-store" }
+      );
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.authorizeUrl) {
+        setError(
+          payload?.error || "We couldn't start Discord linking. Please try again."
+        );
+        setRedirecting(false);
+        return;
+      }
+
+      window.location.href = payload.authorizeUrl;
+    } catch {
+      // Left spinning on success: the navigation above is what ends this
+      // state, and clearing it first would flash an idle button mid-redirect.
+      setError("We couldn't reach the server. Check your connection and try again.");
+      setRedirecting(false);
     }
   };
 
@@ -94,25 +125,34 @@ export default function ConnectWithDiscordButton({
   const wearsBrand = brand && !variant;
 
   return (
-    <Button
-      type="button"
-      variant={variant}
-      onClick={handleClick}
-      disabled={redirecting || disabled}
-      className={cn(
-        "gap-2.5",
-        wearsBrand &&
-          "bg-[#5865F2] text-white hover:bg-[#4752C4] focus-visible:ring-[#5865F2]",
-        className
-      )}
-      {...rest}
-    >
-      {redirecting ? (
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-      ) : (
-        <DiscordGlyph />
-      )}
-      {labelContent}
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant={variant}
+        onClick={handleClick}
+        disabled={redirecting || disabled}
+        className={cn(
+          "gap-2.5",
+          wearsBrand &&
+            "bg-[#5865F2] text-white hover:bg-[#4752C4] focus-visible:ring-[#5865F2]",
+          className
+        )}
+        {...rest}
+      >
+        {redirecting ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <DiscordGlyph />
+        )}
+        {labelContent}
+      </Button>
+      {/* Rendered only when there is something to say, so the four callers
+        * that lay this out themselves keep the spacing they have. */}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </>
   );
 }
