@@ -21,7 +21,8 @@ export function parseReferences(value: string): string[] {
 export async function resolveThreadId(
   accountId: any,
   inReplyTo: string,
-  references: string[]
+  references: string[],
+  fallback?: { subject: string; participants: string[] }
 ): Promise<string> {
   const ids = [inReplyTo, ...references].filter(Boolean);
   if (ids.length) {
@@ -29,6 +30,32 @@ export async function resolveThreadId(
       .select("threadId")
       .lean<any>();
     if (parent?.threadId) return parent.threadId;
+  }
+
+  // The headers named a message we don't have under that id. That happens
+  // when the sending service rewrites the Message-ID on the way out, so a
+  // reply to our own mail names an id we never saw. Gmail groups these by
+  // subject and people, and so do we, but only for something that is plainly
+  // a reply (it carries reply headers or a Re:/Fwd: prefix) and only with
+  // somebody already in the conversation, within the last 60 days. That keeps
+  // two unrelated "Meeting tomorrow" emails apart.
+  const looksLikeReply = ids.length > 0 || /^\s*(re|fw|fwd|aw|sv)\s*(\[\d+\])?\s*:/i.test(fallback?.subject || "");
+  const subject = normalizeSubject(fallback?.subject || "");
+  const people = (fallback?.participants ?? []).map((p) => p.toLowerCase()).filter(Boolean);
+  if (looksLikeReply && subject && people.length) {
+    const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const candidates = await MailMessage.find({
+      accountId,
+      folder: { $ne: "drafts" },
+      date: { $gte: since },
+      $or: [{ from: { $in: people } }, { to: { $in: people } }, { cc: { $in: people } }],
+    })
+      .sort({ date: -1 })
+      .limit(200)
+      .select("threadId subject")
+      .lean<any[]>();
+    const match = candidates.find((c) => normalizeSubject(c.subject) === subject);
+    if (match?.threadId) return match.threadId;
   }
   return new Types.ObjectId().toString();
 }

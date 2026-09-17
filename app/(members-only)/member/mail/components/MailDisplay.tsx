@@ -3,26 +3,36 @@
 import { useState } from "react";
 import {
   Archive,
+  ArchiveRestore,
   ArchiveX,
   ArrowLeft,
   EllipsisVertical,
+  Filter,
   Forward,
   Inbox,
   MailOpen,
+  Maximize2,
+  Minimize2,
   Paperclip,
+  Plus,
   Reply,
   ReplyAll,
+  ShieldCheck,
   Star,
+  Tag,
   Trash2,
+  Undo2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,10 +40,14 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LoadingSpinner } from "../../../components/LoadingState";
 import MessageBody from "./MessageBody";
-import { fileSize, fullDate, initials } from "./format";
-import type { MailDetail } from "./types";
+import AddressMenu from "./AddressMenu";
+import MailPersonAvatar from "./MailPersonAvatar";
+import { fileSize, fullDate } from "./format";
+import { labelColor } from "./labelColors";
+import { labelIcon } from "./labelIcons";
+import type { AddressActions, MailDetail, MailLabel, MailPeople } from "./types";
 
-type Action = "archive" | "junk" | "trash" | "inbox" | "unread" | "star" | "delete";
+export type MailAction = "archive" | "junk" | "trash" | "inbox" | "unread" | "star" | "delete";
 
 export default function MailDisplay({
   message,
@@ -44,33 +58,87 @@ export default function MailDisplay({
   onReplyAll,
   onForward,
   onBack,
+  labels,
+  onToggleLabel,
+  onNewLabel,
+  onFilterLike,
+  focused = false,
+  onToggleFocus,
+  people = {},
+  addressActions,
+  ownAddress,
 }: {
+  people?: MailPeople;
+  addressActions: AddressActions;
+  ownAddress: string;
   message: MailDetail | null;
   thread: MailDetail[];
   loading: boolean;
-  onAction: (action: Action) => void;
+  onAction: (action: MailAction) => void;
   onReply: (m: MailDetail) => void;
   onReplyAll: (m: MailDetail) => void;
   onForward: (m: MailDetail) => void;
   onBack?: () => void;
+  labels: MailLabel[];
+  onToggleLabel: (labelId: string, on: boolean) => void;
+  onNewLabel: () => void;
+  onFilterLike: (m: MailDetail) => void;
+  focused?: boolean;
+  onToggleFocus?: () => void;
 }) {
   const disabled = !message;
-  const inTrash = message?.folder === "trash";
   const latest = thread.length ? thread[thread.length - 1] : message;
+  const applied = new Set(message?.labels ?? []);
+  const shownLabels = labels.filter((l) => applied.has(l.id));
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-[52px] shrink-0 items-center gap-1 px-2">
         {onBack && <ToolButton label="Back" icon={ArrowLeft} onClick={onBack} />}
-        <ToolButton label="Archive" icon={Archive} disabled={disabled} onClick={() => onAction("archive")} />
-        <ToolButton label="Move to junk" icon={ArchiveX} disabled={disabled} onClick={() => onAction("junk")} />
-        <ToolButton
-          label={inTrash ? "Delete forever" : "Move to trash"}
-          icon={Trash2}
-          disabled={disabled}
-          onClick={() => onAction(inTrash ? "delete" : "trash")}
-        />
+        {message && <FolderActions folder={message.folder} direction={message.direction} onAction={onAction} />}
+        {message && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Label as">
+                    <Tag className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Label as</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Label as</DropdownMenuLabel>
+              {labels.map((l) => (
+                <DropdownMenuCheckboxItem
+                  key={l.id}
+                  checked={applied.has(l.id)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(on) => onToggleLabel(l.id, on === true)}
+                >
+                  {(() => {
+                    const Icon = labelIcon(l.icon);
+                    return <Icon className={cn("mr-2 size-4 shrink-0", labelColor(l.color).text)} />;
+                  })()}
+                  <span className="truncate">{l.name}</span>
+                </DropdownMenuCheckboxItem>
+              ))}
+              {labels.length > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuItem onClick={onNewLabel}>
+                <Plus className="size-4" /> Create new
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <div className="ml-auto flex items-center gap-1">
+          {onToggleFocus && (
+            <ToolButton
+              label={focused ? "Restore mail layout" : "Open email full page"}
+              icon={focused ? Minimize2 : Maximize2}
+              onClick={onToggleFocus}
+            />
+          )}
           <ToolButton label="Reply" icon={Reply} disabled={!latest} onClick={() => latest && onReply(latest)} />
           <ToolButton label="Reply all" icon={ReplyAll} disabled={!latest} onClick={() => latest && onReplyAll(latest)} />
           <ToolButton label="Forward" icon={Forward} disabled={!latest} onClick={() => latest && onForward(latest)} />
@@ -94,6 +162,11 @@ export default function MailDisplay({
                 <Inbox className="size-4" /> Move to inbox
               </DropdownMenuItem>
             )}
+            {message && (
+              <DropdownMenuItem onClick={() => onFilterLike(message)}>
+                <Filter className="size-4" /> Filter messages like these
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -105,16 +178,39 @@ export default function MailDisplay({
         </div>
       ) : message ? (
         <ScrollArea className="min-h-0 flex-1">
-          <div className="px-4 pb-2 pt-4">
+          <div className={cn("px-4 pb-2 pt-4", focused && "mx-auto w-full max-w-5xl px-6")}>
             <h2 className="m-0 text-lg font-semibold leading-snug text-foreground">{message.subject}</h2>
+            {shownLabels.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {shownLabels.map((l) => (
+                  <span
+                    key={l.id}
+                    className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium", labelColor(l.color).chip)}
+                  >
+                    {(() => {
+                      const Icon = labelIcon(l.icon);
+                      return <Icon className="size-3" aria-hidden="true" />;
+                    })()}
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex flex-col">
+          <div className={cn("flex flex-col", focused && "mx-auto w-full max-w-5xl")}>
             {(thread.length ? thread : [message]).map((m, i, all) => (
-              <ThreadMessage key={m.id} message={m} defaultOpen={i === all.length - 1 || m.id === message.id} />
+              <ThreadMessage
+                key={m.id}
+                message={m}
+                defaultOpen={i === all.length - 1 || m.id === message.id}
+                people={people}
+                addressActions={addressActions}
+                ownAddress={ownAddress}
+              />
             ))}
           </div>
           {latest && (
-            <div className="flex gap-2 p-4">
+            <div className={cn("flex gap-2 p-4", focused && "mx-auto w-full max-w-5xl px-6")}>
               <Button variant="outline" size="sm" onClick={() => onReply(latest)}>
                 <Reply className="size-4" /> Reply
               </Button>
@@ -133,47 +229,73 @@ export default function MailDisplay({
   );
 }
 
-function ThreadMessage({ message, defaultOpen }: { message: MailDetail; defaultOpen: boolean }) {
+function ThreadMessage({
+  message,
+  defaultOpen,
+  people,
+  addressActions,
+  ownAddress,
+}: {
+  message: MailDetail;
+  defaultOpen: boolean;
+  people: MailPeople;
+  addressActions: AddressActions;
+  ownAddress: string;
+}) {
   const [open, setOpen] = useState(defaultOpen);
-  const name = message.fromName || message.from;
+  const sender = people[message.from.toLowerCase()];
+  const name = sender?.name || message.fromName || message.from;
   const files = message.attachments.filter((a) => !a.inline);
+
+  const addresses = (label: string, list: string[], field: "from" | "to") =>
+    list.length > 0 && (
+      <div className="flex flex-wrap items-baseline gap-x-1 text-xs">
+        <span className="font-medium">{label}:</span>
+        {list.map((address, i) => (
+          <span key={`${address}-${i}`}>
+            <AddressMenu
+              address={address}
+              people={people}
+              actions={addressActions}
+              ownAddress={ownAddress}
+              field={field}
+            />
+            {i < list.length - 1 && ","}
+          </span>
+        ))}
+      </div>
+    );
 
   return (
     <div className="border-t">
-      <button
-        type="button"
+      {/* Not a <button>: the addresses inside are buttons of their own. The
+          outline only shows for keyboard focus, not after a click. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-4 p-4 text-left text-sm"
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
+        className="flex w-full cursor-pointer items-start gap-4 p-4 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         aria-expanded={open}
       >
-        <Avatar>
-          <AvatarFallback>{initials(message.fromName, message.from)}</AvatarFallback>
-        </Avatar>
+        <MailPersonAvatar from={message.from} fromName={message.fromName} to={message.to} people={people} />
         <div className="grid min-w-0 flex-1 gap-1">
           <div className="font-semibold">{name}</div>
           {open ? (
             <>
-              <div className="line-clamp-1 text-xs">
-                <span className="font-medium">From:</span> {message.from}
-              </div>
-              <div className="line-clamp-1 text-xs">
-                <span className="font-medium">To:</span> {message.to.join(", ")}
-              </div>
-              {message.cc.length > 0 && (
-                <div className="line-clamp-1 text-xs">
-                  <span className="font-medium">Cc:</span> {message.cc.join(", ")}
-                </div>
-              )}
-              {message.bcc.length > 0 && (
-                <div className="line-clamp-1 text-xs">
-                  <span className="font-medium">Bcc:</span> {message.bcc.join(", ")}
-                </div>
-              )}
-              {message.replyTo.length > 0 && message.replyTo[0] !== message.from && (
-                <div className="line-clamp-1 text-xs">
-                  <span className="font-medium">Reply-To:</span> {message.replyTo.join(", ")}
-                </div>
-              )}
+              {addresses("From", [message.from], "from")}
+              {addresses("To", message.to, "to")}
+              {addresses("Cc", message.cc, "to")}
+              {addresses("Bcc", message.bcc, "to")}
+              {message.replyTo.length > 0 &&
+                message.replyTo[0] !== message.from &&
+                addresses("Reply-To", message.replyTo, "from")}
             </>
           ) : (
             <div className="line-clamp-1 text-xs text-muted-foreground">{message.snippet}</div>
@@ -187,10 +309,17 @@ function ThreadMessage({ message, defaultOpen }: { message: MailDetail; defaultO
             </div>
           )}
         </div>
-      </button>
+      </div>
       {open && (
         <div className="space-y-4 px-4 pb-4">
-          <MessageBody html={message.html} text={message.text} inlineImageUrls={message.inlineImageUrls} />
+          <MessageBody
+            html={message.html}
+            text={message.text}
+            inlineImageUrls={message.inlineImageUrls}
+            // Your own mail, and mail from a chapter member, isn't a stranger's
+            // tracking pixel: its pictures load without asking.
+            trustImages={message.direction === "out" || Boolean(sender)}
+          />
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {files.map((a) => (
@@ -217,6 +346,41 @@ function ThreadMessage({ message, defaultOpen }: { message: MailDetail; defaultO
       )}
     </div>
   );
+}
+
+/// The actions Gmail offers depend on where the message is: nothing is ever
+/// stuck in Archive, Junk or Trash without a way back.
+function FolderActions({
+  folder,
+  direction,
+  onAction,
+}: {
+  folder: MailDetail["folder"];
+  direction: MailDetail["direction"];
+  onAction: (action: MailAction) => void;
+}) {
+  const back = (label: string, icon: typeof Archive) => (
+    <ToolButton label={label} icon={icon} onClick={() => onAction("inbox")} />
+  );
+  const archive = <ToolButton label="Archive" icon={Archive} onClick={() => onAction("archive")} />;
+  const junk = <ToolButton label="Report junk" icon={ArchiveX} onClick={() => onAction("junk")} />;
+  const trash = <ToolButton label="Move to trash" icon={Trash2} onClick={() => onAction("trash")} />;
+  const forever = <ToolButton label="Delete forever" icon={Trash2} onClick={() => onAction("delete")} />;
+  // What you sent lives in Sent; archiving or junking it would mean nothing.
+  const sent = direction === "out";
+
+  switch (folder) {
+    case "archive":
+      return <>{back(sent ? "Move to Sent" : "Move to inbox", ArchiveRestore)}{!sent && junk}{trash}</>;
+    case "junk":
+      return <>{back(sent ? "Move to Sent" : "Not junk", ShieldCheck)}{forever}</>;
+    case "trash":
+      return <>{back(sent ? "Restore to Sent" : "Restore to inbox", Undo2)}{forever}</>;
+    case "sent":
+      return <>{trash}</>;
+    default:
+      return <>{archive}{junk}{trash}</>;
+  }
 }
 
 function ToolButton({

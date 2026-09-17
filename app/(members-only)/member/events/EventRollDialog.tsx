@@ -263,7 +263,7 @@ export function EventRollDialog({
                               variant="ghost"
                               size="sm"
                               disabled={busy}
-                              onClick={() => void undo(entry.memberId._id)}
+                              onClick={() => undo(entry.memberId._id)}
                             >
                               <Undo2 className="size-4" aria-hidden="true" />
                               Undo
@@ -276,7 +276,7 @@ export function EventRollDialog({
                                   variant="destructive"
                                   size="sm"
                                   disabled={busy}
-                                  onClick={() => void undo(entry.memberId._id)}
+                                  onClick={() => undo(entry.memberId._id)}
                                 >
                                   Remove
                                 </Button>

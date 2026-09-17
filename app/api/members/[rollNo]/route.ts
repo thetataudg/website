@@ -244,7 +244,10 @@ export async function PATCH(
   if ("status" in updates && updates.status) {
     const frozen = ["Removed", "Deceased"].includes(updates.status);
     await MailAccount.updateOne(
-      { memberId: updatedMember._id, status: frozen ? "active" : "suspended" },
+      // A mailbox an admin paused stays paused whatever happens to the status.
+      frozen
+        ? { memberId: updatedMember._id, kind: { $ne: "role" }, status: "active" }
+        : { memberId: updatedMember._id, kind: { $ne: "role" }, status: "suspended", pausedByAdmin: { $ne: true } },
       { $set: { status: frozen ? "suspended" : "active" } }
     ).catch((err) =>
       logger.warn({ err, rollNo: params.rollNo }, "Failed to update chapter mailbox status")

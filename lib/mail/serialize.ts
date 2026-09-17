@@ -29,6 +29,9 @@ export function toDetail(m: any) {
     replyTo: m.replyTo ?? [],
     messageId: m.messageId,
     references: m.references ?? [],
+    replyToId: m.replyToId ? String(m.replyToId) : undefined,
+    forwardOfId: m.forwardOfId ? String(m.forwardOfId) : undefined,
+    includeQuote: m.folder === "drafts" ? m.includeQuote !== false : undefined,
     text: m.text ?? "",
     html: m.html ?? "",
     attachments: (m.attachments ?? []).map((a: any, index: number) => ({

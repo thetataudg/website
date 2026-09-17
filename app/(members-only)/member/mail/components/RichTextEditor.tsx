@@ -9,6 +9,7 @@ import {
   Bold,
   Code2,
   Italic,
+  ImagePlus,
   Link2,
   List,
   ListOrdered,
@@ -28,9 +29,11 @@ import { gfm } from "turndown-plugin-gfm";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 export interface EditorValue {
   html: string;
@@ -39,6 +42,14 @@ export interface EditorValue {
 
 export interface RichTextEditorHandle {
   focusAtStart: () => void;
+  /// Puts this signature at the end of the message, replacing any signature
+  /// already there. Null takes it out.
+  setSignature: (signature: { id: string; html: string; includeSeparator?: boolean } | null) => void;
+  /// The id of the signature currently in the message, if any.
+  currentSignatureId: () => string | null;
+  /// What the member has actually written: the text with the signature left
+  /// out, so a message holding only a signature still counts as empty.
+  writtenText: () => string;
 }
 
 const EMAIL_FONTS = [
@@ -103,15 +114,26 @@ export default function RichTextEditor({
   value,
   onChange,
   editorHandle,
+  onReady,
+  allowImages = false,
 }: {
   value: EditorValue;
   onChange: (next: EditorValue) => void;
   editorHandle?: React.MutableRefObject<RichTextEditorHandle | null>;
+  /// Called once `editorHandle` is usable. Inside a dialog the editor mounts a
+  /// render after its parent, so the parent can't just check the ref on mount.
+  onReady?: () => void;
+  /// Signature editing supports uploaded images. Message attachments continue
+  /// to use the composer's attachment control.
+  allowImages?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
   const initialHtml = useRef(value.html);
   const editorInitialized = useRef(false);
   const savedRange = useRef<Range | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<"rich" | "markdown">("rich");
   const [markdown, setMarkdown] = useState(() => turndown.turndown(value.html));
   const [active, setActive] = useState<Record<string, boolean>>({});
@@ -197,15 +219,72 @@ export default function RichTextEditor({
         selection?.removeAllRanges();
         selection?.addRange(range);
       },
+      setSignature: (signature) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.querySelectorAll("[data-mail-signature]").forEach((node) => node.remove());
+        if (signature) {
+          // Gmail's shape: room to write, then "--" and the signature.
+          const empty = !(editor.textContent || "").trim() && !editor.querySelector("img");
+          if (empty) editor.innerHTML = "<div><br></div><div><br></div>";
+          const block = document.createElement("div");
+          block.setAttribute("data-mail-signature", signature.id);
+          const separator = signature.includeSeparator === false ? "" : `<div style="color:#6b7280">--</div>`;
+          block.innerHTML = `${separator}${signature.html}`;
+          editor.appendChild(block);
+          if (empty && document.activeElement === editor) {
+            const range = document.createRange();
+            range.setStart(editor.firstChild!, 0);
+            range.collapse(true);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+          }
+        } else {
+          // Trailing blank lines left behind by the signature go with it.
+          while (editor.lastChild && !(editor.lastChild.textContent || "").trim()
+            && !(editor.lastChild as HTMLElement).querySelector?.("img")
+            && editor.childNodes.length > 1) {
+            editor.lastChild.remove();
+          }
+        }
+        emitRichValue();
+      },
+      writtenText: () => {
+        const editor = editorRef.current;
+        if (!editor) return "";
+        const copy = editor.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll("[data-mail-signature]").forEach((node) => node.remove());
+        return (copy.textContent || "").trim();
+      },
+      currentSignatureId: () =>
+        editorRef.current?.querySelector("[data-mail-signature]")?.getAttribute("data-mail-signature") ?? null,
     };
+    onReadyRef.current?.();
     return () => {
       editorHandle.current = null;
     };
-  }, [editorHandle]);
+  }, [editorHandle, emitRichValue]);
 
   const run = useCallback((command: string, argument?: string) => {
-    editorRef.current?.focus();
-    restoreSelection();
+    const editor = editorRef.current;
+    if (!editor) return;
+    // Only put the saved selection back when focus really left the editor (a
+    // select, the color popover, the link dialog). The toolbar buttons keep
+    // focus, and re-applying a selection the editor still has does two kinds of
+    // damage: the saved range can be older than the caret, so the format lands
+    // where you were a moment ago, and resetting the selection throws away the
+    // browser's pending "next characters are bold" state, so a second click
+    // meant to turn bold off turns it straight back on.
+    const selection = window.getSelection();
+    const editorOwnsSelection =
+      document.activeElement === editor &&
+      Boolean(selection?.rangeCount) &&
+      editor.contains(selection!.anchorNode);
+    if (!editorOwnsSelection) {
+      editor.focus();
+      restoreSelection();
+    }
     document.execCommand(command, false, argument);
     rememberSelection();
     refreshActive();
@@ -267,6 +346,45 @@ export default function RichTextEditor({
       refreshActive();
       emitRichValue();
     });
+  }
+
+  async function addImage(file: File) {
+    const form = new FormData();
+    form.set("file", file);
+    try {
+      const res = await fetch("/api/mail/signature-images", { method: "POST", body: form });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Couldn't upload that image.");
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      const image = document.createElement("img");
+      image.src = body.src;
+      image.alt = file.name.replace(/\.[^.]+$/, "");
+      image.style.maxWidth = "100%";
+      image.style.height = "auto";
+      const selection = window.getSelection();
+      if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(image);
+        const spacer = document.createElement("br");
+        image.after(spacer);
+        range.setStartAfter(spacer);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        editor.append(image, document.createElement("br"));
+      }
+      rememberSelection();
+      emitRichValue();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't upload that image.");
+    } finally {
+      if (imageInputRef.current) imageInputRef.current.value = "";
+    }
   }
 
   function markdownShortcut(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -361,13 +479,26 @@ export default function RichTextEditor({
             <ToolGroup>
             <ToolbarButton label="Add link" icon={Link2} onClick={openLinkDialog} />
             <ToolbarButton label="Remove link" icon={Unlink} onClick={() => run("unlink")} />
+            {allowImages && (
+              <ToolbarButton
+                label="Add image"
+                icon={ImagePlus}
+                onClick={() => {
+                  rememberSelection();
+                  imageInputRef.current?.click();
+                }}
+              />
+            )}
             <Popover open={colorOpen} onOpenChange={(open) => { if (open) rememberSelection(); else setCustomColorOpen(false); setColorOpen(open); }}>
               <PopoverTrigger asChild>
                 <Button type="button" variant="ghost" size="icon" className="size-8 rounded-sm" aria-label="Text color" title="Text color" onMouseDown={(event) => { event.preventDefault(); rememberSelection(); }}>
                   <span className="text-sm font-semibold underline decoration-2">A</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-52 p-2" align="start">
+              <PopoverContent
+                className={cn("p-2 transition-[width] duration-200", customColorOpen ? "w-64" : "w-52")}
+                align="start"
+              >
                 <div className="grid grid-cols-4 gap-2" aria-label="Text colors">
                   {TEXT_COLORS.map((color) => (
                     <button
@@ -391,7 +522,7 @@ export default function RichTextEditor({
                 </div>
                 {customColorOpen && (
                   <form
-                    className="mt-2 flex gap-2 border-t pt-2"
+                    className="mt-2 space-y-3 border-t pt-3 duration-200 animate-in fade-in-0 slide-in-from-top-1"
                     onSubmit={(event) => {
                       event.preventDefault();
                       if (!/^#[0-9a-f]{6}$/i.test(customColor)) return;
@@ -400,15 +531,20 @@ export default function RichTextEditor({
                       run("foreColor", customColor);
                     }}
                   >
-                    <Input
-                      value={customColor}
-                      onChange={(event) => setCustomColor(event.target.value)}
-                      className="h-8 min-w-0 font-mono text-xs"
-                      maxLength={7}
-                      aria-label="Custom hex color"
-                      placeholder="#6366f1"
-                    />
-                    <Button type="submit" size="sm" className="h-8" disabled={!/^#[0-9a-f]{6}$/i.test(customColor)}>Apply</Button>
+                    <ColorPicker value={customColor} onChange={setCustomColor} />
+                    <div className="flex items-center gap-2">
+                      {/* What the text will look like, not just the swatch. */}
+                      <span
+                        className="flex h-8 min-w-0 flex-1 items-center rounded-md border px-2.5 text-sm font-semibold"
+                        style={{ color: customColor }}
+                        aria-hidden="true"
+                      >
+                        Aa
+                      </span>
+                      <Button type="submit" size="sm" className="h-8" disabled={!/^#[0-9a-f]{6}$/i.test(customColor)}>
+                        Apply
+                      </Button>
+                    </div>
                   </form>
                 )}
               </PopoverContent>
@@ -422,6 +558,20 @@ export default function RichTextEditor({
           </div>
         )}
       </div>
+
+      {allowImages && (
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          className="sr-only"
+          aria-label="Upload signature image"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void addImage(file);
+          }}
+        />
+      )}
 
       <div
           ref={setEditorNode}

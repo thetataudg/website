@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useLive } from "@/components/live/useLive";
 
 type Notification = {
   _id: string;
@@ -39,10 +40,10 @@ function timeAgo(iso: string | null) {
 
 /// The in-app channel, on the website.
 ///
-/// Polled rather than pushed: the whole notification volume here is a handful
-/// of dues notices a term, and a websocket for that would be more moving parts
-/// than the feature is worth. Opening the panel marks everything read, because
-/// a badge that survives you reading the thing is just noise.
+/// Refreshed over the live stream the moment a notification is created, with a
+/// slow poll behind it in case the stream is down. Opening the panel marks
+/// everything read, because a badge that survives you reading the thing is
+/// just noise.
 export default function NotificationBell() {
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -62,9 +63,13 @@ export default function NotificationBell() {
 
   useEffect(() => {
     load();
+    // A slow safety net. New notifications normally arrive over the live
+    // stream below the moment they are created.
     const timer = setInterval(load, 120_000);
     return () => clearInterval(timer);
   }, [load]);
+
+  useLive("notification", load);
 
   // Outside-click / Escape / focus handling comes from Radix Popover.
   async function handleOpenChange(next: boolean) {

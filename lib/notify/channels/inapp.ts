@@ -3,6 +3,7 @@
 // one everything else is built around. It cannot be misconfigured, so a member
 // can always open the app and find out what they were told.
 import Notification from "@/lib/models/Notification";
+import { publishLive } from "@/lib/live";
 import type { Channel, DeliveryRequest, DeliveryResult } from "./types";
 
 export const inAppChannel: Channel = {
@@ -30,6 +31,7 @@ export const inAppChannel: Channel = {
       },
       sentBy: request.sentBy ?? null,
     });
+    publishLive(request.recipient.memberId, "notification");
     return { channel: "inapp", delivered: true, id: created._id };
   },
 };

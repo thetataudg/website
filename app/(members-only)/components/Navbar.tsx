@@ -33,6 +33,7 @@ import AccountMenu from "./AccountMenu";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 import { usePendingRequestCount } from "./usePendingRequestCount";
+import { useLive } from "@/components/live/useLive";
 
 type UserData = {
   rollNo: string | null;
@@ -57,6 +58,8 @@ type NavChild = {
   href: string;
   external?: boolean;
   separatorBefore?: boolean;
+  /** Unread count shown beside the label. */
+  count?: number;
 };
 
 type NavItem = {
@@ -87,11 +90,64 @@ export default function MemberNavbar() {
   const [isCommitteeHead, setIsCommitteeHead] = useState(false);
   const [, setHasCommitteeMembership] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mailUnread, setMailUnread] = useState(0);
 
   // Force client-side mounting (prevents hydration mismatch on permission UI).
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const refreshMailUnread = useCallback(async () => {
+    try {
+      const res = await fetch("/api/mail/unread", { cache: "no-store" });
+      if (!res.ok) return;
+      const body = await res.json();
+      setMailUnread(Number(body.unread) || 0);
+    } catch {
+      /* the badge just stays as it was */
+    }
+  }, []);
+  // New mail lands over the live stream, so the badge moves the moment the
+  // webhook stores it rather than on the next page change.
+  useLive("mail", refreshMailUnread);
+
+  // Unread chapter mail, for the dot on More and the count on Chapter Mail.
+  // Asked on arrival, on every page change, when the tab comes back into view
+  // and once a minute. The mail page also announces its own count the moment
+  // it changes, so reading a message clears the badge without waiting.
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/mail/unread", { cache: "no-store" });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!cancelled) setMailUnread(Number(body.unread) || 0);
+      } catch {
+        /* the badge just stays as it was */
+      }
+    };
+    void load();
+    const tick = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const onAnnounce = (event: Event) => {
+      const value = Number((event as CustomEvent<number>).detail);
+      if (Number.isFinite(value)) setMailUnread(Math.max(0, value));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("chapter-mail-unread", onAnnounce);
+    return () => {
+      cancelled = true;
+      clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("chapter-mail-unread", onAnnounce);
+    };
+  }, [mounted, pathname]);
 
   // fetch current user's rollNo & role
   useEffect(() => {
@@ -338,8 +394,9 @@ export default function MemberNavbar() {
         label: "More",
         href: "#",
         active: false,
+        badge: mailUnread > 0,
         children: [
-          { key: "more-mail", label: "Chapter Mail", href: "/member/mail" },
+          { key: "more-mail", label: "Chapter Mail", href: "/member/mail", count: mailUnread },
           {
             key: "more-merch",
             label: "Merchandise",
@@ -366,6 +423,7 @@ export default function MemberNavbar() {
     canSeeManageEvents,
     canSeeCommitteeEvents,
     canSeeGem,
+    mailUnread,
   ]);
 
   /* Overflow measurement. The nav track is `flex-1 min-w-0`, so its width comes
@@ -472,6 +530,7 @@ export default function MemberNavbar() {
                       key={item.key}
                       label={item.label}
                       active={item.active}
+                      badge={item.badge}
                     >
                       {item.children.map((child) => (
                         <React.Fragment key={child.key}>
@@ -482,7 +541,7 @@ export default function MemberNavbar() {
                               className="my-1 h-px bg-border"
                             />
                           )}
-                          <MenuLink href={child.href} external={child.external}>
+                          <MenuLink href={child.href} external={child.external} count={child.count}>
                             {child.label}
                           </MenuLink>
                         </React.Fragment>
@@ -579,6 +638,7 @@ export default function MemberNavbar() {
                           onNavigate={closeMobile}
                         >
                           {child.label}
+                          {child.count ? <CountBadge count={child.count} /> : null}
                         </MobileLink>
                       ))}
                     </MobileSection>
@@ -638,13 +698,25 @@ const navItemState = (active: boolean) =>
 /* ---------- desktop helpers ---------- */
 
 /** The "something is waiting" marker next to a nav label. */
-function PendingDot() {
+function PendingDot({ label = "Requests waiting for review" }: { label?: string }) {
   return (
     <span
       className="ml-1.5 inline-block size-2 shrink-0 rounded-full bg-destructive"
       role="status"
-      aria-label="Requests waiting for review"
+      aria-label={label}
     />
+  );
+}
+
+/** How many are waiting, as a pill. Caps at 99+ so it never outgrows the row. */
+function CountBadge({ count }: { count: number }) {
+  return (
+    <span
+      className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold tabular-nums leading-none text-destructive-foreground"
+      aria-label={`${count} unread`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 
@@ -675,10 +747,12 @@ function DesktopLink({
 function NavDropdown({
   label,
   active,
+  badge,
   children,
 }: {
   label: string;
   active: boolean;
+  badge?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -692,6 +766,7 @@ function NavDropdown({
         )}
       >
         {label}
+        {badge && <PendingDot label="Unread chapter mail" />}
       </NavigationMenuTrigger>
       <NavigationMenuContent className="left-0 top-full mt-1.5 w-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg">
         <ul className="m-0 w-56 p-1">{children}</ul>
@@ -703,10 +778,12 @@ function NavDropdown({
 function MenuLink({
   href,
   external,
+  count,
   children,
 }: {
   href: string;
   external?: boolean;
+  count?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -718,6 +795,7 @@ function MenuLink({
           className="flex w-full cursor-pointer items-center rounded-sm px-3 py-2 text-sm font-medium text-popover-foreground no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
         >
           {children}
+          {count ? <CountBadge count={count} /> : null}
           {external && <ExternalLink className="ml-auto size-3.5" />}
         </Link>
       </NavigationMenuLink>

@@ -1,3 +1,4 @@
+import { syncCommitteeMailboxes } from "@/lib/mail/roleMailboxes";
 import { NextResponse } from "next/server";
 import { requireAuth, requireOfficer } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -108,6 +109,8 @@ export async function POST(req: Request) {
     }
 
     logger.info({ committeeId: committee._id }, "Committee created");
+    // The committee mailbox follows its head.
+    await syncCommitteeMailboxes({ force: true });
     return NextResponse.json(committee, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to create committee");

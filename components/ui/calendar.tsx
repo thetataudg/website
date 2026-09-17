@@ -22,20 +22,23 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      className={cn("relative p-3", className)}
       classNames={{
         months: "relative flex flex-col gap-4 sm:flex-row",
         month: "relative flex flex-col gap-4",
         month_caption: "flex h-9 items-center justify-center",
         caption_label: "text-sm font-medium text-foreground",
-        nav: "flex items-center gap-1",
+        // The nav renders *before* the months, so the caption row painted over
+        // it and took every click meant for the arrows. Laid over the caption
+        // row explicitly, and above it.
+        nav: "pointer-events-none absolute inset-x-3 top-3 z-10 flex h-9 items-center justify-between",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
-          "absolute left-3 top-3 size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
+          "pointer-events-auto size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
         ),
         button_next: cn(
           buttonVariants({ variant: "outline" }),
-          "absolute right-3 top-3 size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
+          "pointer-events-auto size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
         ),
         month_grid: "w-full border-collapse space-y-1",
         weekdays: "flex",

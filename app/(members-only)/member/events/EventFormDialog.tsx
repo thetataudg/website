@@ -729,7 +729,7 @@ export function EventFormDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button type="button" variant="outline" onClick={() => void save("single")}>
+            <Button type="button" variant="outline" onClick={() => save("single")}>
               Just this event
             </Button>
             <AlertDialogAction

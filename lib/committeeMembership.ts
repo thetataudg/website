@@ -30,6 +30,11 @@ export async function detachMemberFromCommittees(memberId: any): Promise<void> {
   ]);
 
   await Member.updateOne({ _id: id }, { $set: { isCommitteeHead: false } });
+  if (headResult.modifiedCount) {
+    // Their committee mailbox leaves with the head slot.
+    const { syncCommitteeMailboxes } = await import("@/lib/mail/roleMailboxes");
+    await syncCommitteeMailboxes({ force: true });
+  }
 
   if (rosterResult.modifiedCount || headResult.modifiedCount) {
     logger.info(

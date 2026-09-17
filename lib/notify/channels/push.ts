@@ -234,13 +234,14 @@ export const pushChannel: Channel = {
     const payload = {
       aps: {
         alert: {
-          title: request.message.title,
+          title: request.message.pushTitle || request.message.title,
+          ...(request.message.pushSubtitle ? { subtitle: request.message.pushSubtitle } : {}),
           body: request.message.push,
         },
         sound: "default",
         // The bell badge is the member's unread count, which the pipeline
         // doesn't know here — the app recomputes it on foreground.
-        "thread-id": request.message.category,
+        "thread-id": request.message.pushThreadId || request.message.category,
         // "active" is the default and is what everything else here sends.
         // Time-sensitive breaks through Focus and survives an hour on the lock
         // screen; it needs the matching entitlement in the app, which the

@@ -17,7 +17,7 @@ export default function Onboarding({ data, onChange }: { data: AccountPayload; o
   const account = data.account;
   const [choosing, setChoosing] = useState(false);
 
-  if (!data.eligible && (!account || account.status !== "suspended")) {
+  if (!data.eligible && (!account || !["suspended", "revoked"].includes(account.status))) {
     return (
       <Shell>
         <CardHeader>
@@ -35,6 +35,19 @@ export default function Onboarding({ data, onChange }: { data: AccountPayload; o
           <CardTitle>Your mailbox is paused</CardTitle>
           <CardDescription>
             {account.address} can&apos;t send or receive mail right now. Reach out to an officer if you think this is a mistake.
+          </CardDescription>
+        </CardHeader>
+      </Shell>
+    );
+  }
+
+  if (account?.status === "revoked") {
+    return (
+      <Shell>
+        <CardHeader>
+          <CardTitle>Your mailbox was closed</CardTitle>
+          <CardDescription>
+            An officer closed {account.address}. It can&apos;t send or receive mail. Reach out to an officer if you think this is a mistake.
           </CardDescription>
         </CardHeader>
       </Shell>

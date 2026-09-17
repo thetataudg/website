@@ -146,6 +146,13 @@ export interface RenderedMessage {
   /// left-aligned column; a dues notice wants a centred amount. Undefined
   /// everywhere else, which is the receipt.
   email?: EmailOverrides;
+  /// Push-only extras. A banner title other than `title`, the second line iOS
+  /// draws under it, and the key the lock screen stacks by. Mail uses all
+  /// three so a new message reads like Apple Mail's own: sender, subject,
+  /// preview, one stack per conversation.
+  pushTitle?: string;
+  pushSubtitle?: string;
+  pushThreadId?: string;
 }
 
 /// What to write on the button, worked out from where the button lands.

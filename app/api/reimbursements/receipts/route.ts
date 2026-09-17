@@ -30,6 +30,16 @@ const garageUseSSL = process.env.GARAGE_USE_SSL;
 /// and access rules is the kind of thing an auditor asks about.
 const receiptBucket = process.env.S3_RECEIPT_BUCKET || process.env.S3_PHOTO_BUCKET;
 
+/// Garage rejects any signature scoped to a region other than its own
+/// ("unexpected scope: …/us-east-1/s3/aws4_request"), and
+/// `NEXT_PUBLIC_GARAGE_REGION` is the AWS-shaped name, not Garage's. Same rule
+/// as `lib/garage.ts` and the profile-photo upload: sign as "garage" unless
+/// the endpoint really is AWS.
+const garageSigningRegion =
+  process.env.GARAGE_SIGNING_REGION ||
+  (garageEndpointRaw?.includes("amazonaws.com") ? garageRegion : "garage") ||
+  "garage";
+
 const resolvedEndpoint =
   garageEndpointRaw && !garageEndpointRaw.startsWith("http")
     ? `${garageUseSSL === "false" ? "http" : "https"}://${garageEndpointRaw}`
@@ -86,7 +96,7 @@ export async function POST(req: Request) {
     const objectKey = `receipts/${member.rollNo}/${randomUUID()}${ext}`;
 
     const s3 = new S3Client({
-      region: garageRegion || "garage",
+      region: garageSigningRegion,
       endpoint: resolvedEndpoint,
       credentials: {
         accessKeyId: garageAccessKey,

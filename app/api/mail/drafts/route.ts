@@ -42,6 +42,9 @@ export async function POST(req: NextRequest) {
           storageKey: String(a.key),
           state: "ready",
         })),
+      replyToId: isObjectId(body.replyToId) ? body.replyToId : null,
+      forwardOfId: isObjectId(body.forwardOfId) ? body.forwardOfId : null,
+      includeQuote: body.includeQuote !== false,
       date: new Date(),
     };
 

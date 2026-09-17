@@ -9,11 +9,13 @@ import {
   listReceivedAttachments,
   type ReceivedEmail,
 } from "@/lib/mail/resend";
-import { sanitizeEmailHtml, snippetOf } from "@/lib/mail/content";
+import { htmlToText, sanitizeEmailHtml, snippetOf } from "@/lib/mail/content";
 import { parseReferences, resolveThreadId } from "@/lib/mail/threading";
 import { bareAddress, displayNameOf, isOurDomain } from "@/lib/mail/address";
 import { putMailObject, safeFilename, storageConfigured } from "@/lib/mail/storage";
 import { notifyNewMail } from "@/lib/mail/notify";
+import { actionsForIncoming } from "@/lib/mail/filters";
+import { publishLive } from "@/lib/live";
 
 /// Anything bigger stays in Resend and is fetched on demand instead of copied.
 const MAX_COPY_BYTES = 25 * 1024 * 1024;
@@ -46,7 +48,10 @@ export async function ingestReceivedEmail(emailId: string, hint?: any): Promise<
   const accounts = await MailAccount.find({ address: { $in: recipients }, status: "active" })
     .populate("memberId", "status")
     .lean<any[]>();
-  const live = accounts.filter((a) => ["Active", "Alumni"].includes(a.memberId?.status));
+  // A personal mailbox takes mail while its owner is a member. A committee
+  // mailbox takes mail regardless: between heads it still collects, and the
+  // next head finds it waiting.
+  const live = accounts.filter((a) => a.kind === "role" || ["Active", "Alumni"].includes(a.memberId?.status));
   const liveAddresses = new Set(live.map((a) => a.address));
   result.dropped = recipients.filter((r) => !liveAddresses.has(r));
 
@@ -56,24 +61,49 @@ export async function ingestReceivedEmail(emailId: string, hint?: any): Promise<
   const html = sanitizeEmailHtml(email.html || "");
   const text = email.text || "";
   const fromRaw = headerValue(email, "from") || email.from || "";
-  const attachments = (email.attachments ?? hint?.attachments ?? []).map((a: any) => ({
-    filename: safeFilename(a.filename),
-    contentType: a.content_type || "application/octet-stream",
-    size: a.size ?? 0,
-    storageKey: "",
-    resendAttachmentId: a.id,
-    contentId: String(a.content_id || "").replace(/^<|>$/g, ""),
-    inline: a.content_disposition === "inline",
-    state: "pending",
-  }));
+  const attachments = (email.attachments ?? hint?.attachments ?? []).map((a: any) => {
+    const contentId = String(a.content_id || "").replace(/^<|>$/g, "");
+    return {
+      filename: safeFilename(a.filename),
+      contentType: a.content_type || "application/octet-stream",
+      size: a.size ?? 0,
+      storageKey: "",
+      resendAttachmentId: a.id,
+      contentId,
+      // Gmail marks a pasted picture as an attachment, not inline, but the
+      // body still shows it by cid. Anything the body draws is inline.
+      inline:
+        a.content_disposition === "inline" ||
+        Boolean(contentId && html.includes(`cid:${contentId}`)),
+      state: "pending",
+    };
+  });
 
   for (const account of live) {
     try {
-      const threadId = await resolveThreadId(account._id, inReplyTo, references);
+      const threadId = await resolveThreadId(account._id, inReplyTo, references, {
+        subject: email.subject || "",
+        participants: [
+          bareAddress(fromRaw),
+          ...(email.to ?? []).map(bareAddress),
+          ...(email.cc ?? []).map(bareAddress),
+        ].filter((address) => address && address !== account.address),
+      });
+      const filtered = await actionsForIncoming(account._id, {
+        from: bareAddress(fromRaw),
+        fromName: displayNameOf(fromRaw),
+        to: (email.to ?? []).map(bareAddress),
+        cc: (email.cc ?? []).map(bareAddress),
+        subject: email.subject || "",
+        text: text || htmlToText(html),
+        attachments,
+      });
       const doc = await MailMessage.create({
         accountId: account._id,
         direction: "in",
-        folder: "inbox",
+        folder: filtered.folder,
+        starred: filtered.starred,
+        labels: filtered.labels,
         threadId,
         messageId,
         inReplyTo,
@@ -88,14 +118,29 @@ export async function ingestReceivedEmail(emailId: string, hint?: any): Promise<
         html,
         snippet: snippetOf(text, html),
         attachments,
-        read: false,
+        read: filtered.read,
         resendEmailId: emailId,
         deliveryStatus: "received",
         date: email.created_at ? new Date(email.created_at) : new Date(),
       });
       result.delivered += 1;
       result.messageIds.push(String(doc._id));
-      await notifyNewMail(account.memberId?._id ?? account.memberId, displayNameOf(fromRaw) || bareAddress(fromRaw), email.subject || "");
+      // Before the push goes out, so an open inbox has it by the time the
+      // phone buzzes.
+      if (account.memberId) publishLive(account.memberId?._id ?? account.memberId, "mail");
+      // A filter that archives, trashes or marks it read has said this one
+      // isn't worth a notification.
+      if (account.memberId && filtered.folder === "inbox" && !filtered.read) {
+        await notifyNewMail(account.memberId?._id ?? account.memberId, {
+          mailboxId: String(account._id),
+          mailboxLabel: account.kind === "role" ? account.address.split("@")[0] : "",
+          fromLabel: displayNameOf(fromRaw) || bareAddress(fromRaw),
+          subject: email.subject || "",
+          preview: snippetOf(text, html),
+          messageId: String(doc._id),
+          threadId,
+        });
+      }
     } catch (err: any) {
       if (err?.code === 11000) continue; // already delivered on an earlier attempt
       throw err;

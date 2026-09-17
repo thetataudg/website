@@ -4,7 +4,7 @@
 // A private bucket of its own when S3_MAIL_BUCKET is set, falling back to the
 // minutes bucket, which is already private. Nothing here is ever public: every
 // read goes through an ownership check and a short-lived presigned URL.
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createMinutesClient } from "@/lib/minutesStorage";
 
@@ -62,4 +62,24 @@ export async function presignMailPut(key: string, contentType: string, expiresIn
     new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }),
     { expiresIn }
   );
+}
+
+/// Removes attachment bytes in batches of 1000, the most one request may name.
+/// Returns how many keys the bucket reported as failed.
+export async function deleteMailObjects(keys: string[]): Promise<number> {
+  const unique = Array.from(new Set(keys.filter(Boolean)));
+  if (!unique.length) return 0;
+  const { client: s3, bucket } = await client();
+  let failed = 0;
+  for (let i = 0; i < unique.length; i += 1000) {
+    const batch = unique.slice(i, i + 1000);
+    const result = await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+      })
+    );
+    failed += result.Errors?.length ?? 0;
+  }
+  return failed;
 }

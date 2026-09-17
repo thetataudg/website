@@ -27,6 +27,7 @@ export function LoadingSpinner({
   return (
     <Loader2
       aria-hidden="true"
+      data-loading-spinner
       className={cn(
         "animate-spin text-primary motion-reduce:[animation-duration:2s]",
         SIZE_CLASS[size] ?? SIZE_CLASS.lg,

@@ -145,7 +145,7 @@ export function MeetingLocationDialog({
             variant="outline"
             className="w-full"
             disabled={locating}
-            onClick={() => void locateHere()}
+            onClick={() => locateHere()}
           >
             {locating ? (
               <Loader2 className="size-4 animate-spin" />
@@ -201,7 +201,7 @@ export function MeetingLocationDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" disabled={!centre || saving} onClick={() => void save()}>
+          <Button type="button" disabled={!centre || saving} onClick={() => save()}>
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             Save location
           </Button>
