@@ -8,7 +8,7 @@ import { isObjectId, mailErrorResponse, requireMailbox } from "@/lib/mail/sessio
 import { bareAddress, isEmailAddress, mailDomain } from "@/lib/mail/address";
 import { releaseMemberSends, reserveMemberSends } from "@/lib/mail/budget";
 import { sendEmail } from "@/lib/mail/resend";
-import { sanitizeComposedHtml, snippetOf, textToHtml } from "@/lib/mail/content";
+import { absolutizeSignatureImageUrls, forwardBlock, replyQuote, sanitizeComposedHtml, snippetOf, textToHtml } from "@/lib/mail/content";
 import { presignMailGet, safeFilename } from "@/lib/mail/storage";
 import { resolveThreadId } from "@/lib/mail/threading";
 import { toListItem } from "@/lib/mail/serialize";
@@ -68,13 +68,30 @@ export async function POST(req: NextRequest) {
       parent = await MailMessage.findOne({ _id: body.replyToId, accountId: account._id }).lean<any>();
       if (!parent) return NextResponse.json({ error: "Original message not found." }, { status: 404 });
     }
+    let original: any = null;
     if (body.forwardOfId && isObjectId(body.forwardOfId)) {
-      const original = await MailMessage.findOne({ _id: body.forwardOfId, accountId: account._id }).lean<any>();
+      original = await MailMessage.findOne({ _id: body.forwardOfId, accountId: account._id }).lean<any>();
       if (!original) return NextResponse.json({ error: "Original message not found." }, { status: 404 });
       const keep = new Set<number>(Array.isArray(body.forwardAttachments) ? body.forwardAttachments.map(Number) : []);
       (original.attachments ?? []).forEach((a: any, i: number) => {
-        if (keep.has(i) && a.storageKey) attachments.push({ ...a, inline: false });
+        if (keep.has(i) && a.storageKey && !a.inline) attachments.push({ ...a, inline: false });
       });
+    }
+
+    // The quoted message goes under what the member wrote, built here from
+    // the stored original rather than round-tripped through the editor, which
+    // flattened it to text and lost its pictures. `includeQuote: false` is the
+    // member deleting it.
+    const quoted = body.includeQuote === false ? null : parent ?? original;
+    const quote = quoted ? (parent ? replyQuote(quoted) : forwardBlock(quoted)) : null;
+    // The quote's pictures are cid: references to the original's inline
+    // attachments, so those travel with it, marked inline with the same ids.
+    if (quoted) {
+      for (const a of quoted.attachments ?? []) {
+        if (a.inline && a.contentId && a.storageKey && quote!.html.includes(`cid:${a.contentId}`)) {
+          attachments.push({ ...a, inline: true });
+        }
+      }
     }
     if (attachments.reduce((s, a) => s + (a.size || 0), 0) > MAX_ATTACHMENT_BYTES) {
       return NextResponse.json({ error: "Attachments can total 25 MB at most." }, { status: 400 });
@@ -95,10 +112,15 @@ export async function POST(req: NextRequest) {
       headers["References"] = references.join(" ");
     }
     const displayName = (account.displayName || `${member.fName} ${member.lName}`).replace(/["<>]/g, "").trim();
-    const composedHtml = sanitizeComposedHtml(String(body.html || "").slice(0, 500_000));
-    const html = composedHtml
+    const composedHtml = absolutizeSignatureImageUrls(
+      sanitizeComposedHtml(String(body.html || "").slice(0, 500_000)),
+      req.nextUrl.origin
+    );
+    const ownHtml = composedHtml
       ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">${composedHtml}</div>`
       : textToHtml(text);
+    const html = quote ? `${ownHtml}${quote.html}` : ownHtml;
+    const fullText = quote ? `${text.trimEnd()}${quote.text}` : text;
 
     const outgoing = {
       // Built here, never read from the request: a member can only ever send
@@ -108,7 +130,7 @@ export async function POST(req: NextRequest) {
       cc: cc.length ? cc : undefined,
       bcc: bcc.length ? bcc : undefined,
       subject: subject || "(no subject)",
-      text,
+      text: fullText,
       html,
       headers,
       attachments: attachments.length
@@ -117,6 +139,7 @@ export async function POST(req: NextRequest) {
               filename: a.filename,
               path: await presignMailGet(a.storageKey, { expiresIn: 900 }),
               content_type: a.contentType,
+              ...(a.inline && a.contentId ? { content_id: a.contentId } : {}),
             }))
           )
         : undefined,
@@ -146,9 +169,9 @@ export async function POST(req: NextRequest) {
       cc,
       bcc,
       subject: outgoing.subject,
-      text,
+      text: fullText,
       html,
-      snippet: snippetOf(text),
+      snippet: snippetOf(text, ownHtml),
       attachments,
       read: true,
       resendEmailId: result.id,

@@ -5,7 +5,15 @@ import { NextRequest, NextResponse } from "next/server";
 import MailAccount from "@/lib/models/MailAccount";
 import MailMessage from "@/lib/models/MailMessage";
 import logger from "@/lib/logger";
-import { ELIGIBLE_STATUSES, currentMember, mailErrorResponse } from "@/lib/mail/session";
+import {
+  ELIGIBLE_STATUSES,
+  PERSONAL,
+  accessibleMailboxes,
+  currentMember,
+  mailErrorResponse,
+  requireMailbox,
+  summarizeMailboxes,
+} from "@/lib/mail/session";
 import { fullAddress, mailDomain, suggestLocalParts, validateLocalPart } from "@/lib/mail/address";
 import { toAccount } from "@/lib/mail/serialize";
 import { notifyOfficersOfMailRequest } from "@/lib/mail/notify";
@@ -18,7 +26,7 @@ async function availableSuggestions(member: any): Promise<string[]> {
   const candidates = suggestLocalParts(member.fName, member.lName, member.gradYear);
   const taken = await MailAccount.find({
     address: { $in: candidates.map(fullAddress) },
-    memberId: { $ne: member._id },
+    $or: [{ kind: "role" }, { memberId: { $ne: member._id } }],
   })
     .select("address")
     .lean<any[]>();
@@ -29,25 +37,37 @@ async function availableSuggestions(member: any): Promise<string[]> {
 export async function GET() {
   try {
     const member = await currentMember();
-    const account = await MailAccount.findOne({ memberId: member._id }).lean<any>();
+    const account = await MailAccount.findOne({ memberId: member._id, ...PERSONAL }).lean<any>();
     const eligible = ELIGIBLE_STATUSES.includes(member.status);
 
     const payload: any = {
       domain: mailDomain(),
       eligible,
       member: { fName: member.fName, lName: member.lName },
+      // Always the personal mailbox or request, which is what onboarding shows.
       account: toAccount(account),
     };
 
     if (!account || account.status === "rejected") {
       payload.suggestions = eligible ? await availableSuggestions(member) : [];
     }
-    if (account?.status === "active") {
-      const [unread, budget] = await Promise.all([
-        MailMessage.countDocuments({ accountId: account._id, folder: "inbox", read: false }),
+
+    // Every mailbox they can open, with the one in use, for the switcher.
+    const open = await accessibleMailboxes(member);
+    if (open.length) {
+      const { account: current } = await requireMailbox();
+      const [summaries, unreadRows, budget] = await Promise.all([
+        summarizeMailboxes(open),
+        MailMessage.aggregate([
+          { $match: { accountId: { $in: open.map((m) => m._id) }, folder: "inbox", read: false } },
+          { $group: { _id: "$accountId", unread: { $sum: 1 } } },
+        ]),
         sentToday(),
       ]);
-      payload.unread = unread;
+      const unreadBy = new Map(unreadRows.map((r: any) => [String(r._id), r.unread]));
+      payload.mailboxes = summaries.map((m) => ({ ...m, unread: unreadBy.get(m.id) ?? 0 }));
+      payload.current = toAccount(current);
+      payload.unread = unreadBy.get(String(current._id)) ?? 0;
       payload.budget = budget;
     }
     return NextResponse.json(payload);
@@ -67,14 +87,21 @@ export async function POST(req: NextRequest) {
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
     const address = fullAddress(check.localPart);
-    const existing = await MailAccount.findOne({ memberId: member._id });
+    const existing = await MailAccount.findOne({ memberId: member._id, ...PERSONAL });
     if (existing && existing.status !== "rejected") {
       return NextResponse.json(
-        { error: existing.status === "pending" ? "You already have a request in review." : "You already have a chapter mailbox." },
+        {
+          error:
+            existing.status === "pending"
+              ? "You already have a request in review."
+              : existing.status === "revoked"
+                ? "Your chapter mailbox was closed. Ask an officer to restore it."
+                : "You already have a chapter mailbox.",
+        },
         { status: 409 }
       );
     }
-    if (await MailAccount.exists({ address, memberId: { $ne: member._id } })) {
+    if (await MailAccount.exists({ address, $or: [{ kind: "role" }, { memberId: { $ne: member._id } }] })) {
       return NextResponse.json({ error: "That address is taken." }, { status: 409 });
     }
 
@@ -92,7 +119,7 @@ export async function POST(req: NextRequest) {
     try {
       account = existing
         ? await MailAccount.findByIdAndUpdate(existing._id, { $set: fields }, { new: true })
-        : await MailAccount.create({ memberId: member._id, ...fields });
+        : await MailAccount.create({ kind: "personal", memberId: member._id, ...fields });
     } catch (err: any) {
       if (err?.code === 11000) {
         return NextResponse.json({ error: "That address was just taken. Pick another." }, { status: 409 });
@@ -111,7 +138,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   try {
     const member = await currentMember();
-    const removed = await MailAccount.findOneAndDelete({ memberId: member._id, status: { $in: ["pending", "rejected"] } });
+    const removed = await MailAccount.findOneAndDelete({ memberId: member._id, ...PERSONAL, status: { $in: ["pending", "rejected"] } });
     if (!removed) return NextResponse.json({ error: "No request to cancel." }, { status: 404 });
     return NextResponse.json({ ok: true });
   } catch (err) {

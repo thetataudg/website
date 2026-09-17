@@ -47,12 +47,6 @@ function prefixed(prefix: string, subject: string) {
   return new RegExp(`^${prefix}:`, "i").test(s) ? s : `${prefix}: ${s}`.trim();
 }
 
-function quote(m: MailDetail): string {
-  const who = m.fromName ? `${m.fromName} <${m.from}>` : m.from;
-  const body = (m.text || "").trim().split(/\r?\n/).map((l) => `> ${l}`).join("\n");
-  return `\n\nOn ${fullDate(m.date)}, ${who} wrote:\n${body}`;
-}
-
 export function replySeed(m: MailDetail, ownAddress: string, all: boolean): ComposeSeed {
   const own = ownAddress.toLowerCase();
   const primary = m.direction === "out" ? m.to : m.replyTo.length ? m.replyTo : [m.from];
@@ -65,28 +59,54 @@ export function replySeed(m: MailDetail, ownAddress: string, all: boolean): Comp
     to: primary,
     cc,
     subject: prefixed("Re", m.subject),
-    text: quote(m),
     replyToId: m.id,
+    quoted: m,
   };
 }
 
 export function forwardSeed(m: MailDetail): ComposeSeed {
-  const header = [
-    "",
-    "",
-    "---------- Forwarded message ---------",
-    `From: ${m.fromName ? `${m.fromName} <${m.from}>` : m.from}`,
-    `Date: ${fullDate(m.date)}`,
-    `Subject: ${m.subject}`,
-    `To: ${m.to.join(", ")}`,
-    "",
-    (m.text || "").trim(),
-  ].join("\n");
   return {
     mode: "forward",
     subject: prefixed("Fwd", m.subject),
-    text: header,
     forwardOfId: m.id,
+    quoted: m,
     forwardAttachments: m.attachments.filter((a) => !a.inline && a.state === "ready"),
+  };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/// A single editable draft containing several selected messages. We use the
+/// plain-text bodies so opening the composer never loads a sender's trackers.
+export function bulkForwardSeed(messages: MailDetail[]): ComposeSeed {
+  const sections = messages.map((m) => {
+    const from = m.fromName ? `${m.fromName} <${m.from}>` : m.from;
+    const rows = [
+      ["From", from],
+      ["Date", fullDate(m.date)],
+      ["Subject", m.subject],
+      ["To", m.to.join(", ")],
+      ...(m.cc.length ? [["Cc", m.cc.join(", ")]] : []),
+    ];
+    const body = (m.text || m.snippet || "(This message has no text.)").trim();
+    const text = `---------- Forwarded message ---------\n${rows.map(([key, value]) => `${key}: ${value}`).join("\n")}\n\n${body}`;
+    const html =
+      `<div><strong>---------- Forwarded message ---------</strong><br>` +
+      `${rows.map(([key, value]) => `<strong>${key}:</strong> ${escapeHtml(value)}<br>`).join("")}` +
+      `<br><div style="white-space:pre-wrap">${escapeHtml(body)}</div></div>`;
+    return { text, html };
+  });
+
+  return {
+    mode: "new",
+    subject: messages.length === 1 ? prefixed("Fwd", messages[0].subject) : `Fwd: ${messages.length} messages`,
+    text: sections.map((section) => section.text).join("\n\n"),
+    html: sections.map((section) => section.html).join("<br><hr><br>"),
   };
 }

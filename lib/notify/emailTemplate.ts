@@ -83,6 +83,10 @@ export interface EmailContent {
   /// spacing rather than callers embedding <br> and hoping.
   paragraphs: string[];
   meta?: EmailMetaRow[];
+  /// Puts the details table between the paragraphs and the button, for a
+  /// message where the facts are part of what is being read rather than a
+  /// receipt under the action.
+  metaBeforeCta?: boolean;
   ctaLabel?: string;
   ctaHref?: string;
   /// The quiet line under the button — context, caveats, what happens next.
@@ -202,6 +206,9 @@ export function renderEmailHtml(content: EmailContent): string {
 </td></tr>`
     : "";
 
+  const cta =
+    content.ctaLabel && content.ctaHref ? button(content.ctaLabel, content.ctaHref, align) : "";
+
   const paragraphs = content.paragraphs
     .map(
       (text) =>
@@ -254,10 +261,15 @@ export function renderEmailHtml(content: EmailContent): string {
 
     <tr><td align="${textAlign}" style="padding:${content.heroAmount ? "22px" : "0"} 24px 0;text-align:${textAlign}">
       ${paragraphs}
-      ${content.ctaLabel && content.ctaHref ? button(content.ctaLabel, content.ctaHref, align) : ""}
+      ${!content.metaBeforeCta && cta ? cta : ""}
     </td></tr>
 
     ${meta}
+
+    ${content.metaBeforeCta && cta ? `
+    <tr><td align="${textAlign}" style="padding:0 24px;text-align:${textAlign}">
+      ${cta}
+    </td></tr>` : ""}
 
     ${content.footnote ? `
     <tr><td align="${textAlign}" style="padding:24px 24px 0;text-align:${textAlign}">

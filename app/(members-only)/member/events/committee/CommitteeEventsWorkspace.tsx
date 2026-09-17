@@ -369,7 +369,7 @@ export default function CommitteeEventsWorkspace() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => void openDetail(event._id)}
+                            onClick={() => openDetail(event._id)}
                           >
                             <ClipboardList className="size-4" />
                             Roll
@@ -379,7 +379,7 @@ export default function CommitteeEventsWorkspace() {
                             variant="ghost"
                             size="icon"
                             aria-label={`Edit ${event.name}`}
-                            onClick={() => void openEditor(event._id)}
+                            onClick={() => openEditor(event._id)}
                           >
                             <Pencil className="size-4" />
                           </Button>

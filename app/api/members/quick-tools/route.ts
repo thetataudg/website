@@ -143,6 +143,8 @@ export async function POST(req: Request) {
         { $set: { committeeHeadId: null, committeeMembers: [] } }
       );
       await Member.updateMany({ isCommitteeHead: true }, { $set: { isCommitteeHead: false } });
+      const { syncCommitteeMailboxes } = await import("@/lib/mail/roleMailboxes");
+      await syncCommitteeMailboxes({ force: true });
 
       logger.info(
         { clerkId, rollNo: submitter.rollNo, position: regentOrViceRegent },

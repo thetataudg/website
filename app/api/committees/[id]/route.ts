@@ -1,3 +1,4 @@
+import { syncCommitteeMailboxes } from "@/lib/mail/roleMailboxes";
 import { NextResponse } from "next/server";
 import { requireAuth, requireOfficer } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -82,6 +83,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const newHeadId = committee.committeeHeadId?.toString();
     await updateHeadFlags(oldHeadId, newHeadId, committee._id.toString());
+    // The committee mailbox follows its head.
+    await syncCommitteeMailboxes({ force: true });
 
     return NextResponse.json(committee, { status: 200 });
   } catch (err: any) {
@@ -106,6 +109,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     await Committee.deleteOne({ _id: committee._id });
 
     await updateHeadFlags(headId, null, committee._id.toString());
+    // The committee mailbox follows its head.
+    await syncCommitteeMailboxes({ force: true });
 
     return NextResponse.json({ status: "deleted" }, { status: 200 });
   } catch (err: any) {

@@ -53,15 +53,38 @@ export async function notifyMailDecision(memberId: any, decision: "approved" | "
   });
 }
 
-export async function notifyNewMail(memberId: any, fromLabel: string, subject: string): Promise<void> {
+export async function notifyNewMail(
+  memberId: any,
+  mail: {
+    fromLabel: string;
+    subject: string;
+    preview: string;
+    messageId: string;
+    threadId: string;
+    mailboxId: string;
+    /// Set for a committee mailbox, so "technology" shows which inbox it hit.
+    mailboxLabel: string;
+  }
+): Promise<void> {
   const recipient = await recipientFor(memberId);
   if (!recipient) return;
-  const line = `${fromLabel}: ${subject || "(no subject)"}`.slice(0, 118);
+  const subject = mail.subject.trim() || "(no subject)";
+  const preview = mail.preview.replace(/\s+/g, " ").trim();
   await notifyQuietly({
     recipient,
     template: "broadcast_mail_received",
     context: {} as any,
-    message: message({ title: "New chapter mail", body: line, push: line, link: "/member/mail" }),
+    message: message({
+      title: "New chapter mail",
+      body: `${mail.fromLabel}: ${subject}`.slice(0, 200),
+      // Sender, subject, first line: what Apple Mail's own banner shows.
+      pushTitle: mail.fromLabel.slice(0, 80),
+      pushSubtitle: (mail.mailboxLabel ? `[${mail.mailboxLabel}] ${subject}` : subject).slice(0, 120),
+      push: (preview || subject).slice(0, 178),
+      pushThreadId: `mail-${mail.threadId}`,
+      // Straight to the message, not just the inbox.
+      link: `/member/mail?mailbox=${encodeURIComponent(mail.mailboxId)}&message=${encodeURIComponent(mail.messageId)}`,
+    }),
     channels: ["push"],
     audit: false,
   });

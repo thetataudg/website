@@ -15,10 +15,9 @@
 //   forgot   → send a reset code
 //   reset    → set a new password with that code
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSignIn } from "@clerk/nextjs";
+import { useAuth, useSignIn } from "@clerk/nextjs";
 import { ArrowLeft, CircleAlert, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -71,7 +70,7 @@ export default function SignInWorkspace({
   logoutReason?: string;
 }) {
   const { isLoaded, signIn, setActive } = useSignIn();
-  const router = useRouter();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
 
   const [step, setStep] = useState<Step>("password");
   const [identifier, setIdentifier] = useState("");
@@ -94,13 +93,50 @@ export default function SignInWorkspace({
   // keystroke, and it fights password managers and screen readers, which
   // announce from wherever focus lands.
 
+  /// Set synchronously on submit. `busy` is state, so a double submit (Enter
+  /// plus a click, or a password manager submitting for you) read it as false
+  /// twice: the first attempt signed in, the second hit `session_exists`, and
+  /// the member was told their password was wrong while holding a session.
+  const inFlight = useRef(false);
+  const leaving = useRef(false);
+
+  /// A full page load, not `router.push`. The members area mounts its own
+  /// Clerk provider and access gate, and a client-side hop could reach them
+  /// before they saw the new session, which bounced the member straight back
+  /// here. Loading the page fresh means the server and Clerk both start from
+  /// the cookie that was just written.
+  const leave = useCallback(() => {
+    if (leaving.current) return;
+    leaving.current = true;
+    window.location.assign(destination);
+  }, [destination]);
+
+  // Already signed in (a session from an earlier attempt, another tab, or a
+  // refresh): there is nothing to sign in to, and every attempt would fail
+  // with `session_exists`. Go where they were going.
+  useEffect(() => {
+    if (authLoaded && isSignedIn) leave();
+  }, [authLoaded, isSignedIn, leave]);
+
   const finish = useCallback(
     async (createdSessionId: string) => {
-      await setActive?.({ session: createdSessionId });
-      router.push(destination);
+      try {
+        await setActive?.({ session: createdSessionId });
+      } catch {
+        // The session exists whether or not activating it here threw. The
+        // fresh page load below picks it up from the cookie; reporting a
+        // sign-in failure now would be telling the member something false.
+      }
+      leave();
     },
-    [setActive, router, destination]
+    [setActive, leave]
   );
+
+  /// Clerk refuses a new sign-in while one is active. That is not a failure
+  /// the member needs to hear about: they are signed in.
+  const alreadySignedIn = (err: unknown) =>
+    Array.isArray((err as any)?.errors) &&
+    (err as any).errors.some((entry: any) => entry?.code === "session_exists");
 
   /// Email is the only second factor the chapter's instance issues, and the
   /// only one the iOS app handles. Anything else needs a human.
@@ -125,8 +161,9 @@ export default function SignInWorkspace({
 
   async function handlePassword(event: React.FormEvent) {
     event.preventDefault();
-    if (!isLoaded || busy) return;
+    if (!isLoaded || busy || inFlight.current) return;
 
+    inFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -159,8 +196,13 @@ export default function SignInWorkspace({
 
       setError(AUTH_MESSAGES.incomplete);
     } catch (err) {
+      if (alreadySignedIn(err)) {
+        leave();
+        return;
+      }
       setError(authErrorMessage(err, AUTH_MESSAGES.signInFailed));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -294,6 +336,10 @@ export default function SignInWorkspace({
 
   if (!isLoaded) {
     return <LoadingState message="Loading sign-in..." />;
+  }
+
+  if (authLoaded && isSignedIn) {
+    return <LoadingState message="Signing you in..." />;
   }
 
   const heading =

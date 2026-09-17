@@ -608,7 +608,7 @@ export default function ManageEventsWorkspace() {
               type="button"
               variant="destructive"
               disabled={deleteBusy}
-              onClick={() => void confirmDelete()}
+              onClick={() => confirmDelete()}
             >
               {deleteBusy ? (
                 <Loader2 className="size-4 animate-spin" />

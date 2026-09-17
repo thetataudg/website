@@ -525,7 +525,7 @@ function LocationAsk({
           <Button type="button" variant="ghost" onClick={onSkip}>
             Not now
           </Button>
-          <Button type="button" disabled={asking} onClick={() => void onEnable()}>
+          <Button type="button" disabled={asking} onClick={() => onEnable()}>
             {asking ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
             Turn on location
           </Button>

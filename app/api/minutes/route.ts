@@ -254,8 +254,20 @@ export async function POST(req: Request) {
       hidden: false,
     });
 
-    // One email to minutes@ttdg.org. Never throws.
-    await announceMinutes(created);
+    // One email to minutes@ttdg.org, carrying the summary and the PDF itself.
+    // Never throws.
+    const readableName = (eventName ? `${eventName} minutes` : `Minutes ${slug}`)
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    await announceMinutes(created, {
+      attachment: {
+        filename: `${readableName}${ext || ".pdf"}`,
+        content: buffer,
+        contentType: file.type || "application/pdf",
+      },
+      postedBy: [member.fName, member.lName].filter(Boolean).join(" ") || undefined,
+    });
 
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {

@@ -1,4 +1,6 @@
 // lib/reimbursements.ts
+import { maybePresignUrl } from "@/lib/garage";
+
 export interface ReimbursementDTO {
   _id: string;
   memberId: string;
@@ -46,4 +48,16 @@ export function serializeReimbursement(
       ? Math.max(0, Math.floor((now.getTime() - submittedAt.getTime()) / 86400000))
       : 0,
   };
+}
+
+/// Receipts live in a private bucket, so the stored URL on its own opens to
+/// "Access Denied". Anything handed to a browser gets a signed link instead;
+/// the stored value stays the plain one so it never expires in the database.
+export async function withViewableReceipts<T extends { receiptUrls: string[] }>(
+  dto: T
+): Promise<T> {
+  const receiptUrls = await Promise.all(
+    dto.receiptUrls.map(async (url) => (await maybePresignUrl(url)) ?? url)
+  );
+  return { ...dto, receiptUrls };
 }

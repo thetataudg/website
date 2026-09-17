@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
     const check = validateLocalPart(req.nextUrl.searchParams.get("local") || "");
     if (!check.ok) return NextResponse.json({ available: false, error: check.error });
     const address = fullAddress(check.localPart);
-    const taken = await MailAccount.exists({ address, memberId: { $ne: member._id } });
+    const taken = await MailAccount.exists({
+      address,
+      $or: [{ kind: "role" }, { memberId: { $ne: member._id } }],
+    });
     return NextResponse.json({
       available: !taken,
       address,

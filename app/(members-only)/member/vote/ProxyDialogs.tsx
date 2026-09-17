@@ -99,7 +99,7 @@ export function ProxyRequestDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" disabled={!reason.trim() || sending} onClick={() => void send()}>
+          <Button type="button" disabled={!reason.trim() || sending} onClick={() => send()}>
             {sending ? <Loader2 className="size-4 animate-spin" /> : null}
             Send request
           </Button>
@@ -211,7 +211,7 @@ export function ProxyQueueDialog({
                     variant="outline"
                     className="flex-1"
                     disabled={deciding !== null}
-                    onClick={() => void decide(request, false)}
+                    onClick={() => decide(request, false)}
                   >
                     <X className="size-4" />
                     Deny
@@ -220,7 +220,7 @@ export function ProxyQueueDialog({
                     type="button"
                     className="flex-1"
                     disabled={deciding !== null}
-                    onClick={() => void decide(request, true)}
+                    onClick={() => decide(request, true)}
                   >
                     {deciding === request.clerkId ? (
                       <Loader2 className="size-4 animate-spin" />

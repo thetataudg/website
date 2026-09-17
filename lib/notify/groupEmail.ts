@@ -10,7 +10,7 @@
 // "Hey Vinny" line and no per-member amount. Anything that needs either still
 // goes through `notify()`.
 import logger from "@/lib/logger";
-import { sendEmail, resendConfigured } from "@/lib/mail/resend";
+import { OutgoingEmail, sendEmail, resendConfigured } from "@/lib/mail/resend";
 import { recordSystemSend } from "@/lib/mail/budget";
 import { fromAddressFor, replyToFor } from "@/lib/notify/from";
 import {
@@ -42,6 +42,7 @@ export interface GroupEmailInput {
   /// Resend drops a repeat with the same key, so a retried request can't
   /// mail the group twice.
   idempotencyKey?: string;
+  attachments?: OutgoingEmail["attachments"];
 }
 
 /// Sends one message to every listed group. Never throws.
@@ -57,6 +58,7 @@ export async function sendGroupEmail(input: GroupEmailInput): Promise<boolean> {
         subject: input.subject,
         html: renderEmailHtml(input.content),
         text: renderEmailText(input.content),
+        ...(input.attachments?.length ? { attachments: input.attachments } : {}),
       },
       input.idempotencyKey
     );

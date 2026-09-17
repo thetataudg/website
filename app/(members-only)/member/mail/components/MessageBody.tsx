@@ -1,6 +1,39 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Ellipsis } from "lucide-react";
+
+/// Where each mail client puts the history under a reply. Gmail's own markup,
+/// Apple Mail's cite, Yahoo's and Outlook on the web's containers.
+const QUOTE_SELECTOR = [
+  ".gmail_quote_container",
+  "div.gmail_quote",
+  "blockquote.gmail_quote",
+  'blockquote[type="cite"]',
+  ".yahoo_quoted",
+  "#divRplyFwdMsg",
+].join(",");
+
+/// A forward is the message itself, not history, so Gmail leaves it open.
+function isForward(element: Element): boolean {
+  return /^\s*-+\s*Forwarded message/i.test(element.textContent || "");
+}
+
+/// Folds the quoted history out of a plain-text message: the "On … wrote:"
+/// line and the ">" lines that follow it, when they close the message.
+function splitTextQuote(text: string): { body: string; quote: string } {
+  const lines = text.split(/\r?\n/);
+  let start = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    const rest = lines.slice(i + 1).filter((l) => l.trim());
+    if (/^\s*On .+wrote:\s*$/.test(lines[i]) && rest.length && rest.every((l) => l.startsWith(">"))) {
+      start = i;
+      break;
+    }
+  }
+  if (start <= 0 || !lines.slice(0, start).join("").trim()) return { body: text, quote: "" };
+  return { body: lines.slice(0, start).join("\n").trimEnd(), quote: lines.slice(start).join("\n") };
+}
 
 function isUnreadableOnDark(value: string): boolean {
   const color = value.toLowerCase().replace(/\s+/g, "");
@@ -40,12 +73,19 @@ export default function MessageBody({
   html,
   text,
   inlineImageUrls,
+  foldQuotes = true,
+  trustImages = false,
 }: {
   html: string;
   text: string;
   inlineImageUrls?: string[];
+  /// Hide the quoted history behind "..." the way Gmail does.
+  foldQuotes?: boolean;
+  /// Load remote images straight away, for mail from inside the chapter.
+  trustImages?: boolean;
 }) {
-  const [showImages, setShowImages] = useState(false);
+  const [showImages, setShowImages] = useState(trustImages);
+  const [showQuoted, setShowQuoted] = useState(false);
   const [dark, setDark] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
@@ -59,10 +99,29 @@ export default function MessageBody({
     return () => observer.disconnect();
   }, []);
 
-  const { doc, blocked } = useMemo(() => {
-    if (!html) return { doc: "", blocked: false };
+  const { doc, blocked, hasQuote } = useMemo(() => {
+    if (!html) return { doc: "", blocked: false, hasQuote: false };
     const allowed = new Set(inlineImageUrls ?? []);
     const parsed = new DOMParser().parseFromString(html, "text/html");
+    let quoteFound = false;
+    if (foldQuotes) {
+      const outermost = Array.from(parsed.body.querySelectorAll(QUOTE_SELECTOR)).filter(
+        (element) => !element.parentElement?.closest(QUOTE_SELECTOR) && !isForward(element)
+      );
+      if (outermost.length) {
+        // Only fold when something is left to read. A message that is all
+        // quote (a bare forward from some clients) stays as it is.
+        const probe = parsed.body.cloneNode(true) as HTMLElement;
+        probe.querySelectorAll(QUOTE_SELECTOR).forEach((element) => {
+          if (!element.parentElement?.closest(QUOTE_SELECTOR) && !isForward(element)) element.remove();
+        });
+        const remains = (probe.textContent || "").trim() || probe.querySelector("img");
+        if (remains) {
+          quoteFound = true;
+          if (!showQuoted) outermost.forEach((element) => element.remove());
+        }
+      }
+    }
     if (dark) {
       const compact = (value: string) => value.toLowerCase().replace(/\s+/g, "");
       const nearWhite = new Set(["white", "#fff", "#ffffff", "rgb(255,255,255)", "rgba(255,255,255,1)", "#fafafa", "#f9fafb"]);
@@ -108,8 +167,29 @@ export default function MessageBody({
     const link = dark ? "#60a5fa" : "#2563eb";
     const quoteBorder = dark ? "#52525b" : "#d4d4d8";
     const head = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>html{margin:0;background:${surface}}body{box-sizing:border-box;margin:0;min-height:100%;padding:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:${foreground};background:${surface};word-wrap:break-word}a{color:${link}!important;text-decoration:underline!important}img{max-width:100%;height:auto}pre{white-space:pre-wrap}blockquote{margin:.75em 0;border-left:3px solid ${quoteBorder};padding-left:1em}</style>`;
-    return { doc: `<!doctype html><html><head>${head}</head><body>${parsed.body.innerHTML}</body></html>`, blocked: blockedCount > 0 && !showImages };
-  }, [dark, html, inlineImageUrls, showImages]);
+    return {
+      doc: `<!doctype html><html><head>${head}</head><body>${parsed.body.innerHTML}</body></html>`,
+      blocked: blockedCount > 0 && !showImages,
+      hasQuote: quoteFound,
+    };
+  }, [dark, html, inlineImageUrls, showImages, foldQuotes, showQuoted]);
+
+  const textParts = useMemo(
+    () => (foldQuotes ? splitTextQuote(text || "") : { body: text || "", quote: "" }),
+    [text, foldQuotes]
+  );
+
+  const quoteToggle = (
+    <button
+      type="button"
+      onClick={() => setShowQuoted((v) => !v)}
+      className="flex h-5 items-center rounded-sm bg-muted px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+      aria-expanded={showQuoted}
+      aria-label={showQuoted ? "Hide quoted text" : "Show quoted text"}
+    >
+      <Ellipsis className="size-4" />
+    </button>
+  );
 
   // Same-origin (scripts still off) only so the frame can be sized to its
   // content instead of scrolling inside the page.
@@ -137,7 +217,17 @@ export default function MessageBody({
   }, [doc]);
 
   if (!html) {
-    return <div className="whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-muted/20 p-4 text-sm leading-relaxed text-foreground shadow-sm">{text || "(This message has no content.)"}</div>;
+    return (
+      <div className="whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-muted/20 p-4 text-sm leading-relaxed text-foreground shadow-sm">
+        {textParts.body || "(This message has no content.)"}
+        {textParts.quote && (
+          <div className="mt-3 space-y-2">
+            {quoteToggle}
+            {showQuoted && <div className="text-muted-foreground">{textParts.quote}</div>}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -159,6 +249,7 @@ export default function MessageBody({
         className="w-full rounded-lg border border-border/70 bg-card shadow-sm"
         style={{ height }}
       />
+      {hasQuote && quoteToggle}
     </div>
   );
 }

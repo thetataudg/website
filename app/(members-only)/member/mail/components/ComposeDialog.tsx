@@ -1,16 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Paperclip, X } from "lucide-react";
+import { Check, Ellipsis, Paperclip, Settings2, Signature, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { LoadingSpinner } from "../../../components/LoadingState";
 import { fileSize } from "./format";
+import MessageBody from "./MessageBody";
 import RichTextEditor, { type RichTextEditorHandle } from "./RichTextEditor";
-import type { ComposeSeed, MailAttachment, UploadedFile } from "./types";
+import type { ComposeSeed, MailAttachment, MailSignature, SignatureDefaults, UploadedFile } from "./types";
 
 const MAX_FILE = 4.5 * 1024 * 1024;
 const MAX_TOTAL = 25 * 1024 * 1024;
@@ -29,7 +38,7 @@ function plainTextHtml(text: string): string {
     quote = [];
   };
   for (const line of escaped.split(/\r?\n/)) {
-    if (line.startsWith("&gt;")) quote.push(line.replace(/^&gt; ?/, "") || "<br>");
+    if (line.startsWith("&gt;")) quote.push(line.replace(/^(?:&gt;)+ ?/, "") || "<br>");
     else {
       flushQuote();
       output.push(line || "<br>");
@@ -37,6 +46,60 @@ function plainTextHtml(text: string): string {
   }
   flushQuote();
   return output.join("<br>");
+}
+
+const LEGACY_QUOTE_SELECTOR = [
+  ".gmail_quote_container",
+  "div.gmail_quote",
+  "blockquote.gmail_quote",
+  'blockquote[type="cite"]',
+  ".yahoo_quoted",
+  "#divRplyFwdMsg",
+].join(",");
+
+function editableText(element: HTMLElement): string {
+  const copy = element.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll("br").forEach((node) => node.replaceWith("\n"));
+  copy.querySelectorAll("div, p, li, blockquote, h1, h2, h3").forEach((node) => node.append("\n"));
+  return (copy.textContent || "").replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+/// Drafts created before quoted content was stored separately may contain the
+/// original message inside the editable body. Remove only recognizable mail
+/// quote markup/markers, preserve the member's writing and signature, and let
+/// the separate quote preview render the original instead.
+function normalizeDraftBody(seed: ComposeSeed): { html: string; text: string } {
+  const html = seed.html || plainTextHtml(seed.text ?? "");
+  if (seed.mode !== "draft" || !(seed.replyToId || seed.forwardOfId) || typeof window === "undefined") {
+    return { html, text: seed.text ?? "" };
+  }
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const signature = doc.body.querySelector<HTMLElement>("[data-mail-signature]");
+  const signatureHtml = signature?.outerHTML ?? "";
+  signature?.remove();
+
+  const knownQuote = doc.body.querySelector(LEGACY_QUOTE_SELECTOR);
+  if (knownQuote) {
+    knownQuote.remove();
+  } else {
+    const children = Array.from(doc.body.children);
+    const quoteStart = children.findIndex((element) => {
+      const value = (element.textContent || "").replace(/\u00a0/g, " ").trim();
+      return /Forwarded message/i.test(value)
+        || /^On\b[\s\S]*\bwrote:/i.test(value)
+        || /^>{2,}(?:\s|$)/.test(value);
+    });
+    if (quoteStart >= 0) children.slice(quoteStart).forEach((element) => element.remove());
+  }
+
+  // Some contentEditable documents put every line directly in the body. If a
+  // legacy double-quoted body survived as one text run, remove that run too.
+  if (!doc.body.children.length && /^>{2,}(?:\s|$)/.test((doc.body.textContent || "").trim())) {
+    doc.body.textContent = "";
+  }
+  if (signatureHtml) doc.body.insertAdjacentHTML("beforeend", signatureHtml);
+  return { html: doc.body.innerHTML, text: editableText(doc.body) };
 }
 
 const TITLES: Record<ComposeSeed["mode"], string> = {
@@ -47,20 +110,39 @@ const TITLES: Record<ComposeSeed["mode"], string> = {
   draft: "Draft",
 };
 
+type SignatureProps = {
+  /// False until the mailbox has fetched them, so the default isn't skipped
+  /// just because the composer opened first.
+  signaturesReady: boolean;
+  signatures: MailSignature[];
+  signatureDefaults: SignatureDefaults;
+  onManageSignatures: () => void;
+};
+
 export default function ComposeDialog({
   seed,
   fromAddress,
   onClose,
   onSent,
+  ...signatureProps
 }: {
   seed: ComposeSeed | null;
   fromAddress: string;
   onClose: () => void;
   onSent: () => void;
-}) {
+} & SignatureProps) {
   return (
     <Dialog open={Boolean(seed)} onOpenChange={(open) => !open && onClose()}>
-      {seed && <ComposeForm key={seed.draftId ?? seed.replyToId ?? seed.forwardOfId ?? "new"} seed={seed} fromAddress={fromAddress} onClose={onClose} onSent={onSent} />}
+      {seed && (
+        <ComposeForm
+          key={seed.draftId ?? seed.replyToId ?? seed.forwardOfId ?? "new"}
+          seed={seed}
+          fromAddress={fromAddress}
+          onClose={onClose}
+          onSent={onSent}
+          {...signatureProps}
+        />
+      )}
     </Dialog>
   );
 }
@@ -70,19 +152,25 @@ function ComposeForm({
   fromAddress,
   onClose,
   onSent,
+  signaturesReady,
+  signatures,
+  signatureDefaults,
+  onManageSignatures,
 }: {
   seed: ComposeSeed;
   fromAddress: string;
   onClose: () => void;
   onSent: () => void;
-}) {
+} & SignatureProps) {
+  const initialBody = useRef<{ html: string; text: string } | null>(null);
+  if (!initialBody.current) initialBody.current = normalizeDraftBody(seed);
   const [to, setTo] = useState<string[]>(seed.to ?? []);
   const [cc, setCc] = useState<string[]>(seed.cc ?? []);
   const [bcc, setBcc] = useState<string[]>(seed.bcc ?? []);
   const [showCc, setShowCc] = useState(Boolean(seed.cc?.length || seed.bcc?.length));
   const [subject, setSubject] = useState(seed.subject ?? "");
-  const [text, setText] = useState(seed.text ?? "");
-  const [html, setHtml] = useState(seed.html || plainTextHtml(seed.text ?? ""));
+  const [text, setText] = useState(initialBody.current.text);
+  const [html, setHtml] = useState(initialBody.current.html);
   const [files, setFiles] = useState<UploadedFile[]>(seed.attachments ?? []);
   const [forwarded, setForwarded] = useState<MailAttachment[]>(seed.forwardAttachments ?? []);
   const [uploading, setUploading] = useState(0);
@@ -90,17 +178,51 @@ function ComposeForm({
   const [dragging, setDragging] = useState(false);
   const [draftId, setDraftId] = useState<string | undefined>(seed.draftId);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const hasQuote = Boolean(seed.replyToId || seed.forwardOfId);
+  const [includeQuote, setIncludeQuote] = useState(seed.includeQuote !== false);
+  const [showQuote, setShowQuote] = useState(false);
   const clientId = useRef<string>(typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()));
   const dirty = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<RichTextEditorHandle | null>(null);
 
+  // The default signature goes in once, as the composer opens. A draft already
+  // carries whatever signature it was saved with, so it gets none added.
+  const [signatureId, setSignatureId] = useState<string | null>(null);
+  const [editorReady, setEditorReady] = useState(false);
+  const signatureApplied = useRef(false);
+  useEffect(() => {
+    if (signatureApplied.current || !signaturesReady || !editorReady || seed.mode === "draft" || !bodyRef.current) return;
+    const defaultId = seed.mode === "new" ? signatureDefaults.newMail : signatureDefaults.reply;
+    const signature = signatures.find((s) => s.id === defaultId);
+    signatureApplied.current = true;
+    if (!signature) return;
+    bodyRef.current.setSignature(signature);
+    setSignatureId(signature.id);
+  }, [seed.mode, signaturesReady, editorReady, signatures, signatureDefaults]);
+
+  /// Has the member written anything? A signature on its own doesn't count, so
+  /// opening and closing a new message doesn't leave a draft behind.
+  const hasWriting = useCallback(
+    () => Boolean((bodyRef.current?.writtenText() ?? text).trim()),
+    [text]
+  );
+
+  useEffect(() => {
+    if (editorReady && seed.mode === "draft") setSignatureId(bodyRef.current?.currentSignatureId() ?? null);
+  }, [seed.mode, editorReady]);
+
+  function chooseSignature(signature: MailSignature | null) {
+    bodyRef.current?.setSignature(signature);
+    setSignatureId(signature?.id ?? null);
+  }
+
   // Replies open with the cursor above the quoted text.
   useEffect(() => {
-    if ((seed.mode === "reply" || seed.mode === "replyAll" || seed.mode === "forward") && bodyRef.current) {
+    if (editorReady && (seed.mode === "reply" || seed.mode === "replyAll" || seed.mode === "forward") && bodyRef.current) {
       bodyRef.current.focusAtStart();
     }
-  }, [seed.mode]);
+  }, [seed.mode, editorReady]);
 
   const totalSize = files.reduce((s, f) => s + f.size, 0) + forwarded.reduce((s, f) => s + f.size, 0);
 
@@ -111,7 +233,19 @@ function ComposeForm({
       const res = await fetch("/api/mail/drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId, to, cc, bcc, subject, text, html, attachments: files }),
+        body: JSON.stringify({
+          draftId,
+          to,
+          cc,
+          bcc,
+          subject,
+          text,
+          html,
+          attachments: files,
+          replyToId: seed.replyToId,
+          forwardOfId: seed.forwardOfId,
+          includeQuote: hasQuote ? includeQuote : undefined,
+        }),
       });
       if (res.ok) {
         const body = await res.json();
@@ -121,18 +255,18 @@ function ComposeForm({
     } catch {
       dirty.current = true;
     }
-  }, [draftId, to, cc, bcc, subject, text, html, files, sending]);
+  }, [draftId, to, cc, bcc, subject, text, html, files, sending, seed.replyToId, seed.forwardOfId, hasQuote, includeQuote]);
 
   useEffect(() => {
     dirty.current = true;
-  }, [to, cc, bcc, subject, text, html, files]);
+  }, [to, cc, bcc, subject, text, html, files, includeQuote]);
 
   // Autosave a few seconds after the last change.
   useEffect(() => {
-    if (!to.length && !subject && !text.trim() && !files.length) return;
+    if (!to.length && !subject && !hasWriting() && !files.length) return;
     const handle = setTimeout(saveDraft, 3000);
     return () => clearTimeout(handle);
-  }, [to, cc, bcc, subject, text, html, files, saveDraft]);
+  }, [to, cc, bcc, subject, text, html, files, includeQuote, saveDraft, hasWriting]);
 
   async function addFiles(list: FileList | File[]) {
     const incoming = Array.from(list);
@@ -184,6 +318,7 @@ function ComposeForm({
           replyToId: seed.replyToId,
           forwardOfId: seed.forwardOfId,
           forwardAttachments: forwarded.map((a) => a.index),
+          includeQuote: hasQuote ? includeQuote : undefined,
           draftId,
           clientId: clientId.current,
         }),
@@ -202,7 +337,7 @@ function ComposeForm({
   }
 
   async function close() {
-    if (dirty.current && (to.length || subject || text.trim() || files.length)) await saveDraft();
+    if (dirty.current && (to.length || subject || hasWriting() || files.length)) await saveDraft();
     onClose();
   }
 
@@ -259,15 +394,55 @@ function ComposeForm({
         </label>
       </div>
 
-      <div className={cn("relative min-h-0 flex-1", dragging && "bg-accent/40")}>
-        <RichTextEditor
-          editorHandle={bodyRef}
-          value={{ html, text }}
-          onChange={(next) => {
-            setHtml(next.html);
-            setText(next.text);
-          }}
-        />
+      <div className={cn("relative flex min-h-0 flex-1 flex-col", dragging && "bg-accent/40")}>
+        <div className="min-h-0 flex-1">
+          <RichTextEditor
+            editorHandle={bodyRef}
+            onReady={() => setEditorReady(true)}
+            value={{ html, text }}
+            onChange={(next) => {
+              setHtml(next.html);
+              setText(next.text);
+            }}
+          />
+        </div>
+        {/* Gmail's trimmed content: the original goes out under the reply,
+            written by the server from the stored message so its formatting
+            and pictures survive. Here it is only previewed. */}
+        {hasQuote && includeQuote && (
+          <div className="max-h-[45%] shrink-0 overflow-y-auto border-t px-5 py-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowQuote((v) => !v)}
+                className="flex h-5 items-center rounded-sm bg-muted px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-expanded={showQuote}
+                aria-label={showQuote ? "Hide quoted text" : "Show quoted text"}
+              >
+                <Ellipsis className="size-4" />
+              </button>
+              {showQuote && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setIncludeQuote(false)}
+                >
+                  Remove quoted text
+                </button>
+              )}
+            </div>
+            {showQuote && seed.quoted && (
+              <div className="mt-2">
+                <MessageBody
+                  html={seed.quoted.html}
+                  text={seed.quoted.text}
+                  inlineImageUrls={seed.quoted.inlineImageUrls}
+                  foldQuotes={false}
+                />
+              </div>
+            )}
+          </div>
+        )}
         {dragging && (
           <div className="pointer-events-none absolute inset-3 flex items-center justify-center rounded-lg border-2 border-dashed text-sm text-muted-foreground">
             Drop files to attach
@@ -309,6 +484,30 @@ function ComposeForm({
         <Button variant="ghost" size="icon" onClick={() => fileInput.current?.click()} aria-label="Attach files">
           <Paperclip className="size-4" />
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Insert signature" title="Insert signature">
+              <Signature className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="top" className="w-56">
+            <DropdownMenuLabel>Signature</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => chooseSignature(null)}>
+              <Check className={cn("size-4", signatureId ? "opacity-0" : "opacity-100")} />
+              No signature
+            </DropdownMenuItem>
+            {signatures.map((s) => (
+              <DropdownMenuItem key={s.id} onClick={() => chooseSignature(s)}>
+                <Check className={cn("size-4", signatureId === s.id ? "opacity-100" : "opacity-0")} />
+                <span className="truncate">{s.name}</span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onManageSignatures}>
+              <Settings2 className="size-4" /> Manage signatures
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <span className="text-xs text-muted-foreground">{savedAt ? "Draft saved" : ""}</span>
         <div className="ml-auto flex gap-2">
           <Button variant="ghost" onClick={discard} disabled={sending}>

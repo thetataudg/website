@@ -10,6 +10,7 @@ import {
   GraduationCap,
   KeyRound,
   Loader2,
+  Mail,
   MoreHorizontal,
   Pencil,
   PhoneCall,
@@ -75,6 +76,7 @@ import LoadingState from "../../../components/LoadingState";
 import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
 import MemberEditorModal from "./MemberEditorModal";
 import SessionsPanel from "./SessionsPanel";
+import MailAccountsPanel from "./MailAccountsPanel";
 import QuickToolsModal from "./QuickToolsModal";
 import PhoneSyncModal from "./PhoneSyncModal";
 import MinimumVersionModal from "./MinimumVersionModal";
@@ -323,7 +325,7 @@ export default function MembersList({
         <TabsList
           className={cn(
             "grid w-full",
-            isChapterAdmin ? "grid-cols-3 sm:w-[36rem]" : "grid-cols-2 sm:w-[28rem]"
+            isChapterAdmin ? "h-auto grid-cols-2 sm:h-10 sm:w-[48rem] sm:grid-cols-4" : "grid-cols-2 sm:w-[28rem]"
           )}
         >
           <TabsTrigger value="members" className="gap-2">
@@ -338,6 +340,12 @@ export default function MembersList({
             <TabsTrigger value="sessions" className="gap-2">
               <MonitorSmartphone className="size-4" />
               Sessions
+            </TabsTrigger>
+          ) : null}
+          {isChapterAdmin ? (
+            <TabsTrigger value="email" className="gap-2">
+              <Mail className="size-4" />
+              Email
             </TabsTrigger>
           ) : null}
         </TabsList>
@@ -547,6 +555,18 @@ export default function MembersList({
         {isChapterAdmin ? (
           <TabsContent value="sessions">
             <SessionsPanel canRevoke={isChapterAdmin} />
+          </TabsContent>
+        ) : null}
+
+        {isChapterAdmin ? (
+          <TabsContent value="email">
+            <MailAccountsPanel
+              candidates={members.map((member) => ({
+                rollNo: member.rollNo,
+                name: `${member.fName} ${member.lName}`.trim(),
+                status: member.status,
+              }))}
+            />
           </TabsContent>
         ) : null}
       </Tabs>

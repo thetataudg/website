@@ -38,6 +38,13 @@ const MailMessageSchema = new Schema(
     messageId: { type: String, default: "" },
     inReplyTo: { type: String, default: "" },
     references: { type: [String], default: [] },
+    /// On a draft: the message it replies to or forwards, so reopening it and
+    /// sending still threads and still carries the quote.
+    replyToId: { type: Schema.Types.ObjectId, default: null },
+    forwardOfId: { type: Schema.Types.ObjectId, default: null },
+    /// Draft-only preference. The quoted original is stored separately and
+    /// rebuilt when sending; it never belongs in the editable draft body.
+    includeQuote: { type: Boolean, default: true },
     from: { type: String, default: "" },
     fromName: { type: String, default: "" },
     to: { type: [String], default: [] },

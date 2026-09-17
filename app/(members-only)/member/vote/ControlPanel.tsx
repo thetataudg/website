@@ -542,7 +542,7 @@ function SubjectsCard({
                 variant="ghost"
                 size="sm"
                 disabled={working === name}
-                onClick={() => void run(name, () => api.toggleSnapBid(vote._id, name))}
+                onClick={() => run(name, () => api.toggleSnapBid(vote._id, name))}
               >
                 {working === name ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -560,7 +560,7 @@ function SubjectsCard({
                 size="icon"
                 aria-label={`Remove ${name}`}
                 disabled={working === name}
-                onClick={() => void run(name, () => api.removeOption(vote._id, name))}
+                onClick={() => run(name, () => api.removeOption(vote._id, name))}
               >
                 {working === name ? (
                   <Loader2 className="size-4 animate-spin" />

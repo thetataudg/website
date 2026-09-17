@@ -1137,7 +1137,7 @@ export default function MemberEditorModal({ member, show, onClose, onSave }: Pro
                 <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
                   Cancel
                 </Button>
-                <Button type="button" onClick={() => void handleSave()} disabled={saving}>
+                <Button type="button" onClick={() => handleSave()} disabled={saving}>
                   {saving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                   {saving ? "Saving…" : "Save changes"}
                 </Button>

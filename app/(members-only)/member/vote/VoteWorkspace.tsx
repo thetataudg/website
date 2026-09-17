@@ -353,7 +353,7 @@ export default function VoteWorkspace() {
         description="Every vote the chapter has run, and the one it is running now."
         actions={
           <>
-            <Button type="button" variant="outline" onClick={() => void refresh()}>
+            <Button type="button" variant="outline" onClick={() => refresh()}>
               <RefreshCw className="size-4" />
               Refresh
             </Button>

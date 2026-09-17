@@ -11,7 +11,10 @@ import Reimbursement, {
 import { requireTreasury } from "@/lib/duesAuth";
 import { normalizeDueDate, readAmountCents } from "@/lib/dues";
 import { getDefaultSemesterRange } from "@/lib/gem";
-import { serializeReimbursement } from "@/lib/reimbursements";
+import {
+  serializeReimbursement,
+  withViewableReceipts,
+} from "@/lib/reimbursements";
 import { formatCents, recordFinanceEvent } from "@/lib/financeEvents";
 import { announce } from "@/lib/notify/announce";
 import logger from "@/lib/logger";
@@ -41,7 +44,11 @@ export async function GET(req: Request) {
         .sort({ createdAt: -1 })
         .lean<any[]>();
       return NextResponse.json(
-        { reimbursements: mine.map((r) => serializeReimbursement(r)) },
+        {
+          reimbursements: await Promise.all(
+            mine.map((r) => withViewableReceipts(serializeReimbursement(r)))
+          ),
+        },
         { status: 200 }
       );
     }
@@ -66,15 +73,15 @@ export async function GET(req: Request) {
       .lean<any[]>();
     const memberById = new Map(members.map((m) => [m._id.toString(), m]));
 
-    const rows = reimbursements.map((reimbursement) => {
+    const rows = await Promise.all(reimbursements.map(async (reimbursement) => {
       const member = memberById.get(reimbursement.memberId?.toString());
       return {
-        ...serializeReimbursement(reimbursement),
+        ...(await withViewableReceipts(serializeReimbursement(reimbursement))),
         member: member
           ? { rollNo: member.rollNo, fName: member.fName, lName: member.lName }
           : null,
       };
-    });
+    }));
 
     return NextResponse.json(
       {

@@ -228,7 +228,7 @@ export function CreateVoteDialog({
             {kind ? "Back" : "Cancel"}
           </Button>
           {kind ? (
-            <Button type="button" disabled={!filled.length || saving} onClick={() => void save()}>
+            <Button type="button" disabled={!filled.length || saving} onClick={() => save()}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               Create vote
             </Button>

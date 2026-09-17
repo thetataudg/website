@@ -28,8 +28,14 @@ export interface OutgoingEmail {
   text?: string;
   headers?: Record<string, string>;
   /// `path` is a URL Resend fetches itself, which is how attachments stay out
-  /// of our request body.
-  attachments?: Array<{ filename: string; path: string; content_type?: string }>;
+  /// of our request body. `content` is the file itself, base64, for files
+  /// behind a private bucket that Resend has no way to fetch.
+  attachments?: Array<
+    { filename: string; content_type?: string; content_id?: string } & (
+      | { path: string; content?: never }
+      | { content: string; path?: never }
+    )
+  >;
 }
 
 export async function sendEmail(
@@ -94,6 +100,17 @@ export interface ReceivedAttachment {
   content_id?: string;
   download_url: string;
   expires_at?: string;
+}
+
+/// The most recent received emails, newest first.
+export async function listReceivedEmails(limit = 50): Promise<ReceivedEmail[]> {
+  const res = await fetch(`${API}/emails/receiving?limit=${Math.min(100, Math.max(1, limit))}`, { headers: headers() });
+  if (!res.ok) {
+    logger.warn({ status: res.status }, "Could not list received emails");
+    return [];
+  }
+  const body = await res.json().catch(() => ({}));
+  return Array.isArray(body?.data) ? body.data : [];
 }
 
 export async function listReceivedAttachments(emailId: string): Promise<ReceivedAttachment[]> {

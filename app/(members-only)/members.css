@@ -183,3 +183,84 @@ html[data-theme-transition="active"]::view-transition-new(root) {
 .members-shell[data-theme="light"] .discord-link-modal__card p {
   color: #1a192b;
 }
+
+/* ---------- Chapter Mail sidebar icons ----------
+ * Each folder's glyph moves in a way that says what the folder is: the inbox
+ * dips, the star turns, the paper plane takes off, the trash lid tips. Hover
+ * plays the motion; pressing squashes the whole icon; becoming the selected
+ * folder gives it one small pop. Reduced motion keeps only the colour change. */
+.mail-nav-item .mail-nav-icon {
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+.mail-nav-item:active .mail-nav-icon {
+  transform: scale(0.8) !important;
+  transition-duration: 90ms;
+}
+.mail-nav-item[aria-current="page"] .mail-nav-icon {
+  animation: mail-icon-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mail-nav-item:hover .mail-nav-icon[data-motion="inbox"] { transform: translateY(2px) scale(1.06); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="starred"] { transform: rotate(72deg) scale(1.15); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="drafts"] { transform: rotate(-10deg) translateY(-1px); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="sent"] { transform: translate(3px, -3px) rotate(-6deg); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="junk"] { animation: mail-icon-shake 380ms ease-in-out; }
+.mail-nav-item:hover .mail-nav-icon[data-motion="trash"] { transform: rotate(-14deg) translateY(-1px); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="archive"] { transform: translateY(-2px) scale(1.06); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="all"] { transform: scale(1.15) rotate(-6deg); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="label"] { transform: rotate(-12deg) scale(1.12); }
+.mail-nav-item:hover .mail-nav-icon[data-motion="filters"] { transform: translateY(2px) scaleY(0.85); }
+
+@keyframes mail-icon-pop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes mail-icon-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-2px) rotate(-8deg); }
+  40% { transform: translateX(2px) rotate(8deg); }
+  60% { transform: translateX(-1.5px) rotate(-5deg); }
+  80% { transform: translateX(1px) rotate(3deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mail-nav-item .mail-nav-icon {
+    transition: none;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* The Compose button: the pen scribbles a line on hover, and the whole button
+ * presses in when clicked. */
+.mail-compose {
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease, background-color 150ms ease;
+}
+.mail-compose:hover {
+  box-shadow: 0 4px 14px -6px hsl(var(--primary) / 0.45);
+  transform: translateY(-1px);
+}
+.mail-compose:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
+  transition-duration: 80ms;
+}
+.mail-nav-item:hover .mail-nav-icon[data-motion="compose"] {
+  animation: mail-icon-write 700ms ease-in-out;
+}
+@keyframes mail-icon-write {
+  0% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-1.5px, 1px) rotate(-12deg); }
+  40% { transform: translate(1.5px, -0.5px) rotate(8deg); }
+  60% { transform: translate(-1px, 1px) rotate(-10deg); }
+  80% { transform: translate(1px, 0) rotate(4deg); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mail-compose,
+  .mail-compose:hover,
+  .mail-compose:active {
+    transform: none;
+    transition: background-color 150ms ease;
+  }
+}

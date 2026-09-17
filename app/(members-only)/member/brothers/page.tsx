@@ -18,10 +18,19 @@ export default async function BrothersPage() {
   const base = `${proto}://${host}`;
   const cookie = headerList.get("cookie");
 
-  const meRes = await fetch(`${base}/api/members/me`, {
-    headers: cookie ? { cookie } : undefined,
-    cache: "no-store",
-  });
+  // Both at once rather than one after the other. The roster is only
+  // rendered once the access check below passes, so starting it early costs
+  // nothing and takes a whole round trip off every visit.
+  const [meRes, res] = await Promise.all([
+    fetch(`${base}/api/members/me`, {
+      headers: cookie ? { cookie } : undefined,
+      cache: "no-store",
+    }),
+    fetch(`${base}/api/members`, {
+      cache: "no-store",
+      headers: cookie ? { cookie } : undefined,
+    }),
+  ]);
   if (!meRes.ok) {
     return <MembershipRevokedState />;
   }
@@ -33,10 +42,6 @@ export default async function BrothersPage() {
     return <MembershipRevokedState />;
   }
 
-  const res = await fetch(`${base}/api/members`, {
-    cache: "no-store",
-    headers: cookie ? { cookie } : undefined,
-  });
 
   if (!res.ok) {
     throw new Error("Failed to fetch members");
