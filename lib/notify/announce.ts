@@ -15,6 +15,7 @@
 // audit row still says so. Every path is caught and logged.
 import logger from "@/lib/logger";
 import { notify, type NotifyInput } from "@/lib/notify";
+import { withQuery } from "@/lib/notify/links";
 import {
   displayName,
   memberName,
@@ -100,12 +101,19 @@ export async function announce(input: AnnounceInput): Promise<void> {
     }
 
     // --- the Treasurer, always ---
-    const message = renderOfficerMessage({
+    const rendered = renderOfficerMessage({
       event: input.event,
       memberName: displayName(concerned),
       actorName,
       summary: input.summary,
     });
+    // Whose ledger it is, so a tap opens that member even when the event has
+    // no queue item of its own to point at. The item ids are added later by
+    // the pipeline, from `refs`.
+    const message = {
+      ...rendered,
+      link: withQuery(rendered.link, { roll: concerned?.rollNo || null }),
+    };
     const template = officerTemplateFor(input.event);
     const suppressActor = !includeActor();
 

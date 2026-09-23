@@ -16,6 +16,7 @@ import MailMessage from "@/lib/models/MailMessage";
 import Member from "@/lib/models/Member";
 import { ELIGIBLE_STATUSES, isObjectId } from "@/lib/mail/session";
 import { deleteMailObjects, storageConfigured } from "@/lib/mail/storage";
+import { notifyMailboxChange } from "@/lib/mail/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const account = await MailAccount.findOne({ _id: params.id, status: { $in: MANAGED } });
     if (!account) return NextResponse.json({ error: "That mailbox no longer exists." }, { status: 404 });
 
+    const previousOwner = account.memberId;
     const stamp = () => {
       account.statusChangedBy = admin.clerkId;
       account.statusChangedAt = new Date();
@@ -123,6 +125,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       { accountId: String(account._id), address: account.address, action, by: admin.clerkId },
       "Chapter mailbox updated by admin"
     );
+
+    // Tell whoever it happened to. Committee mailboxes follow the committee
+    // head and have their own handoff notices, so only personal ones here.
+    if (account.kind !== "role") {
+      if (action === "reassign") {
+        if (previousOwner) await notifyMailboxChange(previousOwner, "reassigned-away", account.address);
+        await notifyMailboxChange(account.memberId, "reassigned-to", account.address);
+      } else if (account.memberId) {
+        const change = action === "pause" ? "paused" : action === "revoke" ? "revoked" : "resumed";
+        await notifyMailboxChange(account.memberId, change, account.address);
+      }
+    }
     return NextResponse.json({ ok: true, status: account.status });
   } catch (err: any) {
     if (err?.code === 11000) {

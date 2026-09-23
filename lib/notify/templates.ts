@@ -359,7 +359,9 @@ export function renderTemplate(
         body: `${what} is open. Cast your ballot before it closes.`,
         push: `${what} is open. Cast your ballot before it closes.`,
         emailSubject: `Voting is open: ${what}`,
-        link: "/member/vote",
+        link: context.voteId
+          ? `/member/vote?vote=${encodeURIComponent(context.voteId)}`
+          : "/member/vote",
         // "general", matching the proxy-request notice, which is the other
         // vote-shaped message the chapter sends. A "vote" category would mean
         // a new value in the Notification enum and in two exhaustive label

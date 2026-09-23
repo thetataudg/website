@@ -89,3 +89,45 @@ export async function notifyNewMail(
     audit: false,
   });
 }
+
+/// What happened to a member's mailbox after it was handed out, from the
+/// admin console. The member's own view is the closed screen in the app and
+/// on the website; this is how they find out without opening it.
+export async function notifyMailboxChange(
+  memberId: any,
+  change: "paused" | "revoked" | "resumed" | "reassigned-away" | "reassigned-to",
+  address: string
+): Promise<void> {
+  const recipient = await recipientFor(memberId);
+  if (!recipient) return;
+  const copy = {
+    paused: {
+      title: "Your chapter email is paused",
+      body: `${address} can't send or receive mail for now. Your mail is kept.`,
+    },
+    revoked: {
+      title: "Your chapter email was closed",
+      body: `An officer closed ${address}. Reach out to an officer if this looks wrong.`,
+    },
+    resumed: {
+      title: "Your chapter email is back",
+      body: `${address} is working again, with everything that was in it.`,
+    },
+    "reassigned-away": {
+      title: "Your chapter email moved",
+      body: `An officer gave ${address} to another member. You can request a new address.`,
+    },
+    "reassigned-to": {
+      title: "You have a chapter email",
+      body: `${address} is now yours, with the mail already in it.`,
+    },
+  }[change];
+  await notifyQuietly({
+    recipient,
+    template: "broadcast_mail_decision",
+    context: {} as any,
+    message: message({ ...copy, push: copy.body, link: "/member/mail" }),
+    channels: ["push"],
+    audit: false,
+  });
+}

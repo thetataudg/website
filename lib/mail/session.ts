@@ -7,7 +7,7 @@
 // cookie can't reach anyone else's mail. No route accepts a mailbox id from
 // the request body.
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -24,6 +24,9 @@ export class MailError extends Error {
 
 export const ELIGIBLE_STATUSES = ["Active", "Alumni"];
 export const MAILBOX_COOKIE = "chapter_mailbox";
+/// The iOS app names its mailbox per request instead of holding a cookie.
+/// Same trust as the cookie: only honoured if it is one of this member's.
+export const MAILBOX_HEADER = "x-chapter-mailbox";
 
 /// A personal mailbox, from before `kind` existed or after.
 export const PERSONAL = { kind: { $ne: "role" } };
@@ -70,7 +73,7 @@ export async function summarizeMailboxes(accounts: any[]): Promise<MailboxSummar
   }));
 }
 
-/// The mailbox being worked in: the cookie's choice when it is one of theirs,
+/// The mailbox being worked in: the header's or cookie's choice when it is one of theirs,
 /// otherwise their personal mailbox, otherwise their first committee's.
 export async function requireMailbox() {
   const member = await currentMember();
@@ -79,7 +82,7 @@ export async function requireMailbox() {
   }
   const mailboxes = await accessibleMailboxes(member);
   if (!mailboxes.length) throw new MailError(403, "You don't have a chapter mailbox yet.");
-  const wanted = cookies().get(MAILBOX_COOKIE)?.value;
+  const wanted = headers().get(MAILBOX_HEADER) || cookies().get(MAILBOX_COOKIE)?.value;
   const chosen =
     mailboxes.find((m) => String(m._id) === wanted) ??
     mailboxes.find((m) => m.kind !== "role") ??

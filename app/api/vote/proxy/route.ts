@@ -49,7 +49,9 @@ async function announceProxyRequest(opts: {
             // worse than one that never mentioned it.
             push: `${name} wants to vote by proxy on the ${voteName}.`,
             emailSubject: `${title}: ${name}`,
-            link: "/member/vote",
+            // `manage` sends the app to the officer's voting tools, where
+            // proxy requests are answered, rather than to the ballot.
+            link: `/member/vote?vote=${encodeURIComponent(String(opts.vote._id))}&manage=1`,
             category: "general",
             // The generic label for this link is "Open the vote", which is
             // true but passive. An officer reading this has a decision to
