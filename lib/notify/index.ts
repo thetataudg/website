@@ -26,6 +26,7 @@ import { inAppChannel } from "@/lib/notify/channels/inapp";
 import { emailChannel } from "@/lib/notify/channels/email";
 import { pushChannel } from "@/lib/notify/channels/push";
 import { discordChannel } from "@/lib/notify/channels/discord";
+import { specificLink } from "@/lib/notify/links";
 import type { Channel, Recipient } from "@/lib/notify/channels/types";
 
 export const COOLDOWN_HOURS = 24;
@@ -133,10 +134,13 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     return { sent: false, skipped: "cooldown", channels: [], attempts: [] };
   }
 
-  const message = {
+  const rendered = {
     ...(input.message ?? renderTemplate(template as NotifyTemplate, input.context)),
     ...(input.override ?? {}),
   };
+  // Narrowed here, before any channel sees it, so the push, the bell row and
+  // the email button all open the same charge, plan or request.
+  const message = { ...rendered, link: specificLink(rendered.link, input.refs) };
   const amountCents =
     input.amountCents === undefined
       ? input.context.amountCents ?? null
