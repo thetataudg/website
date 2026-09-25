@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import {
   Archive,
+  Bell,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
@@ -143,6 +145,7 @@ export default function MembersList({
   const [saveError, setSaveError] = useState("");
   const [showQuickTools, setShowQuickTools] = useState(false);
   const [showPhoneSync, setShowPhoneSync] = useState(false);
+  const router = useRouter();
   const [showMinVersion, setShowMinVersion] = useState(false);
   const [quickToolsTool, setQuickToolsTool] = useState<
     "election" | "graduations"
@@ -536,6 +539,13 @@ export default function MembersList({
                 title="Minimum app version"
                 description="Set the oldest iPhone app version allowed to run."
                 onClick={() => setShowMinVersion(true)}
+                disabled={!canUseChapterTools}
+              />
+              <ToolRow
+                icon={Bell}
+                title="Notification Center"
+                description="Send a custom push, in-app notification or email to any group or member."
+                onClick={() => router.push("/member/admin/notification-center")}
                 disabled={!canUseChapterTools}
               />
               {!canUseChapterTools ? (
