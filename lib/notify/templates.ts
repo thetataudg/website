@@ -153,6 +153,10 @@ export interface RenderedMessage {
   pushTitle?: string;
   pushSubtitle?: string;
   pushThreadId?: string;
+  /// A picture for the notification, at a URL that stays fetchable. The app's
+  /// notification service extension downloads it and attaches it, which is
+  /// why the push is sent with `mutable-content` whenever this is set.
+  pushImageUrl?: string;
 }
 
 /// What to write on the button, worked out from where the button lands.

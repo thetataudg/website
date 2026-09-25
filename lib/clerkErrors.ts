@@ -28,6 +28,9 @@ export const AUTH_MESSAGES = {
   passwordTooWeak:
     "That password is too easy to guess. Try a longer one with a mix of characters.",
   incomplete: "We couldn't complete sign-in. Please try again.",
+  noPassword:
+    "This account doesn't have a password. Sign in with Google or Apple, or use an emailed code.",
+  locked: "This account is temporarily locked after too many attempts. Try again in an hour.",
   generic: "Something went wrong. Please try again.",
 } as const;
 
@@ -46,6 +49,8 @@ export function authErrorMessage(
   const codes = codesOf(error);
 
   for (const code of codes) {
+    if (code === "user_locked") return AUTH_MESSAGES.locked;
+    if (code === "strategy_for_user_invalid") return AUTH_MESSAGES.noPassword;
     if (code.includes("too_many") || code.includes("rate_limit")) {
       return AUTH_MESSAGES.tooManyAttempts;
     }

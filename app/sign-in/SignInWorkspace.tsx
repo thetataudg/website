@@ -11,7 +11,10 @@
 //
 // Four states, one at a time:
 //   password → the ordinary path
-//   code     → the instance asked for a second factor
+//   code     → an emailed code: a second factor the instance asked for, or a
+//              first factor for an account with no password (made with
+//              Google or Apple), which is what Clerk's hosted page offered
+//              and this form used to report as a wrong password
 //   forgot   → send a reset code
 //   reset    → set a new password with that code
 
@@ -37,6 +40,22 @@ import { AppleMark, GoogleMark } from "@/components/auth/BrandIcons";
 import styles from "@/components/auth/auth.module.css";
 
 type Step = "password" | "code" | "forgot" | "reset";
+
+function hasClerkCode(err: unknown, code: string): boolean {
+  const errors = (err as any)?.errors;
+  return Array.isArray(errors) && errors.some((entry: any) => entry?.code === code);
+}
+
+/// The real Clerk code, in the console only. The screen deliberately shows a
+/// friendlier sentence, and before this nothing recorded which failure it was
+/// standing in for, which is how "wrong password" hid a missing password.
+function logClerkError(context: string, err: unknown) {
+  const errors = (err as any)?.errors;
+  const codes = Array.isArray(errors)
+    ? errors.map((entry: any) => entry?.code).filter(Boolean)
+    : [];
+  console.warn(`[sign-in] ${context}`, codes.length ? codes : err);
+}
 type Provider = "oauth_google" | "oauth_apple";
 
 /// Where a member without an account is sent. `/sign-up` collects the Clerk
@@ -79,6 +98,9 @@ export default function SignInWorkspace({
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [codeDestination, setCodeDestination] = useState("");
+  /// Which factor the emailed code answers. Second after a password; first
+  /// when the member is signing in by code alone.
+  const [codeFactor, setCodeFactor] = useState<"first" | "second">("second");
   const [busy, setBusy] = useState(false);
   const [pendingProvider, setPendingProvider] = useState<Provider | null>(null);
   const [error, setError] = useState("");
@@ -155,9 +177,53 @@ export default function SignInWorkspace({
       emailAddressId: factor.emailAddressId,
     });
     setCodeDestination(factor.safeIdentifier ?? "your email");
+    setCodeFactor("second");
     setCode("");
     setStep("code");
   }, [signIn]);
+
+  /// Sign in with an emailed code and no password. The only way in for an
+  /// account created through Google or Apple that never set a password, and a
+  /// quicker one for anybody who has forgotten theirs.
+  const startEmailFirstFactor = useCallback(async () => {
+    const created = await signIn!.create({ identifier: identifier.trim() });
+    const factor = created.supportedFirstFactors?.find(
+      (candidate: any) => candidate.strategy === "email_code"
+    ) as any;
+    if (!factor) {
+      setError(AUTH_MESSAGES.codeUnavailable);
+      return;
+    }
+    await signIn!.prepareFirstFactor({
+      strategy: "email_code",
+      emailAddressId: factor.emailAddressId,
+    });
+    setCodeDestination(factor.safeIdentifier ?? "your email");
+    setCodeFactor("first");
+    setCode("");
+    setStep("code");
+  }, [signIn, identifier]);
+
+  async function handleEmailCodeInstead() {
+    if (!isLoaded || busy || inFlight.current) return;
+    if (!identifier.trim()) {
+      setError("Enter your email address first.");
+      return;
+    }
+    inFlight.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await startEmailFirstFactor();
+    } catch (err) {
+      logClerkError("email code sign-in", err);
+      setError(authErrorMessage(err, AUTH_MESSAGES.codeUnavailable));
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
 
   async function handlePassword(event: React.FormEvent) {
     event.preventDefault();
@@ -194,10 +260,31 @@ export default function SignInWorkspace({
         return;
       }
 
+      // Clerk asks a new device to confirm by email when "client trust" is on,
+      // and reports it as its own status rather than a second factor.
+      if ((attempt.status as string) === "needs_client_trust") {
+        await startEmailSecondFactor();
+        return;
+      }
+
+      logClerkError("password sign-in: unexpected status " + attempt.status, null);
       setError(AUTH_MESSAGES.incomplete);
     } catch (err) {
       if (alreadySignedIn(err)) {
         leave();
+        return;
+      }
+      logClerkError("password sign-in", err);
+      // No password on this account: it was made with Google or Apple. Send
+      // the code instead of telling them their (nonexistent) password is wrong.
+      if (hasClerkCode(err, "strategy_for_user_invalid")) {
+        try {
+          await startEmailFirstFactor();
+          setNotice("This account doesn't use a password, so we emailed you a code.");
+        } catch (codeErr) {
+          logClerkError("email code fallback", codeErr);
+          setError(AUTH_MESSAGES.noPassword);
+        }
         return;
       }
       setError(authErrorMessage(err, AUTH_MESSAGES.signInFailed));
@@ -215,10 +302,10 @@ export default function SignInWorkspace({
     setError("");
 
     try {
-      const attempt = await signIn.attemptSecondFactor({
-        strategy: "email_code",
-        code: code.trim(),
-      });
+      const attempt =
+        codeFactor === "first"
+          ? await signIn.attemptFirstFactor({ strategy: "email_code", code: code.trim() })
+          : await signIn.attemptSecondFactor({ strategy: "email_code", code: code.trim() });
 
       if (attempt.status === "complete" && attempt.createdSessionId) {
         await finish(attempt.createdSessionId);
@@ -226,6 +313,7 @@ export default function SignInWorkspace({
       }
       setError(AUTH_MESSAGES.codeIncorrect);
     } catch (err) {
+      logClerkError("email code", err);
       setError(authErrorMessage(err, AUTH_MESSAGES.codeIncorrect));
     } finally {
       setBusy(false);
@@ -237,7 +325,8 @@ export default function SignInWorkspace({
     setBusy(true);
     setError("");
     try {
-      await startEmailSecondFactor();
+      if (codeFactor === "first") await startEmailFirstFactor();
+      else await startEmailSecondFactor();
       setNotice("We sent a new code.");
     } catch (err) {
       setError(authErrorMessage(err, AUTH_MESSAGES.codeUnavailable));
@@ -487,6 +576,15 @@ export default function SignInWorkspace({
                 ) : null}
                 Sign in
               </Button>
+
+              <button
+                type="button"
+                className={`${styles.quietLink} ${styles.rise} ${styles.d4} mx-auto block text-xs text-muted-foreground`}
+                onClick={handleEmailCodeInstead}
+                disabled={busy}
+              >
+                Email me a sign-in code instead
+              </button>
 
               <div
                 className={`${styles.rise} ${styles.d5} flex items-center gap-3 pt-1`}

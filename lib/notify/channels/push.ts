@@ -247,8 +247,12 @@ export const pushChannel: Channel = {
         // screen; it needs the matching entitlement in the app, which the
         // Theta Tau target carries.
         "interruption-level": request.timeSensitive ? "time-sensitive" : "active",
+        // Wakes the notification service extension, which is the only thing
+        // that can put a picture on a remote notification.
+        ...(request.message.pushImageUrl ? { "mutable-content": 1 } : {}),
       },
       link: request.message.link,
+      ...(request.message.pushImageUrl ? { image: request.message.pushImageUrl } : {}),
       template: request.template,
     };
 
