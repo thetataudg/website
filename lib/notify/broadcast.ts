@@ -24,6 +24,7 @@ import {
   type BroadcastChannel,
 } from "@/lib/notify/broadcastAudience";
 import { siteUrl } from "@/lib/siteUrl";
+import { signNewsletterImage } from "@/lib/newsletterStorage";
 import logger from "@/lib/logger";
 
 export const TITLE_MAX = 80;
@@ -138,7 +139,16 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 3).trimEnd()}...` : text;
 }
 
-function renderMessage(input: BroadcastInput, broadcastId: any): RenderedMessage {
+/// How long the push's picture link stays valid. The service extension fetches
+/// it within seconds of delivery, but a phone that is off gets the push when
+/// it comes back, so a day of slack.
+const PUSH_IMAGE_TTL_SECONDS = 24 * 60 * 60;
+
+function renderMessage(
+  input: BroadcastInput,
+  broadcastId: any,
+  pushImageUrl: string
+): RenderedMessage {
   const imageUrl = input.imageKey ? broadcastImageUrl(broadcastId) : undefined;
   const paragraphs = input.body
     .split(/\n{2,}/)
@@ -154,7 +164,11 @@ function renderMessage(input: BroadcastInput, broadcastId: any): RenderedMessage
     category: "general",
     ctaLabel: input.link ? "Open in Chapter Tools" : "Open Chapter Tools",
     pushThreadId: `broadcast-${broadcastId}`,
-    pushImageUrl: imageUrl,
+    // Straight to storage rather than through the redirect route: that route
+    // is on this site's origin, which on a dev machine is localhost and
+    // unreachable from the phone. Email keeps the stable route, because an
+    // inbox loads images days later.
+    pushImageUrl: pushImageUrl || undefined,
     email: {
       title: input.title,
       heroImageUrl: imageUrl,
@@ -211,7 +225,10 @@ export async function deliverBroadcast(
   audience: RosterMember[]
 ): Promise<void> {
   try {
-    const message = renderMessage(input, broadcastId);
+    const pushImageUrl = input.imageKey
+      ? await signNewsletterImage(input.imageKey, PUSH_IMAGE_TTL_SECONDS)
+      : "";
+    const message = renderMessage(input, broadcastId, pushImageUrl);
     const wantsInApp = input.channels.includes("inapp");
     const external = input.channels.filter(
       (channel): channel is Exclude<BroadcastChannel, "inapp"> => channel !== "inapp"
