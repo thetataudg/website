@@ -3,6 +3,7 @@
 //        `remindNonResponders` the cron uses, so it is cadence-gated: mashing
 //        the button four times still sends one nudge per person.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import logger from "@/lib/logger";
 import { remindNonResponders } from "@/lib/availability/remind";
 import { currentMember, loadPollContext } from "@/lib/availability/routeHelpers";
@@ -48,6 +49,6 @@ export async function POST(
     return NextResponse.json(report, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to send availability reminders");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

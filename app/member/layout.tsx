@@ -1,4 +1,3 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -22,25 +21,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    /* Both fallbacks point at /member rather than one of them at
-     * /member/onboard: /member already sends anyone without a profile on to
-     * the onboarding form, so a single destination cannot disagree with it.
-     * Without these, Clerk falls back to "/" and a member who has just signed
-     * in lands on the public homepage. */
-    <ClerkProvider
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/member"
-      signUpFallbackRedirectUrl="/member"
-    >
-      <html lang="en" suppressHydrationWarning>
-        <body className="members-shell">
-          <ThemeProvider>
-            <Navbar />
-            {children}
-          </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className="members-shell">
+        <ThemeProvider>
+          <Navbar />
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
   );
 }

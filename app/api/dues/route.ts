@@ -23,6 +23,7 @@ import {
   activePlansFor,
   derivePlanProgress,
   membersAwaitingPlanReview,
+  onScheduleChargeIds,
 } from "@/lib/plans";
 import { applyCreditToOpenCharges, creditBalancesFor } from "@/lib/credit";
 import { formatCents, recordFinanceEvents } from "@/lib/financeEvents";
@@ -231,7 +232,20 @@ export async function GET(req: Request) {
     // A single-member query is really "show me this person's ledger", so hand
     // back the same summary shape /api/dues/me returns.
     if (filter.memberId) {
-      return NextResponse.json(summarize(charges), { status: 200 });
+      const plans = await PaymentPlan.find({
+        memberId: filter.memberId,
+        status: "active",
+      }).lean<any[]>();
+      const now = new Date();
+      return NextResponse.json(
+        summarize(
+          charges,
+          now,
+          false,
+          onScheduleChargeIds(plans, charges as any[], now)
+        ),
+        { status: 200 }
+      );
     }
 
     // The treasurer's list is read as "who owes what", so every row carries the

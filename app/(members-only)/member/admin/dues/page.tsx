@@ -97,12 +97,14 @@ function money(cents: number) {
   });
 }
 
+/// Due, paid and purchase dates are calendar days stored as UTC midnight, so
+/// they are read in UTC. Reading them in Phoenix shows the day before.
 function dayLabel(iso: string | null) {
   if (!iso) return "Not set";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    timeZone: "America/Phoenix",
+    timeZone: "UTC",
   });
 }
 

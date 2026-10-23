@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -120,7 +121,7 @@ export async function GET(req: Request) {
     });
   } catch (err: any) {
     logger.error({ err }, "Failed to get voter list");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -163,7 +164,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to invalidate ballot");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -200,7 +201,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to restore ballot");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -237,6 +238,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to verify voter list");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

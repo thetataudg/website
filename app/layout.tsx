@@ -23,23 +23,25 @@ export default function RootLayout({
      * profile to the onboarding form, so a first-time member and a returning
      * one can share one destination and still each get the right page. Leaving
      * them unset means Clerk uses "/", which is the public homepage. */
-    <ClerkProvider
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/member"
-      signUpFallbackRedirectUrl="/member"
-      appearance={{
-        /* customise if you like – `rootBox` is fine */
-        elements: { rootBox: "container" },
-      }}
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
     >
-      <html
-        lang="en"
-        className={`${GeistSans.variable} ${GeistMono.variable}`}
-        suppressHydrationWarning
-      >
-        <body>{children}</body>
-      </html>
-    </ClerkProvider>
+      <body>
+        <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/member"
+          signUpFallbackRedirectUrl="/member"
+          appearance={{
+            /* customise if you like – `rootBox` is fine */
+            elements: { rootBox: "container" },
+          }}
+        >
+          {children}
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

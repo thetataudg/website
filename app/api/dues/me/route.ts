@@ -17,6 +17,7 @@ import PaymentPlan from "@/lib/models/PaymentPlan";
 import {
   currentDueAcross,
   graceWindowOpen,
+  onScheduleChargeIds,
   partitionPlans,
   serializePlan,
 } from "@/lib/plans";
@@ -103,7 +104,8 @@ export async function GET(req: Request) {
     const summary = summarize(
       charges,
       now,
-      pending.length > 0 || onlineProcessing.length > 0 || awaitingPlan || inGrace
+      pending.length > 0 || onlineProcessing.length > 0 || awaitingPlan || inGrace,
+      onScheduleChargeIds(livePlans, charges as any[], now)
     );
     const chargesFor = (row: any) =>
       (charges as any[]).filter((charge) =>

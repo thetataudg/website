@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -62,6 +63,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, snapBids: vote.snapBids });
   } catch (err: any) {
     logger.error({ err }, "Failed to toggle snap bid");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

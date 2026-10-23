@@ -2,6 +2,7 @@
 // GET - manager only. Runs the solver and returns the ranked times, each with
 //       who would be there and who would be missing.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { DateTime } from "luxon";
 import AvailabilityPoll from "@/lib/models/AvailabilityPoll";
 import Event from "@/lib/models/Event";
@@ -112,6 +113,6 @@ export async function GET(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to compute availability suggestions");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

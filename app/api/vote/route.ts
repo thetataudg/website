@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -290,7 +291,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });
   } catch (err: any) {
     logger.error({ err }, "Failed to submit vote");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -418,6 +419,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unknown vote type" }, { status: 400 });
   } catch (err: any) {
     logger.error({ err }, "Failed to get vote info");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return NextResponse.json(
+      { error: err.message },
+      { status: err?.statusCode === 401 ? 401 : 403 }
+    );
   }
 }

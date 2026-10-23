@@ -2,6 +2,7 @@
 // PUT - one invitee paints their own grid. Self only; an invitee cannot answer
 //       for anyone else.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import AvailabilityPoll from "@/lib/models/AvailabilityPoll";
 import logger from "@/lib/logger";
@@ -89,6 +90,6 @@ export async function PUT(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to save availability response");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

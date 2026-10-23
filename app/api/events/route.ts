@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Event from "@/lib/models/Event";
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
     return NextResponse.json(events, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to list events");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -110,6 +111,6 @@ export async function POST(req: Request) {
     return NextResponse.json(event, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to create event");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

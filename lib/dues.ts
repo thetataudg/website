@@ -152,13 +152,25 @@ export function serializeCharge(
   };
 }
 
+///
+/// `onSchedule` names charges covered by an approved payment plan that has no
+/// missed installment. Those answer to the plan's dates, not their own: a Fall
+/// charge due Oct 13 that a member split into monthly installments isn't past
+/// due on Oct 23 just because the original lump-sum date went by.
 export function summarize(
   charges: any[],
   now = new Date(),
-  suppressOverdue = false
+  suppressOverdue = false,
+  onSchedule: Set<string> = new Set()
 ): DuesSummaryDTO {
   const serialized = charges
-    .map((charge) => serializeCharge(charge, now, suppressOverdue))
+    .map((charge) =>
+      serializeCharge(
+        charge,
+        now,
+        suppressOverdue || onSchedule.has(String(charge?._id))
+      )
+    )
     .sort((a, b) => {
       // Anything still owed floats to the top, then earliest due date first.
       if (a.balanceCents !== b.balanceCents) return b.balanceCents - a.balanceCents;

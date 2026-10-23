@@ -22,12 +22,28 @@ import { ABSTAIN } from "./types";
 
 /** The API's own message when it has one, rather than a bare status code. */
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
+  let response = await fetch(input, {
     ...init,
     headers: init?.body
       ? { "Content-Type": "application/json", ...(init?.headers ?? {}) }
       : init?.headers,
   });
+
+  // A document navigation can repair an expired Clerk session with a
+  // handshake, but fetch/XHR cannot. If a vote poll lands just after the
+  // short-lived JWT expires, force one client-side refresh and retry instead
+  // of making the member reload the page.
+  if (isExpiredClerkSession(response)) {
+    const token = await refreshClerkSessionToken();
+    if (token) {
+      const headers = new Headers(init?.headers);
+      if (init?.body && !headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+      headers.set("Authorization", `Bearer ${token}`);
+      response = await fetch(input, { ...init, headers });
+    }
+  }
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -36,6 +52,45 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
 
   if (response.status === 204) return undefined as T;
   return (await response.json().catch(() => ({}))) as T;
+}
+
+function isExpiredClerkSession(response: Response): boolean {
+  const status = response.headers.get("x-clerk-auth-status");
+  const reason = response.headers.get("x-clerk-auth-reason") ?? "";
+  return (
+    (response.status === 401 || response.status === 403) &&
+    status === "signed-out" &&
+    reason.startsWith("session-token-expired")
+  );
+}
+
+type BrowserClerk = {
+  session?: {
+    getToken(options: { skipCache: true }): Promise<string | null>;
+  } | null;
+};
+
+let tokenRefresh: Promise<string | null> | null = null;
+
+/** Share one forced refresh when several vote polls expire together. */
+function refreshClerkSessionToken(): Promise<string | null> {
+  if (tokenRefresh) return tokenRefresh;
+
+  tokenRefresh = (async () => {
+    if (typeof window === "undefined") return null;
+    const clerk = (window as typeof window & { Clerk?: BrowserClerk }).Clerk;
+    if (!clerk?.session) return null;
+
+    try {
+      return await clerk.session.getToken({ skipCache: true });
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    tokenRefresh = null;
+  });
+
+  return tokenRefresh;
 }
 
 const json = (body: unknown) => JSON.stringify(body);

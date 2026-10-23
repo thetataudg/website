@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { NextRequest } from "next/server";
+import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import { recordPresence } from "@/lib/presence";
 
@@ -24,7 +26,9 @@ export async function requireRole(
 ) {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  Sentry.setUser({ id: userId });
 
+  await connectDB();
   const member = await Member.findOne({ clerkId: userId });
   if (!member || !roles.includes(member.role as any)) {
     throw new ForbiddenError();
@@ -46,7 +50,9 @@ export async function requireRole(
 export async function requireOfficer(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  Sentry.setUser({ id: userId });
 
+  await connectDB();
   const member = await Member.findOne({ clerkId: userId });
   if (!member) throw new ForbiddenError();
 
@@ -60,6 +66,7 @@ export async function requireOfficer(req: NextRequest) {
 export async function getUserIdFromRequest(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  Sentry.setUser({ id: userId });
   await recordPresence(userId);
   return userId;
 }
@@ -70,6 +77,7 @@ export async function getUserIdFromRequest(req: NextRequest): Promise<string> {
 export async function requireAuth(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  Sentry.setUser({ id: userId });
   await recordPresence(userId);
   return userId;
 }
@@ -77,7 +85,9 @@ export async function requireAuth(req: NextRequest): Promise<string> {
 export async function requireAdmin(req: NextRequest): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError();
+  Sentry.setUser({ id: userId });
 
+  await connectDB();
   // `role` is the only admin flag on Member. This used to read `isAdmin`,
   // which doesn't exist, so it turned away every admin.
   const member = await Member.findOne({ clerkId: userId });

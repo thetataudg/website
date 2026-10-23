@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 import { createRequire } from "module";
+import { withSentryConfig } from "@sentry/nextjs/config";
 const require = createRequire(import.meta.url);
 
 const nextConfig = {
@@ -99,4 +100,18 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Readable stack traces in Sentry need the source maps uploaded, which needs
+// SENTRY_AUTH_TOKEN (plus SENTRY_ORG and SENTRY_PROJECT) in Netlify. Without
+// the token the build skips the upload and errors still arrive, just minified.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  telemetry: false,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    // Uploaded to Sentry, then removed so the public site doesn't serve them.
+    deleteSourcemapsAfterUpload: true,
+  },
+});

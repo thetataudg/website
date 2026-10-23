@@ -3,6 +3,7 @@
 // POST - open a new poll (same permission rule as creating the event it will
 //        become: see lib/eventAuth.ts).
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { connectDB } from "@/lib/db";
 import AvailabilityPoll from "@/lib/models/AvailabilityPoll";
 import Committee from "@/lib/models/Committee";
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to list availability polls");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 

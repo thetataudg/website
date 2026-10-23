@@ -1111,7 +1111,8 @@ function DuesCard({ dues }: { dues: DuesSnapshot }) {
     ? "Past due"
     : due
     ? `Due ${new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Phoenix",
+        // A calendar day stored as UTC midnight; Phoenix would show the day before.
+        timeZone: "UTC",
         month: "short",
         day: "numeric",
       }).format(new Date(due))}`

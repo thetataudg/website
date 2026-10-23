@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
@@ -77,7 +78,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ status: "checked-in" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to add manual check-in");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -128,6 +129,6 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     return NextResponse.json({ status: "removed" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to remove check-in");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

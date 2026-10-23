@@ -4,6 +4,7 @@
 // tag, and opens the door — an officer who is standing at the event setting up
 // a tag is starting the event, the same way opening the scanner does.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { connectDB } from "@/lib/db";
 import Event from "@/lib/models/Event";
 import logger from "@/lib/logger";
@@ -46,7 +47,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ booths, status: loaded.event!.status }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to list check-in booths");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -123,7 +124,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to arm check-in booth");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -163,6 +164,6 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     return NextResponse.json({ status: "retired" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to retire check-in booth");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
