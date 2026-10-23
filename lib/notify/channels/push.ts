@@ -7,6 +7,7 @@
 // standard library. The provider token is cached because Apple rejects clients
 // that mint a new one on every send.
 import http2 from "node:http2";
+import { fcmConfigured, sendAndroidPush } from "./fcm";
 import crypto from "node:crypto";
 import DeviceToken from "@/lib/models/DeviceToken";
 import logger from "@/lib/logger";
@@ -202,33 +203,63 @@ export const pushChannel: Channel = {
   name: "push",
 
   isConfigured() {
-    return missingConfiguration().length === 0;
+    return missingConfiguration().length === 0 || fcmConfigured();
   },
 
   async deliver(request: DeliveryRequest): Promise<DeliveryResult> {
-    const missing = missingConfiguration();
-    if (missing.length) {
-      if (!reportedMissingConfiguration) {
-        reportedMissingConfiguration = true;
-        logger.error({ missing }, "APNs push is not configured");
-      }
-      return {
-        channel: "push",
-        delivered: false,
-        skipped: `not configured: ${missing.join(", ")}`,
-      };
-    }
-    const jwt = providerToken();
-    if (!jwt) {
-      return { channel: "push", delivered: false, skipped: "no provider token" };
-    }
-
     const devices = await DeviceToken.find({
       memberId: request.recipient.memberId,
       disabledAt: null,
     }).lean<any[]>();
     if (!devices.length) {
       return { channel: "push", delivered: false, skipped: "no registered device" };
+    }
+
+    const iosDevices = devices.filter((device) => device.platform !== "android");
+    const androidDevices = devices.filter((device) => device.platform === "android");
+    const missing = missingConfiguration();
+    const jwt = iosDevices.length && !missing.length ? providerToken() : null;
+    if (iosDevices.length && (missing.length || !jwt) && !reportedMissingConfiguration) {
+      reportedMissingConfiguration = true;
+      logger.error({ missing }, "APNs push is not configured");
+    }
+
+    let anyDelivered = false;
+    for (const device of androidDevices) {
+      if (!fcmConfigured()) {
+        logger.warn("FCM is not configured; skipping Android push");
+        break;
+      }
+      try {
+        await sendAndroidPush(
+          device.token,
+          request.message.pushTitle || request.message.title,
+          request.message.push,
+          request.message.link || "",
+          request.message.pushImageUrl || undefined,
+        );
+        anyDelivered = true;
+        await DeviceToken.updateOne(
+          { _id: device._id },
+          { $set: { lastSeenAt: new Date() } },
+        );
+      } catch (error: any) {
+        const code = String(error?.code || "");
+        logger.warn({ code, err: error, rollNo: request.recipient.rollNo }, "FCM rejected an Android push");
+        if (code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token") {
+          await DeviceToken.updateOne(
+            { _id: device._id },
+            { $set: { disabledAt: new Date(), disabledReason: code } },
+          );
+        }
+      }
+    }
+
+    if (!jwt || !iosDevices.length) {
+      return anyDelivered
+        ? { channel: "push", delivered: true }
+        : { channel: "push", delivered: false, skipped: "no configured push transport accepted a device" };
     }
 
     const payload = {
@@ -256,8 +287,7 @@ export const pushChannel: Channel = {
       template: request.template,
     };
 
-    let anyDelivered = false;
-    for (const device of devices) {
+    for (const device of iosDevices) {
       // Try what the device told us at registration, then the other gateway if
       // that is refused.
       //
