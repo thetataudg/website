@@ -8,6 +8,7 @@
 // the body, because a body-supplied id would let anyone with a valid tag check
 // in the whole chapter.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import Event from "@/lib/models/Event";
@@ -168,6 +169,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "checked-in", ...payload }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed NFC booth check-in");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

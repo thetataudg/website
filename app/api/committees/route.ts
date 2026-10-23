@@ -1,4 +1,5 @@
 import { syncCommitteeMailboxes } from "@/lib/mail/roleMailboxes";
+import { apiErrorResponse } from "@/lib/apiError";
 import { NextResponse } from "next/server";
 import { requireAuth, requireOfficer } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -68,7 +69,7 @@ export async function GET(req: Request) {
     return NextResponse.json(committees, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to list committees");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 

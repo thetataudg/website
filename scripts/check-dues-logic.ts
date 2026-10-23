@@ -1,4 +1,4 @@
-import { serializeCharge, isPastDueInArizona, arizonaDueDeadline, normalizeDueDate } from "@/lib/dues";
+import { serializeCharge, summarize, isPastDueInArizona, arizonaDueDeadline, normalizeDueDate } from "@/lib/dues";
 import { memberPaidCentsFor, paidCentsFor } from "@/lib/models/DuesCharge";
 import {
   isOnlinePaymentPending,
@@ -35,6 +35,7 @@ import {
   chargeIdsUnderLivePlans,
   denialGraceUntil,
   graceWindowOpen,
+  onScheduleChargeIds,
 } from "@/lib/plans";
 
 let pass = 0, fail = 0;
@@ -574,6 +575,27 @@ check("no mail provider is a skip", thankYouSkipReason(gift, { configured: false
 check("force does not invent an address", thankYouSkipReason({ ...gift, donorEmail: "" }, { configured: true, force: true }), "no email address");
 check("force does not thank for unsettled money", thankYouSkipReason({ ...gift, status: "processing" }, { configured: true, force: true }), "not settled");
 check("nothing at all", thankYouSkipReason(null, { configured: true }), "no donation");
+
+console.log("\nan approved plan on schedule is not past due");
+{
+  // The reported case: Fall dues due Oct 13, split into six monthly payments,
+  // the first one paid, looked at on Oct 23.
+  const fall = { _id: "c1", status: "open", amountCents: 34601, dueDate: new Date("2026-10-13T00:00:00.000Z"), payments: [{ amountCents: 5767 }] };
+  const plan = {
+    status: "active", chargeIds: ["c1"], totalCents: 34601, baselinePaidCents: 0,
+    installments: buildSchedule(34601, 6, "2026-10-13"),
+  };
+  const oct23 = new Date("2026-10-23T22:00:00.000Z");
+  const onTrack = onScheduleChargeIds([plan], [fall], oct23);
+  const summary = summarize([fall], oct23, false, onTrack);
+  check("charge on the plan is not overdue", summary.charges[0].isOverdue, false);
+  check("member is not past due", summary.hasOverdue, false);
+  check("next installment is Nov 13", currentDueAcross([plan], [fall], null, oct23).dueNowDate, "2026-11-13T00:00:00.000Z");
+  // Miss the Nov 13 installment and the charge reads late again.
+  const nov20 = new Date("2026-11-20T22:00:00.000Z");
+  check("a missed installment makes it overdue again", summarize([fall], nov20, false, onScheduleChargeIds([plan], [fall], nov20)).hasOverdue, true);
+  check("without a plan the Oct 13 date still counts", summarize([fall], oct23).hasOverdue, true);
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Script from 'next/script';
-import { ClerkProvider } from "@clerk/nextjs";
 import { inter } from "../fonts";
 import { siteUrl, absoluteUrl } from "@/lib/siteUrl";
 import "reactflow/dist/style.css";
@@ -57,7 +56,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
     <html lang="en">
       <body className={inter.className}>
         {/* External Google Tag Manager script */}
@@ -83,6 +81,5 @@ export default function RootLayout({
         <Footer />
       </body>
     </html>
-    </ClerkProvider>
   );
 }

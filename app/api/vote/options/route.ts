@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, options: vote.options });
   } catch (err: any) {
     logger.error({ err }, "Failed to add option");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -108,6 +109,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true, options: vote.options, removedOptions: vote.removedOptions || [] });
   } catch (err: any) {
     logger.error({ err }, "Failed to remove option");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
@@ -122,6 +123,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to check in member");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

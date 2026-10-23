@@ -151,7 +151,20 @@ function money(cents: number) {
   return cents < 0 ? `-${body}` : body;
 }
 
+/// Due, paid and purchase dates are calendar days stored as UTC midnight, so
+/// they are read in UTC. Reading them in Phoenix shows the day before.
 function dayLabel(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/// For actual moments (a deadline, when something was filed), in chapter time.
+function momentDayLabel(iso: string | null) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -526,7 +539,7 @@ export default function DuesPage() {
             {plan.reviewNote && <span className="block">{plan.reviewNote}</span>}
             <span className="block">
               The full {money(plan.totalCents)} is owed
-              {plan.graceUntil && ` by ${dayLabel(plan.graceUntil)}`}. Talk to
+              {plan.graceUntil && ` by ${momentDayLabel(plan.graceUntil)}`}. Talk to
               the treasurer if that isn&apos;t workable.
             </span>
           </AlertDescription>

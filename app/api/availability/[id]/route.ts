@@ -3,6 +3,7 @@
 // PATCH  - manager edits: title, description, deadline, reminder policy.
 // DELETE - manager cancels the poll (soft: status -> "cancelled").
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import AvailabilityPoll from "@/lib/models/AvailabilityPoll";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
@@ -80,7 +81,7 @@ export async function GET(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to load availability poll");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -143,7 +144,7 @@ export async function PATCH(
     return NextResponse.json(updated, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update availability poll");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -165,6 +166,6 @@ export async function DELETE(
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete availability poll");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

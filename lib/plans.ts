@@ -306,6 +306,24 @@ export function serializePlan(
   };
 }
 
+/// Charges riding on an approved plan that is keeping up with its schedule.
+/// They are judged by the installment dates, so nothing should call them past
+/// due while the plan is on track. A plan with a missed installment drops out
+/// of this set, and its charges read as late again.
+export function onScheduleChargeIds(
+  plans: any[],
+  charges: any[],
+  now = new Date()
+): Set<string> {
+  const ids = new Set<string>();
+  for (const plan of plans ?? []) {
+    if (!planIsActive(plan)) continue;
+    if (derivePlanProgress(plan, charges, now).missedCount > 0) continue;
+    for (const id of plan?.chargeIds ?? []) ids.add(String(id));
+  }
+  return ids;
+}
+
 /// What the member's screens should lead with: this month's installment when a
 /// plan is running, the whole balance otherwise.
 export function currentDue(

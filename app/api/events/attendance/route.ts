@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -141,6 +142,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ events: formatted }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to fetch attendance");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

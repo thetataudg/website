@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -169,7 +170,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, status: "pending" }, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to submit proxy request");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -246,7 +247,7 @@ export async function GET(req: Request) {
     });
   } catch (err: any) {
     logger.error({ err }, "Failed to list proxy requests");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -294,7 +295,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to withdraw proxy request");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -347,6 +348,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to decide proxy request");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }

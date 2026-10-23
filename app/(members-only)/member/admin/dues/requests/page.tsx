@@ -110,7 +110,19 @@ function money(cents: number) {
   });
 }
 
+/// Due, paid and purchase dates are calendar days stored as UTC midnight, so
+/// they are read in UTC. Reading them in Phoenix shows the day before.
 function dayLabel(iso: string | null) {
+  if (!iso) return "Not set";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/// For actual moments (a deadline, when something was filed), in chapter time.
+function momentDayLabel(iso: string | null) {
   if (!iso) return "Not set";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -514,7 +526,7 @@ function PlanList({
                   {dayLabel(plan.proposedAgainstDueDate)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  filed {dayLabel(plan.proposedAt)}
+                  filed {momentDayLabel(plan.proposedAt)}
                 </p>
               </TableCell>
               <TableCell className="text-right font-semibold tabular-nums">

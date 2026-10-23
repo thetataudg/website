@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Event from "@/lib/models/Event";
@@ -45,6 +46,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to toggle attendance");
-    return NextResponse.json({ error: err.message }, { status: 403 });
+    return apiErrorResponse(err);
   }
 }
