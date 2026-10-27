@@ -1,5 +1,5 @@
 // app/api/devices/route.ts
-// Where an iOS device says "you can push to me".
+// Where an iOS or Android device says "you can push to me".
 //
 // Upserted on the token rather than the member: one person can carry two
 // phones, and a token can move to a different account when a device is handed
@@ -32,9 +32,12 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const token = String(body?.token || "").trim();
-    // APNs device tokens are hex. Rejecting anything else here keeps junk out
-    // of the send loop, where a bad token costs a round trip to Apple.
-    if (!/^[0-9a-fA-F]{32,200}$/.test(token)) {
+    const platform = body?.platform === "android" ? "android" : body?.platform === "ios" ? "ios" : null;
+    if (!platform) return NextResponse.json({ error: "Invalid device platform" }, { status: 400 });
+    const validToken = platform === "ios"
+      ? /^[0-9a-fA-F]{32,200}$/.test(token)
+      : /^[A-Za-z0-9_:\-]{20,4096}$/.test(token);
+    if (!validToken) {
       return NextResponse.json({ error: "Invalid device token" }, { status: 400 });
     }
 
@@ -51,7 +54,7 @@ export async function POST(req: Request) {
         $set: {
           memberId: member._id,
           token,
-          platform: "ios",
+          platform,
           environment,
           appVersion: String(body?.appVersion || ""),
           lastSeenAt: new Date(),
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
       { upsert: true, new: true }
     );
 
-    logger.info({ rollNo: member.rollNo, environment }, "Device registered for push");
+    logger.info({ rollNo: member.rollNo, environment, platform }, "Device registered for push");
     return NextResponse.json({ registered: true }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to register device");

@@ -1,6 +1,6 @@
 import mongoose, { Schema, model, models } from "mongoose";
 
-/// An iOS device that has agreed to receive push.
+/// An iOS or Android device that has agreed to receive push.
 ///
 /// Keyed on the token itself rather than the member, because one person can
 /// carry two phones and a token can migrate between accounts when a device is
@@ -16,7 +16,7 @@ const DeviceTokenSchema = new Schema(
       index: true,
     },
     token: { type: String, required: true, unique: true },
-    platform: { type: String, enum: ["ios"], default: "ios" },
+    platform: { type: String, enum: ["ios", "android"], default: "ios" },
     /// "development" or "production" — an APNs token minted against the sandbox
     /// is rejected by the production gateway and vice versa, which is the most
     /// common reason push "just doesn't work".
