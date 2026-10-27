@@ -5,6 +5,7 @@
 // through the submission, plan, and reimbursement routes, and an officer turns
 // those into ledger entries.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -191,6 +192,6 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to load dues for member");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

@@ -2,6 +2,7 @@
 // Treasurer-facing ledger: list every charge, or raise new ones. Members read
 // their own balance from /api/dues/me instead.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 
 import { connectDB } from "@/lib/db";
@@ -288,7 +289,7 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to list dues charges");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -550,6 +551,6 @@ export async function POST(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to create dues charges");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

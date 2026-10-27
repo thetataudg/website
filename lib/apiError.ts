@@ -1,5 +1,22 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+
+/// Clerk's verdicts for a session token that was genuine but out of date.
+/// Both clients answer these by refreshing the token and retrying once (the
+/// iOS app in `APIClient`, the website in `SessionFetchRetry`), so reporting
+/// them filled Sentry with refusals nobody ever saw.
+const STALE_TOKEN_REASONS = new Set(["token-expired", "token-not-active-yet"]);
+
+/// Why Clerk's middleware decided the request was signed out, as it records
+/// on the request. Empty outside a request or when the middleware didn't run.
+function clerkAuthReason(): string {
+  try {
+    return headers().get("x-clerk-auth-reason") || "";
+  } catch {
+    return "";
+  }
+}
 
 /**
  * Turns whatever a route's catch block caught into the right status.
@@ -15,7 +32,19 @@ export function apiErrorResponse(err: any) {
   // they're worth seeing in Sentry too, as warnings rather than errors.
   // Crashes (5xx) already reach Sentry through `logger.error`.
   if (status === 401 || status === 403) {
-    Sentry.captureMessage(`API ${status}: ${error}`, "warning");
+    const reason = status === 401 ? clerkAuthReason() : "";
+    if (!STALE_TOKEN_REASONS.has(reason)) {
+      Sentry.withScope((scope) => {
+        if (reason) scope.setTag("clerk.auth_reason", reason);
+        // One issue per kind of refusal, not one per route that happened to
+        // throw it, which is how a single expired cookie became six issues.
+        scope.setFingerprint(["api-refusal", String(status), reason || "none"]);
+        Sentry.captureMessage(
+          `API ${status}: ${error}${reason ? ` (${reason})` : ""}`,
+          "warning"
+        );
+      });
+    }
   }
   return NextResponse.json({ error }, { status });
 }

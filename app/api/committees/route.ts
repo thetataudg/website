@@ -115,6 +115,6 @@ export async function POST(req: Request) {
     return NextResponse.json(committee, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to create committee");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

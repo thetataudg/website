@@ -5,6 +5,7 @@
 // exclusions, same cooldown, same records. The only difference is that this one
 // carries an actor and can be told to ignore the calendar.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { requireTreasury } from "@/lib/duesAuth";
@@ -107,7 +108,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ...report, skipped: selection.skipped }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to send dues reminders");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -170,6 +171,6 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to preview dues reminders");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

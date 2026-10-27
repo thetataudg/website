@@ -2,6 +2,7 @@
 // A member's own paper trail. Needs no treasury role — this is their record as
 // much as the chapter's, and being able to read it is the point.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -35,6 +36,6 @@ export async function GET(req: Request) {
     return NextResponse.json(history, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to load finance history");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

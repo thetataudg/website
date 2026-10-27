@@ -2,6 +2,7 @@
 // An officer reviewing a claim. Approving mints credit and immediately drains
 // it into whatever the member owes.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import Reimbursement from "@/lib/models/Reimbursement";
 import { requireTreasury } from "@/lib/duesAuth";
@@ -194,6 +195,6 @@ export async function PATCH(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to review reimbursement");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

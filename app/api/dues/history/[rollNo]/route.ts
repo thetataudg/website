@@ -3,6 +3,7 @@
 // own — there is deliberately no second, fuller version for officers, because a
 // record the member can't see isn't one they can dispute.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import { requireTreasury } from "@/lib/duesAuth";
@@ -38,6 +39,6 @@ export async function GET(
     return NextResponse.json(history, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to load finance history");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

@@ -49,9 +49,17 @@ function initialise(mapkit: any, firstToken: string): Promise<any> {
       authorizationCallback: async (done: (value: string) => void) => {
         // The first call is already paid for; later ones are MapKit renewing a
         // token that is about to run out.
-        const value = token ?? (await fetchToken());
-        token = null;
-        done(value);
+        // MapKit does not catch what this throws, so a failed renewal used to
+        // surface as an unhandled rejection. The map already on screen keeps
+        // working until its token lapses, and MapKit asks again after that.
+        try {
+          const value = token ?? (await fetchToken());
+          token = null;
+          done(value);
+        } catch (error) {
+          token = null;
+          console.warn("Apple Maps token renewal failed", error);
+        }
       },
     });
     resolve(mapkit);

@@ -5,6 +5,7 @@
 // which is already a dependency, and generating it server-side would mean
 // shipping a second renderer for no gain.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import DuesCharge, { balanceCentsFor, paidCentsFor } from "@/lib/models/DuesCharge";
@@ -105,6 +106,6 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to build the dues export");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

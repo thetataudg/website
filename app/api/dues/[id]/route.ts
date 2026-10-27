@@ -1,6 +1,7 @@
 // app/api/dues/[id]/route.ts
 // Record payments against a charge, or amend/void it.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import DuesCharge, {
@@ -253,7 +254,7 @@ export async function PATCH(
     return NextResponse.json(serializeCharge(charge.toObject()), { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update dues charge");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -341,6 +342,6 @@ export async function DELETE(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to void dues charge");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

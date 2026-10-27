@@ -1,6 +1,7 @@
 // app/api/dues/plans/[id]/route.ts
 // An officer answering a plan proposal — or a member withdrawing one.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -302,6 +303,6 @@ export async function PATCH(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to review payment plan");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

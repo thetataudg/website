@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -400,7 +401,7 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to fetch GEM status");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -509,6 +510,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ record }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update GEM record");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
