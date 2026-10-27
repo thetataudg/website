@@ -2,6 +2,7 @@
 // PATCH  /api/newsletters/<slug>  — edit, publish, unpublish. E-Council or admin.
 // DELETE /api/newsletters/<slug>  — remove it and its artwork. E-Council or admin.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { connectDB } from "@/lib/db";
 import Newsletter from "@/lib/models/Newsletter";
 import logger from "@/lib/logger";
@@ -73,7 +74,7 @@ export async function GET(req: Request, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
     logger.error({ err, slug: params.slug }, "Failed to read newsletter");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -206,7 +207,7 @@ export async function PATCH(req: Request, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
     logger.error({ err, slug: params.slug }, "Failed to update newsletter");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -230,6 +231,6 @@ export async function DELETE(req: Request, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
     logger.error({ err, slug: params.slug }, "Failed to delete newsletter");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

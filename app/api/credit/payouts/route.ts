@@ -1,6 +1,7 @@
 // app/api/credit/payouts/route.ts
 // Handing a member's credit back as actual money.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import Member from "@/lib/models/Member";
 import { requireTreasury } from "@/lib/duesAuth";
@@ -95,6 +96,6 @@ export async function POST(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to pay out credit");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

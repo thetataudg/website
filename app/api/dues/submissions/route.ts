@@ -2,6 +2,7 @@
 // A member reporting that they paid, and the officer-facing queue of claims
 // waiting to be checked.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -106,7 +107,7 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to list payment submissions");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -255,6 +256,6 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     logger.error({ err }, "Failed to file payment submission");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

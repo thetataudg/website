@@ -3,6 +3,7 @@
 // a notification can be edited or deleted, because it's also the member's copy
 // of what the chapter told them and when.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -120,7 +121,7 @@ export async function GET(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to load notifications");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -160,6 +161,6 @@ export async function PATCH(req: Request) {
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to mark notifications read");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

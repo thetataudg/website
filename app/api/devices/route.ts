@@ -6,6 +6,7 @@
 // on. Re-registering a token that was previously disabled brings it back — the
 // device is evidently alive again.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ registered: true }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to register device");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -101,6 +102,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ disabled: result.modifiedCount ?? 0 }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to disable device");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

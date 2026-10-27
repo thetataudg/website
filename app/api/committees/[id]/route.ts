@@ -90,7 +90,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json(committee, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update committee");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -116,6 +116,6 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     return NextResponse.json({ status: "deleted" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete committee");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

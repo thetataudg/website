@@ -4,6 +4,8 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 
+import SessionFetchRetry from "@/components/auth/SessionFetchRetry";
+
 // export const metadata: Metadata = { title: "ΔΓ Chapter Tools" };
 import "./(public-site)/globals.css";
 
@@ -39,6 +41,7 @@ export default function RootLayout({
             elements: { rootBox: "container" },
           }}
         >
+          <SessionFetchRetry />
           {children}
         </ClerkProvider>
       </body>

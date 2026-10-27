@@ -2,6 +2,7 @@
 // An officer checking a member's payment claim: verify it into the ledger, or
 // send it back with a reason.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import DuesCharge, { balanceCentsFor } from "@/lib/models/DuesCharge";
 import PaymentSubmission from "@/lib/models/PaymentSubmission";
@@ -266,7 +267,7 @@ export async function PATCH(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to review payment claim");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -347,6 +348,6 @@ export async function DELETE(
     );
   } catch (err: any) {
     logger.error({ err }, "Failed to withdraw a submission");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

@@ -7,6 +7,7 @@
 // an object key; the article stores the key and the reader gets a fresh signed
 // URL on every read.
 import path from "path";
+import { apiErrorResponse } from "@/lib/apiError";
 import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import logger from "@/lib/logger";
@@ -173,6 +174,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
     logger.error({ err }, "Failed to upload newsletter image");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

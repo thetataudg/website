@@ -1,4 +1,5 @@
 import path from "path";
+import { apiErrorResponse } from "@/lib/apiError";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/clerk";
 import { connectDB } from "@/lib/db";
@@ -159,7 +160,7 @@ export async function GET(
     // don't have access, try signing out". The real cause was in the server log
     // and nowhere else. Deliberate refusals below still answer 403; this does
     // not.
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -296,7 +297,7 @@ export async function PATCH(
     return NextResponse.json(enriched, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to update minutes");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -331,6 +332,6 @@ export async function DELETE(
     return NextResponse.json({ status: "deleted" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to delete minutes");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }

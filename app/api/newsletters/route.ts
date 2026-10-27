@@ -1,6 +1,7 @@
 // GET  /api/newsletters  — the feed. Public.
 // POST /api/newsletters  — start an issue. E-Council or admin.
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/apiError";
 import { connectDB } from "@/lib/db";
 import Newsletter from "@/lib/models/Newsletter";
 import logger from "@/lib/logger";
@@ -71,7 +72,7 @@ export async function GET(req: Request) {
     // A thrown exception is a server failure, not an authorisation decision.
     // Reads here are public, so there is no 403 this can legitimately be.
     logger.error({ err }, "Failed to list newsletters");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
 
@@ -128,6 +129,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
     logger.error({ err }, "Failed to create newsletter");
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiErrorResponse(err);
   }
 }
