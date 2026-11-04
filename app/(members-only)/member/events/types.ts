@@ -35,6 +35,14 @@ export interface EventItem {
   gemCategory?: string | null;
   status: string;
   visibleToAlumni: boolean;
+  /**
+   * What the signed-in viewer may do to this event, decided by the server
+   * (`lib/events/permissions.ts`) and sent with every event it returns. The
+   * client never works these out for itself, so a button is on screen exactly
+   * when the call behind it will be allowed.
+   */
+  canManage?: boolean;
+  canDelete?: boolean;
 }
 
 export type EventLocationKind = "physical" | "virtual";

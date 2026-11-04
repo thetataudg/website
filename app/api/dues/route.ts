@@ -13,19 +13,10 @@ import {
   normalizeDueDate,
   readAmountCents,
   serializeCharge,
-  summarize,
 } from "@/lib/dues";
 import { requireTreasury } from "@/lib/duesAuth";
-import { balanceCentsFor, paidCentsFor } from "@/lib/models/DuesCharge";
-import PaymentSubmission from "@/lib/models/PaymentSubmission";
-import { membersAwaitingReview } from "@/lib/submissions";
-import PaymentPlan from "@/lib/models/PaymentPlan";
-import {
-  activePlansFor,
-  derivePlanProgress,
-  membersAwaitingPlanReview,
-  onScheduleChargeIds,
-} from "@/lib/plans";
+import { loadDuesRoster, loadMemberLedger } from "@/lib/duesRead";
+import { balanceCentsFor } from "@/lib/models/DuesCharge";
 import { applyCreditToOpenCharges, creditBalancesFor } from "@/lib/credit";
 import { formatCents, recordFinanceEvents } from "@/lib/financeEvents";
 import { notifyMany } from "@/lib/notify";
@@ -76,175 +67,21 @@ export async function GET(req: Request) {
     // per-charge. The roster view answers it directly so the treasurer's main
     // screen isn't sixty rows of line items to mentally group.
     if (searchParams.get("view") === "roster") {
-      const active = await Member.find({ status: "Active" })
-        .select("rollNo fName lName")
-        .lean<any[]>();
-
-      const byMember = new Map<string, any[]>();
-      for (const charge of charges as any[]) {
-        const key = charge.memberId?.toString();
-        if (!key) continue;
-        if (!byMember.has(key)) byMember.set(key, []);
-        byMember.get(key)!.push(charge);
-      }
-
-      // Members who owe nothing still belong on the roster — an empty row is
-      // how a treasurer confirms someone is settled rather than missing.
-      const rosterIds = new Set([
-        ...active.map((member) => member._id.toString()),
-        ...Array.from(byMember.keys()),
-      ]);
-
-      const extraIds = Array.from(rosterIds).filter(
-        (id) => !active.some((member) => member._id.toString() === id)
-      );
-      const extras = extraIds.length
-        ? await Member.find({ _id: { $in: extraIds } })
-            .select("rollNo fName lName status")
-            .lean<any[]>()
-        : [];
-      const memberById = new Map(
-        [...active, ...extras].map((member) => [member._id.toString(), member])
-      );
-
-      const awaiting = await membersAwaitingReview(Array.from(rosterIds));
-      // One aggregation for the whole chapter rather than two queries each.
-      const credits = await creditBalancesFor(Array.from(rosterIds));
-      const [awaitingPlan, plansByMember] = await Promise.all([
-        membersAwaitingPlanReview(Array.from(rosterIds)),
-        activePlansFor(Array.from(rosterIds)),
-      ]);
-      const now = new Date();
-
-      const rows = Array.from(rosterIds).map((id) => {
-        const member = memberById.get(id);
-        const own = byMember.get(id) ?? [];
-        const open = own.filter((charge) => charge.status === "open");
-        // Somebody waiting on either queue is waiting on the chapter.
-        const pendingReview = awaiting.has(id) || awaitingPlan.has(id);
-        // A member can run several plans at once. The roster leads with the one
-        // that most needs attention — furthest behind, then soonest due — and
-        // reports the count so a treasurer can see there are others.
-        const memberPlans = plansByMember.get(id) ?? [];
-        const scored = memberPlans
-          .map((row: any) => ({ row, progress: derivePlanProgress(row, own, now) }))
-          .filter((entry: any) => !entry.progress.isComplete)
-          .sort((a: any, b: any) => {
-            if (b.progress.missedCount !== a.progress.missedCount) {
-              return b.progress.missedCount - a.progress.missedCount;
-            }
-            const aDue = a.progress.dueNowDate ? new Date(a.progress.dueNowDate).getTime() : Infinity;
-            const bDue = b.progress.dueNowDate ? new Date(b.progress.dueNowDate).getTime() : Infinity;
-            return aDue - bDue;
-          });
-        const livePlan = scored[0]?.row ?? null;
-        const planProgress = scored[0]?.progress ?? null;
-        const planCount = scored.length;
-        const balanceCents = own.reduce(
-          (sum, charge) => sum + balanceCentsFor(charge),
-          0
-        );
-        const dueDates = open
-          .filter((charge) => balanceCentsFor(charge) > 0 && charge.dueDate)
-          .map((charge) => new Date(charge.dueDate).getTime())
-          .sort((a, b) => a - b);
-
-        return {
-          memberId: id,
-          rollNo: member?.rollNo ?? "Unknown",
-          fName: member?.fName ?? "Unknown",
-          lName: member?.lName ?? "",
-          status: member?.status ?? "Active",
-          assignedCents: open.reduce(
-            (sum, charge) => sum + (Number(charge.amountCents) || 0),
-            0
-          ),
-          paidCents: own.reduce((sum, charge) => sum + paidCentsFor(charge), 0),
-          balanceCents,
-          creditCents: credits.get(id) ?? 0,
-          chargeCount: open.length,
-          nextDueDate: dueDates.length
-            ? new Date(dueDates[0]).toISOString()
-            : null,
-          // Somebody waiting on review is not late, however long it takes.
-          awaitingReview: pendingReview,
-          // A member on a live plan has agreed dates that run past the charge's
-          // own due date, so the charge-level overdue flag is the wrong
-          // question for them — the installment is.
-          plan: planProgress
-            ? {
-                _id: String(livePlan._id),
-                // How many live plans this member is running, this one included.
-                planCount,
-                installmentCount: planProgress.installments.length,
-                currentSeq: planProgress.currentSeq,
-                amountDueNowCents: planProgress.amountDueNowCents,
-                dueNowDate: planProgress.dueNowDate,
-                paidCents: planProgress.paidCents,
-                remainingCents: planProgress.remainingCents,
-                missedCount: planProgress.missedCount,
-                isBehind: planProgress.missedCount > 0,
-              }
-            : null,
-          isOverdue: planProgress
-            ? planProgress.missedCount > 0
-            : !pendingReview &&
-              open.some(
-                (charge) =>
-                  balanceCentsFor(charge) > 0 &&
-                  serializeCharge(charge, now).isOverdue
-              ),
-        };
+      // The roster arithmetic lives in `lib/duesRead.ts`, shared with the MCP
+      // server so a treasurer's numbers agree on both sides.
+      return NextResponse.json(await loadDuesRoster(charges as any[]), {
+        status: 200,
       });
-
-      rows.sort((a, b) => {
-        if (a.balanceCents !== b.balanceCents) return b.balanceCents - a.balanceCents;
-        return `${a.lName}${a.fName}`.localeCompare(`${b.lName}${b.fName}`);
-      });
-
-      const [pendingCount, pendingPlanCount] = await Promise.all([
-        PaymentSubmission.countDocuments({ status: "pending" }),
-        PaymentPlan.countDocuments({ status: "pending" }),
-      ]);
-
-      return NextResponse.json(
-        {
-          members: rows,
-          totals: {
-            currency: "USD",
-            outstandingCents: rows.reduce((sum, row) => sum + row.balanceCents, 0),
-            collectedCents: rows.reduce((sum, row) => sum + row.paidCents, 0),
-            // What the chapter owes its members, which is a debt the treasurer
-            // should see as plainly as the one owed to them.
-            creditOwedCents: rows.reduce((sum, row) => sum + row.creditCents, 0),
-            memberCount: rows.length,
-            owingCount: rows.filter((row) => row.balanceCents > 0).length,
-            overdueCount: rows.filter((row) => row.isOverdue).length,
-            pendingReviewCount: pendingCount,
-            pendingPlanCount,
-            activePlanCount: rows.filter((row) => row.plan).length,
-            planBehindCount: rows.filter((row) => row.plan?.isBehind).length,
-          },
-        },
-        { status: 200 }
-      );
     }
 
     // A single-member query is really "show me this person's ledger", so hand
     // back the same summary shape /api/dues/me returns.
     if (filter.memberId) {
-      const plans = await PaymentPlan.find({
-        memberId: filter.memberId,
-        status: "active",
-      }).lean<any[]>();
-      const now = new Date();
       return NextResponse.json(
-        summarize(
-          charges,
-          now,
-          false,
-          onScheduleChargeIds(plans, charges as any[], now)
-        ),
+        await loadMemberLedger(filter.memberId, {
+          ...(filter.term ? { term: filter.term } : {}),
+          ...(filter.status ? { status: filter.status } : {}),
+        }),
         { status: 200 }
       );
     }

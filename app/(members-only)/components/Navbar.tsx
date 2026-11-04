@@ -256,11 +256,15 @@ export default function MemberNavbar() {
       !!userData.isECouncil ||
       !!userData.isCommitteeHead ||
       isCommitteeHead);
+  // Committee heads manage their own committee's events (edit, take the roll),
+  // so the screen is theirs too; it only lists what they may change.
   const canSeeManageEvents =
     !!userData &&
     (userData.role === "admin" ||
       userData.role === "superadmin" ||
-      !!userData.isECouncil);
+      !!userData.isECouncil ||
+      !!userData.isCommitteeHead ||
+      isCommitteeHead);
   const isPrivilegedUser =
     !!userData &&
     (userData.role === "admin" ||

@@ -97,8 +97,8 @@ export async function POST(req: Request) {
     }
 
     // Belt and braces behind the status check: the sweep that auto-completes
-    // stale events only runs every ten minutes, so there is a window where a
-    // finished event is still `ongoing`.
+    // stale events runs on a timer, so there is a window where a finished
+    // event is still `ongoing`.
     const now = Date.now();
     const opensAt = new Date(event.startTime).getTime() - EARLY_WINDOW_MS;
     const closesAt = new Date(event.endTime).getTime() + AUTO_COMPLETE_GRACE_MS;

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
-import { ArrowLeft, CircleAlert, Search, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, CircleAlert, Plus, Search, TriangleAlert, X } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +33,8 @@ import LoadingState from "../../components/LoadingState";
 import { useTheme } from "../../components/ThemeProvider";
 import { PageContainer, PageHeader } from "../../components/shell/PageShell";
 
-import { AttendanceDialog } from "./EventDialogs";
 import { EventCard } from "./EventCard";
+import { useEventManagement } from "./useEventManagement";
 import { useEventsData } from "./useEventsData";
 import { STATUS_LABEL, isRecurring, type EventItem } from "./types";
 
@@ -48,15 +48,17 @@ import { STATUS_LABEL, isRecurring, type EventItem } from "./types";
 export function AllEventsList({ scope }: { scope: "mine" | "others" }) {
   const { isLoaded, isSignedIn } = useAuth();
   const {
+    viewer,
     loading,
     error,
+    reload,
     committeeLabel,
     swatchFor,
     canManage,
     updateStatus,
-    fetchDetails,
     sortedFor,
   } = useEventsData();
+  const management = useEventManagement({ viewer, onChanged: reload });
 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -64,7 +66,6 @@ export function AllEventsList({ scope }: { scope: "mine" | "others" }) {
   const [includePast, setIncludePast] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState("all");
-  const [summary, setSummary] = React.useState<any>(null);
   const [pendingCancel, setPendingCancel] = React.useState<EventItem | null>(null);
 
   const all = sortedFor(scope, includePast);
@@ -123,11 +124,19 @@ export function AllEventsList({ scope }: { scope: "mine" | "others" }) {
             : "Everything else happening around the chapter."
         }
         actions={
-          <Badge variant="muted">
-            {events.length === all.length
-              ? `${all.length} ${all.length === 1 ? "event" : "events"}`
-              : `${events.length} of ${all.length}`}
-          </Badge>
+          <>
+            <Badge variant="muted">
+              {events.length === all.length
+                ? `${all.length} ${all.length === 1 ? "event" : "events"}`
+                : `${events.length} of ${all.length}`}
+            </Badge>
+            {management.canCreate ? (
+              <Button type="button" onClick={management.openCreate}>
+                <Plus className="size-4" />
+                New event
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -199,18 +208,19 @@ export function AllEventsList({ scope }: { scope: "mine" | "others" }) {
               canManage={canManage(event)}
               onStart={() => void updateStatus(event._id, "ongoing")}
               onEnd={async () => {
-                const details = await updateStatus(event._id, "completed");
-                if (details) setSummary(details);
+                // Ending an event goes straight to its roll: the next thing
+                // anybody does is check who is missing.
+                if (await updateStatus(event._id, "completed")) {
+                  void management.openRoll(event._id);
+                }
               }}
               onCancel={() =>
                 isRecurring(event)
                   ? setPendingCancel(event)
                   : void updateStatus(event._id, "cancelled")
               }
-              onViewAttendance={async () => {
-                const details = await fetchDetails(event._id);
-                if (details) setSummary(details);
-              }}
+              onEdit={() => void management.openEdit(event._id)}
+              onAttendance={() => void management.openRoll(event._id)}
             />
           ))}
         </div>
@@ -241,7 +251,7 @@ export function AllEventsList({ scope }: { scope: "mine" | "others" }) {
         </Card>
       )}
 
-      <AttendanceDialog event={summary} onClose={() => setSummary(null)} />
+      {management.dialogs}
 
       <Dialog open={!!pendingCancel} onOpenChange={(open) => !open && setPendingCancel(null)}>
         <DialogContent>

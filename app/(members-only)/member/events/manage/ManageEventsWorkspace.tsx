@@ -8,7 +8,6 @@ import {
   ChevronRight,
   CircleAlert,
   ClipboardList,
-  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -18,15 +17,6 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,8 +59,7 @@ import { PageContainer, PageHeader } from "../../../components/shell/PageShell";
 import { useTheme } from "../../../components/ThemeProvider";
 
 import { StatusBadge } from "../EventCard";
-import { EventFormDialog } from "../EventFormDialog";
-import { EventRollDialog, useActiveMembers } from "../EventRollDialog";
+import { useEventManagement } from "../useEventManagement";
 import { useEventsData } from "../useEventsData";
 import {
   EVENT_TYPE_LABEL,
@@ -90,7 +79,11 @@ import {
 
 const EVENTS_PER_PAGE = 15;
 
+/** How far back "Recent" reaches. */
+const RECENT_DAYS = 14;
+
 const STATUS_FILTERS = [
+  { value: "recent", label: "Recent and upcoming" },
   { value: "active", label: "Active (scheduled / ongoing)" },
   { value: "scheduled", label: "Scheduled" },
   { value: "ongoing", label: "Ongoing" },
@@ -107,42 +100,57 @@ const TYPE_FILTERS = [
 
 export default function ManageEventsWorkspace() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { me, events, committees, loading, error, reload, isAdmin, committeeLabel, swatchFor } =
-    useEventsData();
+  const {
+    viewer,
+    events,
+    committees,
+    loading,
+    error,
+    reload,
+    committeeLabel,
+    swatchFor,
+  } = useEventsData();
+  const management = useEventManagement({ viewer, onChanged: reload });
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  const [statusFilter, setStatusFilter] = React.useState("active");
+  // "Recent" is the default because the most common reason to open this page
+  // is a meeting that just ended: attendance to fix, or a check-in to reopen.
+  // Scheduled and ongoing events are one filter away, and a finished event is
+  // no longer buried under "Completed" in a list that opens on upcoming ones.
+  const [statusFilter, setStatusFilter] = React.useState("recent");
   const [typeFilter, setTypeFilter] = React.useState("all");
   const [committeeFilter, setCommitteeFilter] = React.useState("all");
   const [categoryFilter, setCategoryFilter] = React.useState("all");
   const [query, setQuery] = React.useState("");
   const [page, setPage] = React.useState(1);
 
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<any | null>(null);
-  const [deleting, setDeleting] = React.useState<EventItem | null>(null);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = React.useState(false);
-  const [roll, setRoll] = React.useState<any | null>(null);
-  const members = useActiveMembers();
 
-  const canCreate = !!me && (isAdmin || me.isECouncil);
-
-  /** Committee heads only manage their own; officers manage everything. */
-  const managed = React.useMemo(() => {
-    if (!me) return [];
-    if (isAdmin || me.isECouncil) return events;
-    const mine = committees.map((committee) => committee._id);
-    return events.filter((event) => mine.includes(event.committeeId ?? ""));
-  }, [me, isAdmin, events, committees]);
+  /**
+   * Only what the viewer can manage, as the server judged it: officers get
+   * everything, a committee head gets the events of the committee they head.
+   */
+  const managed = React.useMemo(() => events.filter((event) => event.canManage), [events]);
 
   const filtered = React.useMemo(() => {
-    const statuses = statusFilter === "active" ? ["scheduled", "ongoing"] : [statusFilter];
+    const statuses =
+      statusFilter === "active"
+        ? ["scheduled", "ongoing"]
+        : statusFilter === "recent"
+        ? ["scheduled", "ongoing", "completed"]
+        : [statusFilter];
     const needle = query.trim().toLowerCase();
+    const recentCutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
 
     return managed.filter((event) => {
       if (!statuses.includes(event.status)) return false;
+      if (
+        statusFilter === "recent" &&
+        event.status === "completed" &&
+        new Date(event.endTime).getTime() < recentCutoff
+      ) {
+        return false;
+      }
 
       const type = resolveEventType(event);
       if (typeFilter !== "all" && type !== typeFilter) return false;
@@ -171,59 +179,6 @@ export default function ManageEventsWorkspace() {
 
   const rows = filtered.slice((page - 1) * EVENTS_PER_PAGE, page * EVENTS_PER_PAGE);
 
-  async function openEditor(eventId: string) {
-    const response = await fetch(`/api/events/${eventId}`);
-    if (!response.ok) return;
-    setEditing(await response.json());
-    setFormOpen(true);
-  }
-
-  /**
-   * The roll, reachable from every row rather than only from finished events.
-   *
-   * Attendance gets corrected long after the fact — somebody signed in on
-   * paper, somebody's phone died — so the officer who has to fix it should not
-   * have to go and find the committee page to do it.
-   */
-  async function openRoll(eventId: string) {
-    const response = await fetch(`/api/events/${eventId}`);
-    if (response.ok) setRoll(await response.json());
-  }
-
-  /**
-   * Deleting a finished event with a roll attached is an admin's call: the
-   * attendance on it is the only record that those members were there.
-   */
-  async function confirmDelete() {
-    if (!deleting) return;
-    setDeleteBusy(true);
-    setDeleteError(null);
-    try {
-      if (!isAdmin) {
-        const response = await fetch(`/api/events/${deleting._id}`);
-        if (response.ok) {
-          const detail = await response.json();
-          if (detail.status === "completed" && detail.attendees?.length) {
-            setDeleteError("Only admins can delete completed events with attendees.");
-            return;
-          }
-        }
-      }
-
-      const response = await fetch(`/api/events/${deleting._id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "The event could not be deleted.");
-      }
-      await reload();
-      setDeleting(null);
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "The event could not be deleted.");
-    } finally {
-      setDeleteBusy(false);
-    }
-  }
-
   if (!isLoaded) return <LoadingState message="Loading events..." />;
 
   if (!isSignedIn) {
@@ -241,14 +196,16 @@ export default function ManageEventsWorkspace() {
 
   if (loading) return <LoadingState message="Loading events..." />;
 
-  if (!canCreate) {
+  // Reaching this page needs the standing to manage some event: an officer,
+  // or the head of a committee.
+  if (!management.canCreate) {
     return (
       <PageContainer>
         <Alert variant="destructive">
           <ShieldAlert className="size-4" />
           <AlertTitle>Unauthorized</AlertTitle>
           <AlertDescription>
-            Only admins and E-Council can manage chapter events.
+            Only admins, E-Council, and committee heads can manage events.
           </AlertDescription>
         </Alert>
       </PageContainer>
@@ -261,13 +218,7 @@ export default function ManageEventsWorkspace() {
         title="Manage events"
         description="Create, edit, and organize chapter or committee events."
         actions={
-          <Button
-            type="button"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
+          <Button type="button" onClick={management.openCreate}>
             <Plus className="size-4" />
             Create event
           </Button>
@@ -427,7 +378,7 @@ export default function ManageEventsWorkspace() {
                           />
                           <button
                             type="button"
-                            onClick={() => void openRoll(event._id)}
+                            onClick={() => void management.openRoll(event._id)}
                             className="min-w-0 truncate text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             {event.name}
@@ -473,25 +424,26 @@ export default function ManageEventsWorkspace() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Event actions</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => void openEditor(event._id)}>
+                            <DropdownMenuItem onSelect={() => void management.openEdit(event._id)}>
                               <Pencil className="size-4" />
                               Edit event
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => void openRoll(event._id)}>
+                            <DropdownMenuItem onSelect={() => void management.openRoll(event._id)}>
                               <ClipboardList className="size-4" />
                               Take the roll
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => {
-                                setDeleteError(null);
-                                setDeleting(event);
-                              }}
-                            >
-                              <Trash2 className="size-4" />
-                              Delete event
-                            </DropdownMenuItem>
+                            {event.canDelete ? (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => management.requestDelete(event)}
+                                >
+                                  <Trash2 className="size-4" />
+                                  Delete event
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -553,73 +505,7 @@ export default function ManageEventsWorkspace() {
         </CardHeader>
       </Card>
 
-      <EventFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        event={editing}
-        committees={committees}
-        allowChapterWide
-        canChangeCommittee={isAdmin}
-        onSaved={async () => {
-          await reload();
-          setEditing(null);
-        }}
-      />
-
-      <EventRollDialog
-        event={roll}
-        members={members}
-        onClose={() => setRoll(null)}
-        onRefresh={openRoll}
-        onEdit={(eventId) => {
-          setRoll(null);
-          void openEditor(eventId);
-        }}
-      />
-
-      <AlertDialog
-        open={!!deleting}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleting(null);
-            setDeleteError(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleting?.name} will be removed, along with any attendance recorded
-              against it. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {deleteError ? (
-            <Alert variant="destructive">
-              <CircleAlert className="size-4" />
-              <AlertDescription>{deleteError}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={deleteBusy}
-              onClick={() => confirmDelete()}
-            >
-              {deleteBusy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Trash2 className="size-4" />
-              )}
-              Delete event
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {management.dialogs}
     </PageContainer>
   );
 }

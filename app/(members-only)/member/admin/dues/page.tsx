@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import {
   Bell,
   CircleAlert,
   CircleCheck,
   Clock,
   Download,
+  CreditCard,
+  Ellipsis,
   History,
   Plus,
   Search,
@@ -40,6 +43,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PayOutCreditModal from "./PayOutCreditModal";
 import RemindModal from "./RemindModal";
@@ -108,6 +117,30 @@ function dayLabel(iso: string | null) {
   });
 }
 
+/// Where "I've seen this, stop showing it" is remembered for the unassigned
+/// banner. Per officer, so a shared computer doesn't hide it for the next
+/// treasurer, and in this browser only: it is a convenience, not a record, so
+/// every access is guarded and the banner simply shows if storage is blocked.
+function dismissalKey(userId: string) {
+  return `dues.unassignedBannerDismissed.${userId}`;
+}
+
+function readDismissed(userId: string): string | null {
+  try {
+    return window.localStorage.getItem(dismissalKey(userId));
+  } catch {
+    return null;
+  }
+}
+
+function writeDismissed(userId: string, signature: string) {
+  try {
+    window.localStorage.setItem(dismissalKey(userId), signature);
+  } catch {
+    // Storage blocked: the banner just comes back next visit.
+  }
+}
+
 type Filter = "owing" | "overdue" | "credit" | "all";
 
 export default function DuesRosterPage() {
@@ -128,7 +161,18 @@ export default function DuesRosterPage() {
   const [unassigned, setUnassigned] = useState<{
     count: number;
     cents: number;
+    /// Newest payment id. Mongo ids sort by creation time, so this changes
+    /// whenever a new payment lands, even if another was assigned meanwhile
+    /// and the count and total happen to stay the same.
+    newestId: string;
   } | null>(null);
+  const { user } = useUser();
+  /// The pile's signature when the banner was last dismissed. The banner is
+  /// hidden only while the live pile still matches it, so it returns by itself
+  /// as soon as something new arrives.
+  const [dismissedSignature, setDismissedSignature] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -136,9 +180,13 @@ export default function DuesRosterPage() {
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (cancelled || !data?.totals) return;
+        const ids: string[] = (data.payments ?? []).map((p: any) =>
+          String(p._id)
+        );
         setUnassigned({
           count: data.totals.unassignedCount ?? 0,
           cents: data.totals.unassignedCents ?? 0,
+          newestId: ids.sort().pop() ?? "",
         });
       })
       .catch(() => null);
@@ -146,6 +194,10 @@ export default function DuesRosterPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (user?.id) setDismissedSignature(readDismissed(user.id));
+  }, [user?.id]);
 
   const load = useCallback(async () => {
     try {
@@ -218,6 +270,14 @@ export default function DuesRosterPage() {
     { label: "Owed to members", value: money(totals.creditOwedCents ?? 0) },
   ];
 
+  const unassignedSignature = unassigned
+    ? `${unassigned.count}:${unassigned.cents}:${unassigned.newestId}`
+    : null;
+  const showUnassignedBanner =
+    !!unassigned &&
+    unassigned.count > 0 &&
+    dismissedSignature !== unassignedSignature;
+
   const FILTER_LABELS: Record<Filter, string> = {
     owing: "Owing",
     overdue: "Overdue",
@@ -273,6 +333,27 @@ export default function DuesRosterPage() {
                 )}
               </Link>
             </Button>
+            {/* Home for actions that have been dismissed from the page body. */}
+            {unassigned && unassigned.count > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="More">
+                    <Ellipsis aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/member/admin/dues/unassigned"
+                      className="no-underline"
+                    >
+                      <CreditCard aria-hidden="true" className="mr-2 size-4" />
+                      Unassigned payments
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </>
         }
       />
@@ -286,7 +367,7 @@ export default function DuesRosterPage() {
         )}
       </div>
 
-      {unassigned && unassigned.count > 0 ? (
+      {unassigned && showUnassignedBanner ? (
         <Alert>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span>
@@ -299,9 +380,25 @@ export default function DuesRosterPage() {
               taken in person has no owner yet, across {unassigned.count}{" "}
               payment{unassigned.count === 1 ? "" : "s"}.
             </span>
-            <Button size="sm" variant="outline" asChild>
-              <a href="/member/admin/dues/unassigned">Assign it</a>
-            </Button>
+            <span className="flex items-center gap-1">
+              <Button size="sm" variant="outline" asChild>
+                <a href="/member/admin/dues/unassigned">Assign it</a>
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                aria-label="Dismiss"
+                onClick={() => {
+                  if (user?.id && unassignedSignature) {
+                    writeDismissed(user.id, unassignedSignature);
+                  }
+                  setDismissedSignature(unassignedSignature);
+                }}
+              >
+                <X aria-hidden="true" className="size-4" />
+              </Button>
+            </span>
           </AlertDescription>
         </Alert>
       ) : null}

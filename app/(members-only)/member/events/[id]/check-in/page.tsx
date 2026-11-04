@@ -40,7 +40,6 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
   const { isLoaded, isSignedIn } = useAuth();
   const [me, setMe] = useState<{ role: string; memberId: string } | null>(null);
   const [event, setEvent] = useState<any>(null);
-  const [committee, setCommittee] = useState<any>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string>("");
@@ -76,12 +75,6 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
 
       const eventData = await refreshEvent();
 
-      if (eventData?.committeeId) {
-        const commRes = await fetch(`/api/committees/${eventData.committeeId}`);
-        const commData = commRes.ok ? await commRes.json() : null;
-        setCommittee(commData);
-      }
-
       const memRes = await fetch("/api/members");
       const memData = memRes.ok ? await memRes.json() : [];
       setMembers(memData.filter((m: Member) => m.status === "Active"));
@@ -96,10 +89,10 @@ export default function EventCheckInPage({ params }: { params: { id: string } })
     };
   }, []);
 
-  const isAdmin = me?.role === "admin" || me?.role === "superadmin";
-  const isHead =
-    committee?.committeeHeadId?.toString?.() === me?.memberId ||
-    committee?.committeeHeadId?._id === me?.memberId;
+  // The server's verdict on this event, sent with it. It is the same rule the
+  // check-in routes enforce, so E-Council (who the routes allow) is let in and
+  // nobody is shown a page whose every action would be refused.
+  const canRunDoor = !!event?.canManage;
 
   const mstDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Phoenix",
@@ -351,13 +344,13 @@ function stopScanner() {
     );
   }
 
-  if (!isAdmin && !isHead) {
+  if (!canRunDoor) {
     return (
       <PageContainer className="max-w-2xl">
         <Alert variant="destructive" role="alert">
           <TriangleAlert aria-hidden="true" />
           <AlertDescription>
-            Only committee heads or admins can check in attendees.
+            Only admins, E-Council, and the committee head can check in attendees.
           </AlertDescription>
         </Alert>
       </PageContainer>
@@ -390,7 +383,7 @@ function stopScanner() {
           event?.name || "Check in attendees and track participation."
         }
         actions={
-          event?.status === "ongoing" && (isAdmin || isHead) ? (
+          event?.status === "ongoing" && canRunDoor ? (
             <Button
               variant="outline"
               className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"

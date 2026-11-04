@@ -2,19 +2,29 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { RedirectToSignIn, useAuth } from "@clerk/nextjs";
 import {
   ArrowLeft,
   CalendarDays,
+  ClipboardList,
   Clock,
   ExternalLink,
   Loader2,
   MapPin,
+  Pencil,
+  Play,
+  QrCode,
+  RotateCcw,
+  Square,
+  Trash2,
   Video,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "../EventCard";
+import { fetchEventDetail, patchEventStatus } from "../eventActions";
+import { useEventManagement } from "../useEventManagement";
 import {
   EVENT_TYPE_LABEL,
   resolveEventType,
@@ -45,6 +55,7 @@ const timeFormat = new Intl.DateTimeFormat("en-US", {
 
 export default function EventPageClient({ eventId }: { eventId: string }) {
   const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
   const [event, setEvent] = React.useState<EventItem | null>(null);
   const [mine, setMine] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -98,6 +109,13 @@ export default function EventPageClient({ eventId }: { eventId: string }) {
       cancelled = true;
     };
   }, [eventId, isSignedIn]);
+
+  // Re-reads the event after a manager changes it from the panel below, so
+  // the badge and the buttons follow what the server now says.
+  const reloadEvent = React.useCallback(async () => {
+    const detail = await fetchEventDetail(eventId);
+    if (detail) setEvent(detail);
+  }, [eventId]);
 
   const respond = async (status: string) => {
     if (saving) return;
@@ -224,6 +242,14 @@ export default function EventPageClient({ eventId }: { eventId: string }) {
         </p>
       ) : null}
 
+      {event.canManage ? (
+        <ManagerPanel
+          event={event}
+          onChanged={reloadEvent}
+          onDeleted={() => router.push("/member/events")}
+        />
+      ) : null}
+
       {!isPast && event.status !== "cancelled" ? (
         <div className="mt-8">
           <p className="text-sm font-medium">Are you coming?</p>
@@ -243,6 +269,117 @@ export default function EventPageClient({ eventId }: { eventId: string }) {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * What the people who run the event can do from its own page.
+ *
+ * Only mounted for a viewer the server said can manage this event, so the
+ * member list and committee lookups behind these dialogs are never fetched for
+ * everyone else who opens a shared link. Every action here is also enforced
+ * server-side.
+ */
+function ManagerPanel({
+  event,
+  onChanged,
+  onDeleted,
+}: {
+  event: EventItem;
+  onChanged: () => Promise<void>;
+  onDeleted: () => void;
+}) {
+  const management = useEventManagement({ onChanged, onDeleted });
+  const [busy, setBusy] = React.useState(false);
+
+  async function moveTo(status: string, openRollAfter = false) {
+    setBusy(true);
+    try {
+      if (await patchEventStatus(event._id, status)) {
+        await onChanged();
+        if (openRollAfter) void management.openRoll(event._id);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 flex flex-wrap gap-2 rounded-lg border p-4">
+      {event.status === "scheduled" ? (
+        <Button type="button" size="sm" disabled={busy} onClick={() => void moveTo("ongoing")}>
+          <Play className="h-4 w-4" />
+          Start event
+        </Button>
+      ) : null}
+
+      {event.status === "ongoing" ? (
+        <>
+          <Button type="button" size="sm" asChild>
+            <Link href={`/member/events/${event._id}/check-in`}>
+              <QrCode className="h-4 w-4" />
+              Start check-in
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void moveTo("completed", true)}
+          >
+            <Square className="h-4 w-4" />
+            End event
+          </Button>
+        </>
+      ) : null}
+
+      {event.status === "completed" ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => void management.reopen(event._id)}
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reopen check-in
+        </Button>
+      ) : null}
+
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => void management.openRoll(event._id)}
+      >
+        <ClipboardList className="h-4 w-4" />
+        Attendance
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => void management.openEdit(event._id)}
+      >
+        <Pencil className="h-4 w-4" />
+        Edit
+      </Button>
+      {event.canDelete ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="text-destructive hover:text-destructive"
+          onClick={() => management.requestDelete(event)}
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </Button>
+      ) : null}
+
+      {management.dialogs}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { apiErrorResponse } from "@/lib/apiError";
 import mongoose from "mongoose";
 import Event from "@/lib/models/Event";
-import Member from "@/lib/models/Member";
+import { existingMemberIds, pushManualCheckIns, removeCheckIn } from "@/lib/events/attendance";
 import logger from "@/lib/logger";
 import { canManageCheckIn, getMemberByClerk } from "@/lib/checkinAuth";
 import { canonicalCheckInSource } from "@/lib/checkinSource";
@@ -10,15 +10,30 @@ import { canonicalCheckInSource } from "@/lib/checkinSource";
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const actor = await getMemberByClerk(req);
-    const { memberId } = await req.json();
+    const body = await req.json();
 
-    if (!memberId || !mongoose.Types.ObjectId.isValid(memberId)) {
-      return NextResponse.json({ error: "memberId is required" }, { status: 400 });
+    // One member, or many. The bulk form exists for "check in everyone who
+    // RSVP'd": a roll of forty is one request and one refresh instead of forty
+    // of each, and every id still goes through the same dedupe below.
+    const bulk = Array.isArray(body?.memberIds);
+    const requested: string[] = bulk
+      ? Array.from(new Set<string>(body.memberIds.map((id: unknown) => String(id))))
+      : body?.memberId
+      ? [String(body.memberId)]
+      : [];
+
+    if (
+      !requested.length ||
+      requested.some((id) => !mongoose.Types.ObjectId.isValid(id))
+    ) {
+      return NextResponse.json(
+        { error: bulk ? "memberIds is required" : "memberId is required" },
+        { status: 400 }
+      );
     }
-
-    // Decided here, not by the caller. The website used to post "Phone" for a
-    // hand-added member, which put them on the roster as a scan.
-    const checkInSource = canonicalCheckInSource("manual");
+    if (requested.length > 500) {
+      return NextResponse.json({ error: "Too many members" }, { status: 400 });
+    }
 
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -33,48 +48,39 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const targetMember = await Member.findById(memberId).lean();
-    if (!targetMember) {
+    const existingIds = await existingMemberIds(requested);
+    if (!bulk && !existingIds.has(requested[0])) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    if (event.attendees && !Array.isArray(event.attendees)) {
-      await Event.collection.updateOne(
-        { _id: eventId },
-        { $set: { attendees: [] } }
+    // The conditional push (and the legacy-shape repair) is shared with the
+    // MCP server: `lib/events/attendance.ts`.
+    const added = await pushManualCheckIns({
+      eventId,
+      memberIds: requested,
+      existingIds,
+      actorId: actor._id,
+    });
+
+    if (bulk) {
+      logger.info(
+        { eventId, requested: requested.length, added, source: canonicalCheckInSource("manual") },
+        "Bulk manual check-in added"
       );
+      return NextResponse.json({ status: "checked-in", added }, { status: 200 });
     }
 
-    const targetId = new mongoose.Types.ObjectId(memberId);
-    const scannerId =
-      typeof actor._id === "string" && mongoose.Types.ObjectId.isValid(actor._id)
-        ? new mongoose.Types.ObjectId(actor._id)
-        : null;
-    const update = await Event.updateOne(
-      {
-        _id: eventId,
-        "attendees.memberId": { $ne: targetId },
-      },
-      {
-        $push: {
-          attendees: {
-            memberId: targetId,
-            checkedInAt: new Date(),
-            source: checkInSource,
-            scannerMemberId: scannerId,
-          },
-        },
-      }
-    );
-
-    if (update.matchedCount === 0) {
+    if (added === 0) {
       return NextResponse.json(
         { status: "already-checked-in" },
         { status: 200 }
       );
     }
 
-    logger.info({ eventId, memberId, source: checkInSource }, "Manual check-in added");
+    logger.info(
+      { eventId, memberId: requested[0], source: canonicalCheckInSource("manual") },
+      "Manual check-in added"
+    );
     return NextResponse.json({ status: "checked-in" }, { status: 200 });
   } catch (err: any) {
     logger.error({ err }, "Failed to add manual check-in");
@@ -112,13 +118,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const targetId = new mongoose.Types.ObjectId(memberId);
-    const update = await Event.collection.updateOne(
-      { _id: eventId },
-      { $pull: { attendees: { memberId: targetId } } } as any
-    );
+    const removed = await removeCheckIn(eventId, memberId);
 
-    if (update.modifiedCount === 0) {
+    if (!removed) {
       return NextResponse.json({ status: "not-checked-in" }, { status: 200 });
     }
 

@@ -10,10 +10,13 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  ClipboardList,
   Download,
   LayoutList,
   Loader2,
   MapPin,
+  Pencil,
+  Plus,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react";
@@ -55,8 +58,8 @@ import LoadingState from "../../components/LoadingState";
 import { useTheme } from "../../components/ThemeProvider";
 import { PageContainer, PageHeader } from "../../components/shell/PageShell";
 
-import { AttendanceDialog } from "./EventDialogs";
 import { EventCard, StatusBadge } from "./EventCard";
+import { useEventManagement } from "./useEventManagement";
 import { useEventsData } from "./useEventsData";
 import {
   EVENT_TYPE_LABEL,
@@ -86,6 +89,7 @@ const PREVIEW_COUNT = 3;
 export default function EventsWorkspace() {
   const { isLoaded, isSignedIn } = useAuth();
   const {
+    viewer,
     events,
     loading,
     error,
@@ -95,9 +99,9 @@ export default function EventsWorkspace() {
     swatchFor,
     canManage,
     updateStatus,
-    fetchDetails,
     sortedFor,
   } = useEventsData();
+  const management = useEventManagement({ viewer, onChanged: reload });
 
   // The palette flips with the appearance rather than being tinted by CSS: the
   // dark shades are different hues, not the light ones faded.
@@ -110,7 +114,6 @@ export default function EventsWorkspace() {
   const [calendarView, setCalendarView] = React.useState<BigCalendarView>("month");
   const [selection, setSelection] = React.useState<DateRange>({ start: null, end: null });
   const [dayOpen, setDayOpen] = React.useState<Date | null>(null);
-  const [summary, setSummary] = React.useState<any>(null);
   const [pendingCancel, setPendingCancel] = React.useState<EventItem | null>(null);
   const [syncing, setSyncing] = React.useState(false);
   const [syncFeedback, setSyncFeedback] = React.useState<string | null>(null);
@@ -215,17 +218,18 @@ export default function EventsWorkspace() {
   const cardHandlers = (event: EventItem) => ({
     onStart: () => void updateStatus(event._id, "ongoing"),
     onEnd: async () => {
-      const details = await updateStatus(event._id, "completed");
-      if (details) setSummary(details);
+      // Ending an event goes straight to its roll: the next thing anybody
+      // does is check who is missing.
+      if (await updateStatus(event._id, "completed")) {
+        void management.openRoll(event._id);
+      }
     },
     onCancel: () =>
       isRecurring(event)
         ? setPendingCancel(event)
         : void updateStatus(event._id, "cancelled"),
-    onViewAttendance: async () => {
-      const details = await fetchDetails(event._id);
-      if (details) setSummary(details);
-    },
+    onEdit: () => void management.openEdit(event._id),
+    onAttendance: () => void management.openRoll(event._id),
   });
 
   if (!isLoaded) return <LoadingState message="Loading events..." />;
@@ -252,6 +256,12 @@ export default function EventsWorkspace() {
         description="Meetings, chapter events, and committee plans."
         actions={
           <>
+            {management.canCreate ? (
+              <Button type="button" onClick={management.openCreate}>
+                <Plus className="size-4" />
+                New event
+              </Button>
+            ) : null}
             {canForceSync ? (
               <Button type="button" variant="outline" disabled={syncing} onClick={forceSync}>
                 {syncing ? (
@@ -598,6 +608,34 @@ export default function EventsWorkspace() {
                       {event.location}
                     </p>
                   ) : null}
+                  {event.canManage ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setDayOpen(null);
+                          void management.openRoll(event._id);
+                        }}
+                      >
+                        <ClipboardList className="size-4" />
+                        Attendance
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setDayOpen(null);
+                          void management.openEdit(event._id);
+                        }}
+                      >
+                        <Pencil className="size-4" />
+                        Edit
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -609,7 +647,7 @@ export default function EventsWorkspace() {
         </DialogContent>
       </Dialog>
 
-      <AttendanceDialog event={summary} onClose={() => setSummary(null)} />
+      {management.dialogs}
 
       <Dialog open={!!pendingCancel} onOpenChange={(open) => !open && setPendingCancel(null)}>
         <DialogContent>
@@ -676,7 +714,8 @@ function EventSection({
     onStart: () => void;
     onEnd: () => void;
     onCancel: () => void;
-    onViewAttendance: () => void;
+    onEdit: () => void;
+    onAttendance: () => void;
   };
 }) {
   const preview = events.slice(0, PREVIEW_COUNT);
