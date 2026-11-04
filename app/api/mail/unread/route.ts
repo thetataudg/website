@@ -4,7 +4,7 @@
 // live mailbox just gets zero, not an error.
 import { NextResponse } from "next/server";
 import MailMessage from "@/lib/models/MailMessage";
-import { accessibleMailboxes, currentMember } from "@/lib/mail/session";
+import { accessibleMailboxes, currentMember, MailError } from "@/lib/mail/session";
 import { syncReceivedMail } from "@/lib/mail/sync";
 
 export const runtime = "nodejs";
@@ -22,7 +22,13 @@ export async function GET() {
       read: false,
     });
     return NextResponse.json({ unread });
-  } catch {
+  } catch (err) {
+    // A refused session must stay a 401. Answering 200 with zero hid it from
+    // the client's refresh-and-retry, so the badge dropped to nothing every
+    // time the cookie lapsed instead of recovering.
+    if (err instanceof MailError && err.statusCode === 401) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json({ unread: 0 });
   }
 }

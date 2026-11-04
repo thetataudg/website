@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import logger from "@/lib/logger";
 import { syncAllEvents } from "@/lib/calendar";
-import { autoCompleteStaleEvents } from "@/lib/eventLifecycle";
+import { advanceEventLifecycle } from "@/lib/eventLifecycle";
 
 const CRON_SECRET = process.env.CALENDAR_SYNC_CRON_SECRET;
 
@@ -22,7 +22,10 @@ async function handleCron(req: Request) {
 
   try {
     await connectDB();
-    const closed = await autoCompleteStaleEvents();
+    // Also run in-process by the scheduler in instrumentation.ts; kept here
+    // so an external cron can still trigger it, and because it is idempotent
+    // the two cannot conflict.
+    const closed = await advanceEventLifecycle();
     const results = await syncAllEvents();
     const synced = results.filter((item) => item.status === "synced").length;
     return NextResponse.json(

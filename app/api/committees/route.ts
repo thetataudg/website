@@ -7,37 +7,7 @@ import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { isCalendarColor, nextCalendarColor } from "@/lib/calendarColors";
-import { pruneInactiveCommitteeMembers } from "@/lib/committeeMembership";
-
-/**
- * Gives a colour to any committee created before committees had colours.
- *
- * Runs on read because that is the only route every client hits, and it is a
- * no-op the moment there is nothing left to fix. Without it the app would have
- * to invent a colour locally, and the website and the phone would disagree
- * about which committee is teal.
- */
-async function backfillColors() {
-  const uncoloured = await Committee.find({
-    $or: [{ color: { $exists: false } }, { color: null }],
-  })
-    .select("_id")
-    .lean<any[]>();
-  if (!uncoloured.length) return;
-
-  const taken = (
-    await Committee.find({ color: { $nin: [null] } })
-      .select("color")
-      .lean<any[]>()
-  ).map((committee) => committee.color);
-
-  for (const committee of uncoloured) {
-    const color = nextCalendarColor(taken);
-    taken.push(color);
-    await Committee.updateOne({ _id: committee._id }, { $set: { color } });
-  }
-  logger.info({ count: uncoloured.length }, "Backfilled committee calendar colours");
-}
+import { listCommittees } from "@/lib/committeeQueries";
 
 export async function GET(req: Request) {
   try {
@@ -55,16 +25,9 @@ export async function GET(req: Request) {
       ];
     }
 
-    await backfillColors();
-    // Self-healing: anyone who has since gone Alumni/Removed/Deceased comes off
-    // the rosters here, so a stale entry disappears the next time the directory
-    // is opened rather than needing a migration.
-    await pruneInactiveCommitteeMembers();
-
-    const committees = await Committee.find(filter)
-      .populate("committeeHeadId", "fName lName rollNo")
-      .populate("committeeMembers", "fName lName rollNo")
-      .lean();
+    // Backfill, self-healing prune and populate: `lib/committeeQueries.ts`,
+    // shared with the MCP server.
+    const committees = await listCommittees(filter);
 
     return NextResponse.json(committees, { status: 200 });
   } catch (err: any) {

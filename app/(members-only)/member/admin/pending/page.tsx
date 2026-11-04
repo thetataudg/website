@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { connectDB } from "@/lib/db";
 import PendingMember from "@/lib/models/PendingMember";
 import Member from "@/lib/models/Member";
@@ -57,12 +58,17 @@ interface PendingRequest {
 
 export default async function PendingPage() {
   const { userId } = await auth();
-  if (!userId) throw new Error("Unauthenticated");
+  // A session that lapsed between the middleware check and this render (an old
+  // tab, a cookie that aged out) used to throw here, which Next reports to
+  // Sentry as an unhandled server error (WEBSITE-G). It's an ordinary signed-out
+  // visit, so send them to sign in and bring them back afterwards.
+  if (!userId) redirect("/sign-in?redirect_url=/member/admin/pending");
 
   await connectDB();
   const user = await Member.findOne({ clerkId: userId });
   if (!user || !["superadmin", "admin"].includes(user.role)) {
-    throw new Error("Unauthorized");
+    // Same reasoning: a non-officer opening this URL is a refusal, not a crash.
+    redirect("/member");
   }
 
   const rawRequests = await PendingMember.find({ status: "pending" }).lean();

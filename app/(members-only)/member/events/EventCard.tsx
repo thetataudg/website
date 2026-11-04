@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   MapPin,
+  Pencil,
   Play,
   QrCode,
   Square,
@@ -87,7 +88,8 @@ export function EventCard({
   onStart,
   onCancel,
   onEnd,
-  onViewAttendance,
+  onEdit,
+  onAttendance,
 }: {
   event: EventItem;
   committeeLabel: string;
@@ -97,7 +99,10 @@ export function EventCard({
   onStart: () => void;
   onCancel: () => void;
   onEnd: () => void;
-  onViewAttendance: () => void;
+  /** Opens the editor. */
+  onEdit: () => void;
+  /** Opens the roll, which is editable, whatever the event's status. */
+  onAttendance: () => void;
 }) {
   const category =
     event.gemCategory && GEM_CATEGORY_LABELS[event.gemCategory as GemCategory]
@@ -191,12 +196,17 @@ export function EventCard({
             </>
           ) : null}
 
-          {event.status === "completed" ? (
-            <Button type="button" size="sm" variant="outline" onClick={onViewAttendance}>
-              <ClipboardList className="size-4" />
-              View attendance
-            </Button>
-          ) : null}
+          {/* Edit and the roll are offered whatever the status. Attendance is
+            * corrected long after an event ends (a dead phone, a paper sign-in),
+            * so a finished event is where the roll matters most. */}
+          <Button type="button" size="sm" variant="outline" onClick={onAttendance}>
+            <ClipboardList className="size-4" />
+            Attendance
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={onEdit}>
+            <Pencil className="size-4" />
+            Edit
+          </Button>
         </CardFooter>
       ) : null}
     </Card>

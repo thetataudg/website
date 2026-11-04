@@ -8,6 +8,25 @@ import * as Sentry from "@sentry/nextjs";
 /// them filled Sentry with refusals nobody ever saw.
 const STALE_TOKEN_REASONS = new Set(["token-expired", "token-not-active-yet"]);
 
+/// Clerk's middleware doesn't only say "token-expired". When the refresh it
+/// attempts can't happen it appends why, giving reasons like
+/// `session-token-expired-refresh-non-eligible-no-refresh-cookie`,
+/// `...-non-eligible-non-get`, `...-refresh_token_not_found` and
+/// `...-session_refresh_session_token_ineligible`. Exact-match on the two
+/// short names let all of those through, and they made up nearly every
+/// "API 401" Sentry issue (WEBSITE-D, E, J): an old tab, a cookie that aged
+/// out, or an API call from a client with no cookie to refresh. Each is a
+/// signed-out request the client answers by re-authenticating, not a bug.
+/// `session-token-and-uat-missing` (WEBSITE-C) is the same story for a
+/// request that arrived with no session at all.
+function isExpectedSignedOutReason(reason: string): boolean {
+  return (
+    STALE_TOKEN_REASONS.has(reason) ||
+    reason.startsWith("session-token-expired") ||
+    reason === "session-token-and-uat-missing"
+  );
+}
+
 /// Why Clerk's middleware decided the request was signed out, as it records
 /// on the request. Empty outside a request or when the middleware didn't run.
 function clerkAuthReason(): string {
@@ -33,7 +52,7 @@ export function apiErrorResponse(err: any) {
   // Crashes (5xx) already reach Sentry through `logger.error`.
   if (status === 401 || status === 403) {
     const reason = status === 401 ? clerkAuthReason() : "";
-    if (!STALE_TOKEN_REASONS.has(reason)) {
+    if (!isExpectedSignedOutReason(reason)) {
       Sentry.withScope((scope) => {
         if (reason) scope.setTag("clerk.auth_reason", reason);
         // One issue per kind of refusal, not one per route that happened to

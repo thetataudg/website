@@ -9,6 +9,20 @@ import { connectDB } from "@/lib/db";
 import Member from "@/lib/models/Member";
 import { holdsOffice } from "@/lib/officeMatch";
 
+/// The permission itself, apart from the request: admins and E-Council. The
+/// MCP server holds a member it already authenticated rather than a request,
+/// so the rule is a function both can call.
+export function canManageDues(viewer: {
+  role?: string | null;
+  isECouncil?: boolean | null;
+}): boolean {
+  return (
+    viewer.role === "admin" ||
+    viewer.role === "superadmin" ||
+    Boolean(viewer.isECouncil)
+  );
+}
+
 /// Dues are E-Council business — the treasurer sits on E-Council, and admins
 /// cover for them.
 ///
@@ -26,11 +40,7 @@ export async function requireTreasury(req: Request) {
     err.statusCode = 404;
     throw err;
   }
-  const privileged =
-    viewer.role === "admin" ||
-    viewer.role === "superadmin" ||
-    Boolean(viewer.isECouncil);
-  if (!privileged) {
+  if (!canManageDues(viewer)) {
     const err: any = new Error("Forbidden");
     err.statusCode = 403;
     throw err;

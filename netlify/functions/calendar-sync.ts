@@ -2,7 +2,7 @@ import type { Handler } from "@netlify/functions";
 import { connectDB } from "../../lib/db";
 import logger from "../../lib/logger";
 import { syncAllEvents } from "../../lib/calendar";
-import { autoCompleteStaleEvents } from "../../lib/eventLifecycle";
+import { advanceEventLifecycle } from "../../lib/eventLifecycle";
 import { remindUpcomingEvents } from "../../lib/eventNotify";
 
 export const config = {
@@ -25,10 +25,11 @@ const formatSummary = (results: { status: string }[]) => {
 export const handler: Handler = async () => {
   try {
     await connectDB();
-    // Rides along with the sync rather than taking a schedule of its own: this
-    // already runs every ten minutes, which is far finer than the three-hour
-    // grace period the sweep works to.
-    const closed = await autoCompleteStaleEvents();
+    // Rides along with the sync rather than taking a schedule of its own. The
+    // self-hosted server runs the same function every minute from
+    // instrumentation.ts; this is the backstop for a Netlify deploy, and the
+    // two are safe together because every transition is a conditional update.
+    const closed = await advanceEventLifecycle();
     // Also rides along here. The half-hour warning wants a tick well inside
     // its own lead time, and ten minutes is the finest schedule already
     // running; a second scheduled function for one query would be a whole

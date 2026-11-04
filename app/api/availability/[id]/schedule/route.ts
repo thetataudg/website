@@ -50,9 +50,11 @@ export async function POST(
     return NextResponse.json({ event }, { status: 201 });
   } catch (err: any) {
     logger.error({ err }, "Failed to schedule from availability poll");
-    const status = /valid|already has an event/i.test(err.message || "")
-      ? 400
-      : 403;
+    // `RecurrenceError` carries its own 400; the rest are told apart by text.
+    const status =
+      err.statusCode === 400 || /valid|already has an event/i.test(err.message || "")
+        ? 400
+        : 403;
     return NextResponse.json({ error: err.message }, { status });
   }
 }

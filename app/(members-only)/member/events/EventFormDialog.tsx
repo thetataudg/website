@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, TriangleAlert, X } from "lucide-react";
+import { Loader2, Trash2, TriangleAlert, X } from "lucide-react";
 
 import {
   AlertDialog,
@@ -39,7 +39,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { GEM_CATEGORIES, GEM_CATEGORY_LABELS } from "@/lib/gem";
-import { toArizonaInputValue, toArizonaIso } from "@/lib/recurrence";
+import { toArizonaDateTime, toArizonaInputValue, toArizonaIso } from "@/lib/recurrence";
 
 import type {
   Committee,
@@ -82,7 +82,6 @@ export interface EventFormValues {
   recurrenceFrequency: string;
   recurrenceInterval: string;
   recurrenceEndDate: string;
-  recurrenceCount: string;
 }
 
 function blankForm(defaults?: Partial<EventFormValues>): EventFormValues {
@@ -107,16 +106,15 @@ function blankForm(defaults?: Partial<EventFormValues>): EventFormValues {
     recurrenceFrequency: "weekly",
     recurrenceInterval: "1",
     recurrenceEndDate: "",
-    recurrenceCount: "1",
     ...defaults,
   };
 }
 
 function toDateInputValue(value: string | Date): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  // The day in Arizona, not the browser's zone: the server stores the end
+  // date as the last moment of that Arizona day, which an officer travelling
+  // in another zone would otherwise see as the day after.
+  return toArizonaDateTime(new Date(value))?.toFormat("yyyy-MM-dd") ?? "";
 }
 
 function formFor(event: any, defaults?: Partial<EventFormValues>): EventFormValues {
@@ -148,7 +146,6 @@ function formFor(event: any, defaults?: Partial<EventFormValues>): EventFormValu
     recurrenceEndDate: event.recurrence?.endDate
       ? toDateInputValue(event.recurrence.endDate)
       : event.recurrenceEndDate || "",
-    recurrenceCount: String(event.recurrence?.count || 1),
     ...defaults,
   };
 }
@@ -161,6 +158,7 @@ export function EventFormDialog({
   fixedCommitteeId,
   allowChapterWide = true,
   canChangeCommittee = true,
+  onDelete,
   onSaved,
 }: {
   open: boolean;
@@ -171,7 +169,14 @@ export function EventFormDialog({
   /** Pins every event this form makes to one committee. */
   fixedCommitteeId?: string | null;
   allowChapterWide?: boolean;
+  /**
+   * Whether the committee on an existing event may be changed. The server
+   * refuses any `committeeId` from a non-admin, so when this is false the key
+   * is left out of the request altogether rather than sent unchanged.
+   */
   canChangeCommittee?: boolean;
+  /** Offered on an existing event the viewer is allowed to delete. */
+  onDelete?: (event: any) => void;
   onSaved: (event: EventItem, appliedToSeries: boolean) => Promise<void> | void;
 }) {
   const editing = !!event?._id;
@@ -193,17 +198,22 @@ export function EventFormDialog({
     const pinned = fixedCommitteeId
       ? committees.find((committee) => committee._id === fixedCommitteeId)
       : null;
+    // Somebody who can only schedule for one committee has nothing to choose.
+    const onlyCommittee =
+      !allowChapterWide && !fixedCommitteeId && committees.length === 1
+        ? committees[0]._id
+        : "";
     setForm(
       event
         ? formFor(event, fixedCommitteeId ? { committeeId: fixedCommitteeId } : undefined)
         : blankForm({
-            committeeId: fixedCommitteeId ?? "",
+            committeeId: fixedCommitteeId ?? onlyCommittee,
             eventType: fixedCommitteeId ? "meeting" : "event",
             gemCategory: fixedCommitteeId ? "committee-meeting" : "",
             name: pinned ? `${pinned.name} meeting` : "",
           })
     );
-  }, [open, event, fixedCommitteeId, committees]);
+  }, [open, event, fixedCommitteeId, committees, allowChapterWide]);
 
   const set = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -217,6 +227,32 @@ export function EventFormDialog({
     if (editing && !scope && isRecurringSeries) {
       setSeriesPrompt(true);
       return;
+    }
+
+    // Anyone who cannot make chapter-wide events must name a committee; the
+    // server would refuse it, and "forbidden" is a poor way to say so.
+    if (!allowChapterWide && !form.chapterWide && !form.committeeId && !editing) {
+      setError("Choose which committee this event is for.");
+      return;
+    }
+
+    if (form.startTime && form.endTime && form.endTime <= form.startTime) {
+      setError("The event has to end after it starts.");
+      return;
+    }
+
+    // A repeating event is generated in full when it is saved, so the end
+    // date is what says how many there are. The server enforces the same
+    // rules; this is just the quick answer.
+    if (form.recurrenceEnabled) {
+      if (!form.recurrenceEndDate) {
+        setError("Choose the date this event stops repeating.");
+        return;
+      }
+      if (form.recurrenceEndDate <= form.startTime.slice(0, 10)) {
+        setError("The repeat end date has to be after the event starts.");
+        return;
+      }
     }
 
     setSaving(true);
@@ -240,11 +276,20 @@ export function EventFormDialog({
         frequency: form.recurrenceFrequency,
         interval: Number(form.recurrenceInterval) || 1,
         endDate: form.recurrenceEndDate || null,
-        count: Number(form.recurrenceCount) || 1,
       },
     };
-    if (editing) payload.applyToSeries = scope === "series" ? "series" : "single";
-    else payload.emailGroups = { actives: emailActives, alumni: emailAlumni && form.visibleToAlumni };
+    if (editing) {
+      payload.applyToSeries = scope === "series" ? "series" : "single";
+      // Only an admin may move an event between committees. The server answers
+      // a `committeeId` key from anybody else with a 403, even one that says
+      // nothing new, so for everyone else it is simply not part of the save.
+      // This is why every non-admin edit used to fail.
+      if (!canChangeCommittee) delete payload.committeeId;
+      // A status the person did not touch is not part of the save either: it
+      // would otherwise restate the status this form was opened with over
+      // whatever Start or End changed in the meantime.
+      if (form.status === (event.status || "scheduled")) delete payload.status;
+    } else payload.emailGroups = { actives: emailActives, alumni: emailAlumni && form.visibleToAlumni };
 
     try {
       const response = await fetch(editing ? `/api/events/${event._id}` : "/api/events", {
@@ -342,7 +387,9 @@ export function EventFormDialog({
                     <SelectValue placeholder="Select committee" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UNCATEGORIZED}>No committee</SelectItem>
+                    {allowChapterWide || form.chapterWide ? (
+                      <SelectItem value={UNCATEGORIZED}>No committee</SelectItem>
+                    ) : null}
                     {committees.map((committee) => (
                       <SelectItem key={committee._id} value={committee._id}>
                         {committee.name}
@@ -398,7 +445,7 @@ export function EventFormDialog({
                     set("startTime", next);
                     // An end before its start is never what anybody meant, so
                     // moving the start carries the end along by the same gap.
-                    if (!form.endTime || form.endTime < next) {
+                    if (!form.endTime || form.endTime <= next) {
                       const start = new Date(next);
                       if (!Number.isNaN(start.getTime())) {
                         start.setHours(start.getHours() + 1);
@@ -670,28 +717,16 @@ export function EventFormDialog({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="event-until">Ends on</Label>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="event-until">Repeat until</Label>
                   <DatePicker
                     id="event-until"
                     value={form.recurrenceEndDate}
                     onChange={(next) => set("recurrenceEndDate", next)}
-                    placeholder="No end date"
-                    clearable
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="event-count">Generate next</Label>
-                  <Input
-                    id="event-count"
-                    type="number"
-                    min={1}
-                    value={form.recurrenceCount}
-                    onChange={(change) => set("recurrenceCount", change.target.value)}
+                    placeholder="Choose an end date"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Creates this many occurrences now. More generate as events complete.
+                    Every occurrence up to this date is added now. Up to a year, 200 events.
                   </p>
                 </div>
               </div>
@@ -706,6 +741,18 @@ export function EventFormDialog({
             ) : null}
 
             <DialogFooter>
+              {editing && onDelete && event.canDelete !== false ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive sm:mr-auto"
+                  disabled={saving}
+                  onClick={() => onDelete(event)}
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+              ) : null}
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>

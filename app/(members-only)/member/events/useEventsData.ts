@@ -9,6 +9,7 @@ import {
   type CalendarSwatch,
 } from "@/lib/calendarColors";
 
+import { patchEventStatus } from "./eventActions";
 import { isPastEvent, resolveEventType, type Committee, type EventItem, type Me } from "./types";
 
 /**
@@ -19,20 +20,13 @@ import { isPastEvent, resolveEventType, type Committee, type EventItem, type Me 
  * permission rules, and no chance of the list and the calendar disagreeing
  * about whose event something is.
  */
-export function useEventsData() {
+export function useEventViewer(enabled = true) {
   const [me, setMe] = React.useState<Me | null>(null);
-  const [events, setEvents] = React.useState<EventItem[]>([]);
   const [committees, setCommittees] = React.useState<Committee[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const reload = React.useCallback(async () => {
-    const response = await fetch("/api/events?includePast=true");
-    if (!response.ok) throw new Error("Events could not be loaded.");
-    setEvents(await response.json());
-  }, []);
+  const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
+    if (!enabled) return;
     let active = true;
 
     fetch("/api/members/me")
@@ -48,39 +42,52 @@ export function useEventsData() {
         });
       })
       .catch(() => {
-        if (active) setMe(null);
+        if (active) {
+          setMe(null);
+          setReady(true);
+        }
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled]);
 
   React.useEffect(() => {
-    if (!me) return;
+    if (!enabled || !me) return;
     let active = true;
 
-    Promise.all([
-      fetch("/api/committees")
-        .then((response) => (response.ok ? response.json() : []))
-        .then((data) => {
-          if (active) setCommittees(data);
-        }),
-      reload(),
-    ])
-      .catch((err: Error) => {
-        if (active) setError(err.message);
+    fetch("/api/committees")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data) => {
+        if (active) setCommittees(data);
       })
+      .catch(() => undefined)
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setReady(true);
       });
 
     return () => {
       active = false;
     };
-  }, [me, reload]);
+  }, [enabled, me]);
 
   const isAdmin = me?.role === "admin" || me?.role === "superadmin";
+  const isOfficer = isAdmin || !!me?.isECouncil;
+
+  const headCommitteeIds = React.useMemo(
+    () =>
+      committees
+        .filter((committee) => {
+          const headId =
+            typeof committee.committeeHeadId === "string"
+              ? committee.committeeHeadId
+              : committee.committeeHeadId?._id;
+          return !!me?.memberId && headId === me.memberId;
+        })
+        .map((committee) => committee._id),
+    [committees, me?.memberId]
+  );
 
   const memberCommitteeIds = React.useMemo(
     () =>
@@ -99,6 +106,73 @@ export function useEventsData() {
         .map((committee) => committee._id),
     [committees, me?.memberId]
   );
+
+  /**
+   * Whose calendar this viewer may put something on. Officers get the chapter
+   * and every committee; anyone else only the committees they head or sit on,
+   * which is the rule the create route enforces and what the iOS "+" offers.
+   */
+  const schedulableCommittees = React.useMemo(
+    () =>
+      isOfficer
+        ? committees
+        : committees.filter((committee) => memberCommitteeIds.includes(committee._id)),
+    [isOfficer, committees, memberCommitteeIds]
+  );
+
+  /**
+   * Who gets a "New event" button. Matches the phone: officers and committee
+   * heads. A plain committee member could be let through by the server but is
+   * not offered it, so the two apps do not disagree about who can schedule.
+   */
+  const canCreate = isOfficer || headCommitteeIds.length > 0;
+
+  return {
+    me,
+    committees,
+    ready,
+    isAdmin,
+    isOfficer,
+    memberCommitteeIds,
+    headCommitteeIds,
+    schedulableCommittees,
+    canCreate,
+  };
+}
+
+export type EventViewer = ReturnType<typeof useEventViewer>;
+
+export function useEventsData() {
+  const viewer = useEventViewer();
+  const { me, committees, memberCommitteeIds, isAdmin } = viewer;
+  const [events, setEvents] = React.useState<EventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const reload = React.useCallback(async () => {
+    const response = await fetch("/api/events?includePast=true");
+    if (!response.ok) throw new Error("Events could not be loaded.");
+    setEvents(await response.json());
+  }, []);
+
+  React.useEffect(() => {
+    if (!me) return;
+    let active = true;
+
+    reload()
+      .catch((err: Error) => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setEventsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [me, reload]);
+
+  const loading = !viewer.ready || (!!me && eventsLoading);
 
   const committeeNames = React.useMemo(
     () => new Map(committees.map((committee) => [committee._id, committee.name])),
@@ -139,19 +213,11 @@ export function useEventsData() {
     [memberCommitteeIds]
   );
 
-  const canManage = React.useCallback(
-    (event: EventItem) => {
-      if (isAdmin || me?.isECouncil) return true;
-      if (!event.committeeId) return false;
-      const committee = committees.find((entry) => entry._id === event.committeeId);
-      const headId =
-        typeof committee?.committeeHeadId === "string"
-          ? committee?.committeeHeadId
-          : committee?.committeeHeadId?._id;
-      return headId === me?.memberId;
-    },
-    [isAdmin, me?.isECouncil, me?.memberId, committees]
-  );
+  /**
+   * The server's answer, not a local re-derivation of it: the list arrives
+   * with `canManage` on every event.
+   */
+  const canManage = React.useCallback((event: EventItem) => !!event.canManage, []);
 
   const canForceSync = !!me && (isAdmin || me.isCommitteeHead);
 
@@ -170,12 +236,7 @@ export function useEventsData() {
       status: string,
       applyToSeries: "single" | "series" = "single"
     ) => {
-      const response = await fetch(`/api/events/${eventId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, applyToSeries }),
-      });
-      if (!response.ok) return null;
+      if (!(await patchEventStatus(eventId, status, applyToSeries))) return null;
 
       await reload();
       return status === "completed" ? await fetchDetails(eventId) : null;
@@ -201,6 +262,7 @@ export function useEventsData() {
     me,
     events,
     committees,
+    viewer,
     loading,
     error,
     reload,

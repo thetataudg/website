@@ -17,6 +17,22 @@ export type ChapterToolSubmitter = {
   role?: string;
 };
 
+/// The permission itself, apart from the request, for callers that already hold
+/// an authenticated member (the MCP server). The database query below says the
+/// same thing as a filter; keep the two in step.
+export function isChapterToolSubmitter(member: {
+  role?: string | null;
+  isECouncil?: boolean | null;
+  ecouncilPosition?: string | null;
+}): boolean {
+  if (member.role === "admin" || member.role === "superadmin") return true;
+  return (
+    !!member.isECouncil &&
+    (member.ecouncilPosition === "Regent" ||
+      member.ecouncilPosition === "Vice Regent")
+  );
+}
+
 /**
  * Admins as well as the two seats.
  *

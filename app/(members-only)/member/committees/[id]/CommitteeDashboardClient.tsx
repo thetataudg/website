@@ -5,7 +5,7 @@
 // controls; everyone else on the roster gets the read + their own grid.
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarPlus, Crown, Loader2, Users } from "lucide-react";
+import { ArrowLeft, CalendarPlus, ClipboardList, Crown, Loader2, Pencil, Users } from "lucide-react";
 import { DateTime } from "luxon";
 
 import {
@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { EventFormDialog } from "../../events/EventFormDialog";
+import { useEventManagement } from "../../events/useEventManagement";
 import CommitteeAttendance from "../CommitteeAttendance";
 import CommitteePolls from "../_polls/CommitteePolls";
 
@@ -41,7 +41,6 @@ export default function CommitteeDashboardClient({
   const [events, setEvents] = React.useState<any[]>([]);
   const [viewer, setViewer] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [scheduling, setScheduling] = React.useState(false);
 
   const loadEvents = React.useCallback(async () => {
     const res = await fetch(
@@ -66,6 +65,13 @@ export default function CommitteeDashboardClient({
       }
     })();
   }, [committeeId, loadEvents]);
+
+  // The dialogs for making, editing and taking the roll for this committee's
+  // events. New events are pinned to this committee.
+  const management = useEventManagement({
+    onChanged: loadEvents,
+    fixedCommitteeId: committeeId,
+  });
 
   const canManage = React.useMemo(() => {
     if (!viewer || !committee) return false;
@@ -117,7 +123,7 @@ export default function CommitteeDashboardClient({
         description={committee.description || undefined}
         actions={
           canManage ? (
-            <Button onClick={() => setScheduling(true)}>
+            <Button onClick={management.openCreate}>
               <CalendarPlus className="size-4" /> Schedule event
             </Button>
           ) : null
@@ -181,9 +187,29 @@ export default function CommitteeDashboardClient({
                         {e.location ? ` · ${e.location}` : ""}
                       </div>
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/member/events/${e._id}`}>Open</Link>
-                    </Button>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                      {e.canManage ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void management.openRoll(e._id)}
+                          >
+                            <ClipboardList className="size-4" /> Attendance
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void management.openEdit(e._id)}
+                          >
+                            <Pencil className="size-4" /> Edit
+                          </Button>
+                        </>
+                      ) : null}
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/member/events/${e._id}`}>Open</Link>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </li>
@@ -204,19 +230,7 @@ export default function CommitteeDashboardClient({
         <CommitteeAttendance committeeId={committeeId} />
       </section>
 
-      <EventFormDialog
-        open={scheduling}
-        onOpenChange={setScheduling}
-        event={null}
-        committees={[committee]}
-        fixedCommitteeId={committeeId}
-        allowChapterWide={false}
-        canChangeCommittee={false}
-        onSaved={async () => {
-          setScheduling(false);
-          await loadEvents();
-        }}
-      />
+      {management.dialogs}
     </PageContainer>
   );
 }
