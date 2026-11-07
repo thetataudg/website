@@ -7,7 +7,7 @@ import Committee from "@/lib/models/Committee";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { isCalendarColor, nextCalendarColor } from "@/lib/calendarColors";
-import { listCommittees } from "@/lib/committeeQueries";
+import { claimCommitteeFlag, listCommittees } from "@/lib/committeeQueries";
 
 export async function GET(req: Request) {
   try {
@@ -43,6 +43,8 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { name, description = "", committeeHeadId, committeeMembers = [], color } = body;
+    const isTechCommittee = body.isTechCommittee === true;
+    const isRushCommittee = body.isRushCommittee === true;
 
     if (!name || typeof name !== "string") {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -64,7 +66,11 @@ export async function POST(req: Request) {
       committeeMembers,
       events: [],
       color: assigned,
+      isTechCommittee,
+      isRushCommittee,
     });
+    if (isTechCommittee) await claimCommitteeFlag(committee._id, "isTechCommittee");
+    if (isRushCommittee) await claimCommitteeFlag(committee._id, "isRushCommittee");
 
     if (committeeHeadId) {
       await Member.findByIdAndUpdate(committeeHeadId, {

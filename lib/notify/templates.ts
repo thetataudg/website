@@ -72,6 +72,23 @@ export const TRANSACTIONAL_TEMPLATES = [
   "availability_reminder",
   "availability_final_call",
   "availability_closed",
+  // Committee task tracker and bug reports. Transactional because the
+  // reminder cooldown is keyed on the template alone: assigning someone two
+  // tasks in a day would otherwise deliver the first and mute the second.
+  // `lib/tasks/cron.ts` owns the real cadence through `reminderState`.
+  "task_assigned",
+  "task_unassigned",
+  "task_mentioned",
+  "task_commented",
+  "task_status_changed",
+  "task_due_soon",
+  "task_overdue",
+  "task_stale",
+  "task_digest",
+  "bug_received",
+  "bug_status_changed",
+  "bug_reply",
+  "bug_new",
 ] as const;
 
 export type ReminderTemplate = (typeof REMINDER_TEMPLATES)[number];
@@ -124,6 +141,27 @@ export interface TemplateContext {
   deadlineLabel?: string;
   respondedCount?: number;
   inviteeCount?: number;
+  /// Task tracker. `taskPath` is the site-relative link, prebuilt by the
+  /// caller; `dueLabel` (above) carries the Phoenix-formatted due date.
+  taskKey?: string;
+  taskTitle?: string;
+  taskPath?: string;
+  taskStatusLabel?: string;
+  staleDays?: number;
+  committeeName?: string;
+  commentExcerpt?: string;
+  /// Bug reports. `bugRef` is "TTDG-R2741".
+  bugRef?: string;
+  bugTitle?: string;
+  bugStatusLabel?: string;
+  /// The public status key ("triaged", "wont_fix"...), for the sentence.
+  bugStatus?: string;
+  bugSeverityLabel?: string;
+  /// Weekly digest: counts for the headline and one line per item.
+  digestOverdue?: number;
+  digestStale?: number;
+  digestDone?: number;
+  digestLines?: string[];
 }
 
 export interface RenderedMessage {
@@ -135,7 +173,7 @@ export interface RenderedMessage {
   push: string;
   emailSubject: string;
   link: string;
-  category: "dues" | "reimbursement" | "plan" | "event" | "availability" | "general" | "mail";
+  category: "dues" | "reimbursement" | "plan" | "event" | "availability" | "general" | "mail" | "tasks" | "bugs";
   /// What the email's button says. Optional, and usually left unset: the
   /// wording is derived from `link` by `ctaLabelFor` so the button can never
   /// promise somewhere it does not go. Set it only when the action deserves
@@ -187,6 +225,8 @@ const DUES_PAGE_LABELS: Record<RenderedMessage["category"], string> = {
   availability: "Open your dues",
   general: "Open your dues",
   mail: "Open your dues",
+  tasks: "Open your dues",
+  bugs: "Open your dues",
 };
 
 /// Most specific path first, since these are prefix matches and
@@ -208,6 +248,9 @@ const CTA_BY_PATH: ReadonlyArray<readonly [string, string]> = [
   ["/member/gem", "Open your GEM standing"],
   ["/member/profile", "Open your profile"],
   ["/member/mail", "Open Chapter Mail"],
+  ["/member/tech", "Open task"],
+  ["/member/rush", "Open the rush editor"],
+  ["/report", "View report"],
   ["/member", "Open the portal"],
 ] as const;
 
@@ -222,6 +265,8 @@ const CTA_BY_CATEGORY: Record<RenderedMessage["category"], string> = {
   availability: "Open the poll",
   general: "Open the portal",
   mail: "Open Chapter Mail",
+  tasks: "Open task",
+  bugs: "View report",
 };
 
 export function ctaLabelFor(
@@ -239,6 +284,17 @@ export function ctaLabelFor(
   }
   return CTA_BY_CATEGORY[message.category] ?? "Open the portal";
 }
+
+/// How each report status reads in a notification. No em dashes.
+const BUG_STATUS_SENTENCE: Record<string, { headline: string; detail: string }> = {
+  received: { headline: "was received", detail: "was received. We will take a look soon." },
+  triaged: { headline: "was accepted", detail: "was accepted and added to our to-do list." },
+  in_progress: { headline: "is being worked on", detail: "is being worked on now." },
+  fixed: { headline: "has been fixed", detail: "has been fixed. Reopen it if you still see the problem." },
+  wont_fix: { headline: "won't be fixed", detail: "won't be fixed for now. The report has the details." },
+  duplicate: { headline: "was merged with another report", detail: "was merged with another report. You will get updates from that one." },
+  closed_by_reporter: { headline: "was closed", detail: "was closed." },
+};
 
 export function renderTemplate(
   template: NotifyTemplate,
@@ -264,7 +320,182 @@ export function renderTemplate(
   // to the committees dashboard.
   const pollLink = context.pollPath || "/member/committees";
 
+  // Task tracker and bug report copy. House style: plain, short, no em dashes.
+  const taskKey = context.taskKey || "A task";
+  const taskTitle = context.taskTitle || "";
+  const taskName = taskTitle ? `${taskKey}: ${taskTitle}` : taskKey;
+  const taskPath = context.taskPath || "/member/tech";
+  const actor = context.actorName || "Someone";
+  const bugRef = context.bugRef || "your report";
+  const bugPath = context.bugRef ? `/report/${encodeURIComponent(context.bugRef)}` : "/report";
+
   switch (template) {
+    case "task_assigned":
+      return {
+        title: `${actor} assigned you ${taskKey}`,
+        body: `${actor} assigned you ${taskName}.${context.dueLabel ? ` It is due ${context.dueLabel}.` : ""}`,
+        push: `${actor} assigned you ${taskName}`,
+        emailSubject: `${taskKey} assigned to you: ${taskTitle}`.trim(),
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+
+    case "task_unassigned":
+      return {
+        title: `You were taken off ${taskKey}`,
+        body: `${actor} took you off ${taskName}. Nothing else is needed from you on it.`,
+        push: `You were taken off ${taskKey}`,
+        emailSubject: `You were taken off ${taskKey}`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+
+    case "task_mentioned":
+      return {
+        title: `${actor} mentioned you on ${taskKey}`,
+        body: context.commentExcerpt
+          ? `${actor} mentioned you on ${taskName}: "${context.commentExcerpt}"`
+          : `${actor} mentioned you on ${taskName}.`,
+        push: `${actor} mentioned you on ${taskKey}${context.commentExcerpt ? `: ${context.commentExcerpt}` : ""}`.slice(0, 118),
+        emailSubject: `${actor} mentioned you on ${taskKey}`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+
+    case "task_commented":
+      return {
+        title: `New comment on ${taskKey}`,
+        body: context.commentExcerpt
+          ? `${actor} commented on ${taskName}: "${context.commentExcerpt}"`
+          : `${actor} commented on ${taskName}.`,
+        push: `${actor} on ${taskKey}${context.commentExcerpt ? `: ${context.commentExcerpt}` : ""}`.slice(0, 118),
+        emailSubject: `New comment on ${taskKey}`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+
+    case "task_status_changed": {
+      const review = context.taskStatusLabel === "In review";
+      return {
+        title: review ? `${taskKey} is ready for review` : `${taskKey} is now ${context.taskStatusLabel || "updated"}`,
+        body: review
+          ? `${actor} moved ${taskName} to In review.`
+          : `${actor} moved ${taskName} to ${context.taskStatusLabel || "a new status"}.`,
+        push: review ? `${taskKey} is ready for review` : `${taskKey} is now ${context.taskStatusLabel || "updated"}`,
+        emailSubject: review ? `${taskKey} is ready for review` : `${taskKey} is now ${context.taskStatusLabel || "updated"}`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+    }
+
+    case "task_due_soon":
+      return {
+        title: `${taskKey} is due ${context.dueLabel || "soon"}`,
+        body: `${taskName} is due ${context.dueLabel || "soon"}.`,
+        push: `${taskKey} is due ${context.dueLabel || "soon"}`,
+        emailSubject: `${taskKey} is due ${context.dueLabel || "soon"}`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+
+    case "task_overdue":
+      return {
+        title: `${taskKey} is overdue`,
+        body: `${taskName} was due ${context.dueLabel || "recently"}. Update it, or move the date if the plan changed.`,
+        push: `${taskKey} was due ${context.dueLabel || "recently"}`,
+        emailSubject: `${taskKey} is overdue`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+
+    case "task_stale": {
+      const days = context.staleDays ?? 0;
+      const status = (context.taskStatusLabel || "in progress").toLowerCase();
+      return {
+        title: `Still on ${taskKey}?`,
+        body: `${taskName} has been ${status} for ${days} days with no updates. Post a quick comment or move it so the committee knows where it stands.`,
+        push: `${taskKey} has been ${status} for ${days} days. Still on it?`,
+        emailSubject: `Still on ${taskKey}?`,
+        link: taskPath,
+        category: "tasks",
+        pushThreadId: context.taskKey ? `task:${context.taskKey}` : undefined,
+      };
+    }
+
+    case "task_digest": {
+      const who = context.committeeName || "Committee";
+      const summary = `${context.digestOverdue ?? 0} overdue, ${context.digestStale ?? 0} stale, ${context.digestDone ?? 0} done`;
+      const lines = context.digestLines?.length ? context.digestLines : ["Nothing overdue, stale or unassigned."];
+      return {
+        title: `${who} weekly: ${summary}`,
+        body: `${who} this week: ${summary}.`,
+        push: `${who} weekly: ${summary}`,
+        emailSubject: `${who} weekly: ${summary}`,
+        link: "/member/tech/team",
+        category: "tasks",
+        email: { paragraphs: [`${who} this week: ${summary}.`, ...lines], align: "left" },
+      };
+    }
+
+    case "bug_received":
+      return {
+        title: `We got your report ${bugRef}`,
+        body: `Thanks for reporting "${context.bugTitle || "the problem"}". The Technology committee will take a look, and you will hear here when it moves.`,
+        push: `We got your report ${bugRef}`,
+        emailSubject: `We got your report ${bugRef}`,
+        link: bugPath,
+        category: "bugs",
+        pushThreadId: context.bugRef ? `bug:${context.bugRef}` : undefined,
+      };
+
+    case "bug_status_changed": {
+      // A sentence per status: "is now Won't fix" read badly.
+      const said = BUG_STATUS_SENTENCE[context.bugStatus || ""] ?? {
+        headline: `has an update`,
+        detail: "has an update.",
+      };
+      return {
+        title: `Your report ${bugRef} ${said.headline}`,
+        body: `"${context.bugTitle || "Your report"}" ${said.detail}`,
+        push: `Your report ${bugRef} ${said.headline}`,
+        emailSubject: `Your report ${bugRef} ${said.headline}`,
+        link: bugPath,
+        category: "bugs",
+        pushThreadId: context.bugRef ? `bug:${context.bugRef}` : undefined,
+      };
+    }
+
+    case "bug_reply":
+      return {
+        title: `The Technology committee replied to ${bugRef}`,
+        body: context.commentExcerpt
+          ? `New reply on "${context.bugTitle || "your report"}": "${context.commentExcerpt}"`
+          : `There is a new reply on "${context.bugTitle || "your report"}".`,
+        push: `The Technology committee replied to ${bugRef}`,
+        emailSubject: `New reply on ${bugRef}`,
+        link: bugPath,
+        category: "bugs",
+        pushThreadId: context.bugRef ? `bug:${context.bugRef}` : undefined,
+      };
+
+    case "bug_new":
+      return {
+        title: `New bug report: ${context.bugTitle || bugRef}`,
+        body: `${context.memberName || "A member"} reported "${context.bugTitle || "a problem"}"${context.bugSeverityLabel ? ` (${context.bugSeverityLabel})` : ""}. It is waiting in Triage.`,
+        push: `New bug report: ${context.bugTitle || bugRef}`.slice(0, 118),
+        emailSubject: `New bug report ${bugRef}: ${context.bugTitle || ""}`.trim(),
+        link: "/member/tech/triage",
+        category: "bugs",
+        pushThreadId: context.bugRef ? `bug:${context.bugRef}` : undefined,
+      };
+
     case "assigned":
       return {
         title: "Your semester dues",

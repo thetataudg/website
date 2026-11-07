@@ -27,7 +27,7 @@ import { APP_STORE_APP_ID, APP_STORE_URL } from "@/lib/appleAppSiteAssociation";
 export const MINIMUM_IOS_VERSION = "1.0";
 
 /** The newest build shipped. Advisory: the app does not block on this. */
-export const LATEST_IOS_VERSION = "2.0";
+export const LATEST_IOS_VERSION = "5.0";
 
 /** Dotted numeric, one to four components. "1", "1.2", "1.2.3" all pass. */
 export function isValidVersionString(value: unknown): boolean {

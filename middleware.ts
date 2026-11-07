@@ -17,5 +17,9 @@ export default clerkMiddleware({ clockSkewInMs: 5 * 60_000 });
 export const config = {
   matcher: [
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // API routes always run through Clerk, even when the path ends in a file
+    // extension (report screenshots are `/api/report/.../x.webp`); without
+    // this the route sees no session and answers "Sign in".
+    '/(api|trpc)(.*)',
   ],
 };

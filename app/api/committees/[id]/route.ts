@@ -8,7 +8,7 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import logger from "@/lib/logger";
 import { isCalendarColor } from "@/lib/calendarColors";
-import { loadCommittee } from "@/lib/committeeQueries";
+import { claimCommitteeFlag, loadCommittee } from "@/lib/committeeQueries";
 
 async function updateHeadFlags(oldHeadId?: string | null, newHeadId?: string | null, committeeId?: string) {
   if (newHeadId) {
@@ -74,7 +74,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         : [];
     }
 
+    // Officers only (this route is behind requireOfficer), so a committee
+    // head can never flip these on their own committee.
+    if (typeof updates.isTechCommittee === "boolean") {
+      committee.isTechCommittee = updates.isTechCommittee;
+    }
+    if (typeof updates.isRushCommittee === "boolean") {
+      committee.isRushCommittee = updates.isRushCommittee;
+    }
+
     await committee.save();
+    if (committee.isTechCommittee) await claimCommitteeFlag(committee._id, "isTechCommittee");
+    if (committee.isRushCommittee) await claimCommitteeFlag(committee._id, "isRushCommittee");
 
     const newHeadId = committee.committeeHeadId?.toString();
     await updateHeadFlags(oldHeadId, newHeadId, committee._id.toString());

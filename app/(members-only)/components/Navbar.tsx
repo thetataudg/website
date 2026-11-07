@@ -46,6 +46,9 @@ type UserData = {
   needsPermissionReview?: boolean;
   pending?: boolean;
   pendingStatus?: string;
+  /// Capability flags from /api/members/me. Cosmetic: every route re-checks.
+  canEditRushPage?: boolean;
+  techCommitteeId?: string | null;
 };
 
 type Committee = {
@@ -172,6 +175,8 @@ export default function MemberNavbar() {
           needsPermissionReview: data.needsPermissionReview ?? false,
           pending: isPending,
           pendingStatus: data.pendingStatus,
+          canEditRushPage: Boolean(data.canEditRushPage),
+          techCommitteeId: data.techCommitteeId ?? null,
         });
       } catch (error) {
         console.error("Navbar: Fetch error:", error);
@@ -276,6 +281,8 @@ export default function MemberNavbar() {
   // Account, deletion and email requests waiting for an admin.
   const pendingRequests = usePendingRequestCount(isAdmin);
   const canSeeGem = Boolean(userData?.memberId);
+  const canEditRushPage = Boolean(userData?.canEditRushPage);
+  const canSeeTech = Boolean(userData?.techCommitteeId);
   /* Admin is a single link now, not a dropdown. Admins land on the roster (the
    * tab strip there covers everything, GEM included); E-Council members who are
    * not admins get no tab strip, so they go straight to the one admin page they
@@ -392,26 +399,50 @@ export default function MemberNavbar() {
         label: "Dues",
         href: "/member/dues",
         active: isActive("/member/dues"),
+      }
+    );
+
+    if (canSeeTech) {
+      items.push({
+        key: "tech",
+        label: "Tech",
+        href: "/member/tech",
+        active: isActive("/member/tech"),
+      });
+    }
+
+    const moreChildren: NavChild[] = [
+      { key: "more-mail", label: "Chapter Mail", href: "/member/mail", count: mailUnread },
+    ];
+    if (canEditRushPage) {
+      moreChildren.push({ key: "more-rush", label: "Rush Page", href: "/member/rush" });
+    }
+    moreChildren.push(
+      {
+        key: "more-report",
+        label: "Report a problem",
+        href: `/report?from=${encodeURIComponent(pathname || "/member")}`,
       },
+      {
+        key: "more-merch",
+        label: "Merchandise",
+        // Relative on purpose: /2dg4u is a redirect this app owns (see
+        // next.config.mjs). Hardcoding the old apex sent members through an
+        // extra cross-domain hop after the move to ttdg.org.
+        href: "/2dg4u",
+        external: true,
+        separatorBefore: true,
+      }
+    );
+
+    items.push(
       {
         key: "more",
         label: "More",
         href: "#",
         active: false,
         badge: mailUnread > 0,
-        children: [
-          { key: "more-mail", label: "Chapter Mail", href: "/member/mail", count: mailUnread },
-          {
-            key: "more-merch",
-            label: "Merchandise",
-            // Relative on purpose: /2dg4u is a redirect this app owns (see
-            // next.config.mjs). Hardcoding the old apex sent members through an
-            // extra cross-domain hop after the move to ttdg.org.
-            href: "/2dg4u",
-            external: true,
-            separatorBefore: true,
-          },
-        ],
+        children: moreChildren,
       }
     );
 
@@ -428,6 +459,9 @@ export default function MemberNavbar() {
     canSeeCommitteeEvents,
     canSeeGem,
     mailUnread,
+    canEditRushPage,
+    canSeeTech,
+    pathname,
   ]);
 
   /* Overflow measurement. The nav track is `flex-1 min-w-0`, so its width comes

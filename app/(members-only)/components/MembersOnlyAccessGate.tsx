@@ -39,7 +39,15 @@ export default function MembersOnlyAccessGate({
   useEffect(() => {
     if (!isLoaded || isSignedIn || !checkedRevoke) return;
     const reason = revokeNotice ? "session-revoked" : "session-expired";
-    router.replace(`/sign-in?logout=${reason}`);
+    // Carry the page they were opening (a notification link, a shared task
+    // link) so sign-in lands them back on it. Same-origin paths only; the
+    // sign-in page re-checks this before honouring it.
+    const here = `${window.location.pathname}${window.location.search}`;
+    const params = new URLSearchParams({ logout: reason });
+    if (here.startsWith("/") && !here.startsWith("//") && here !== "/member") {
+      params.set("redirect_url", here);
+    }
+    router.replace(`/sign-in?${params.toString()}`);
   }, [isLoaded, isSignedIn, checkedRevoke, revokeNotice, router]);
 
   // Membership status only matters for someone who is actually signed in.

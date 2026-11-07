@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-type Topic = "mail" | "notification";
+export type Topic = "mail" | "notification" | "tasks";
 
 /// One EventSource per tab, however many components listen. The bell, the
 /// navbar and the inbox all want the same stream, and three connections per
@@ -13,7 +13,7 @@ let source: EventSource | null = null;
 function ensureSource() {
   if (source || typeof window === "undefined" || !("EventSource" in window)) return;
   source = new EventSource("/api/live");
-  (["mail", "notification"] as Topic[]).forEach((topic) => {
+  (["mail", "notification", "tasks"] as Topic[]).forEach((topic) => {
     source!.addEventListener(topic, () => listeners.get(topic)?.forEach((fn) => fn()));
   });
   // After a dropped connection nothing was delivered in between, so refetch
@@ -32,11 +32,12 @@ function releaseSource() {
 }
 
 /// Calls `onChange` whenever the server says `topic` changed for this member.
-export function useLive(topic: Topic, onChange: () => void) {
+export function useLive(topic: Topic | null, onChange: () => void) {
   const latest = useRef(onChange);
   latest.current = onChange;
 
   useEffect(() => {
+    if (!topic) return;
     const fn = () => latest.current();
     if (!listeners.has(topic)) listeners.set(topic, new Set());
     listeners.get(topic)!.add(fn);

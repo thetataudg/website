@@ -8,6 +8,9 @@ import logger from "@/lib/logger";
 import { normalizePhone } from "@/lib/phone";
 import { maybePresignUrl } from "@/lib/garage";
 import { markWalletPassUpdatedForMember } from "@/lib/walletPassStore";
+import { getRushCommittee, getTechCommittee } from "@/lib/committeeQueries";
+import { canEditRushPageWith } from "@/lib/rush/permissions";
+import { canManageTracker, canViewTracker } from "@/lib/tasks/permissions";
 
 export const runtime = "nodejs";
 
@@ -60,6 +63,13 @@ export async function GET(req: Request) {
 
     if (member && !Array.isArray(member)) {
         logger.info({ clerkId, rollNo: member.rollNo }, "Member/me GET successful");
+        // Capability flags for the navbar. Cosmetic only: every route that
+        // acts on them re-checks on the server.
+        const [techCommittee, rushCommittee] = await Promise.all([
+          getTechCommittee(),
+          getRushCommittee(),
+        ]);
+        const canViewTech = canViewTracker(member, techCommittee);
         return NextResponse.json(
             {
                 memberId: member._id?.toString(),
@@ -83,6 +93,9 @@ export async function GET(req: Request) {
                 discordId: member.discordId || null,
                 accountDeletionRequested: Boolean(member.accountDeletionRequestedAt),
                 accountDeletionRequestedAt: member.accountDeletionRequestedAt?.toISOString(),
+                canEditRushPage: canEditRushPageWith(member, rushCommittee),
+                techCommitteeId: canViewTech && techCommittee ? String(techCommittee._id) : null,
+                canManageTech: canManageTracker(member, techCommittee),
             },
             { status: 200 }
         );

@@ -155,7 +155,7 @@ export default function MinimumVersionModal({ show, canSubmit, onClose }: Props)
                 setConfirmBlocking(0);
                 setSaved(false);
               }}
-              placeholder="2.0"
+              placeholder="5.0"
               inputMode="decimal"
               disabled={!canSubmit}
             />

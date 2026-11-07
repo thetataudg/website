@@ -9,6 +9,13 @@ import Event from "@/lib/models/Event";
 import Member from "@/lib/models/Member";
 import { buildICS, verifyFeedToken } from "@/lib/calendarFeed";
 import logger from "@/lib/logger";
+import Committee from "@/lib/models/Committee";
+import Task from "@/lib/models/Task";
+import { OPEN_STATUSES } from "@/lib/tasks/constants";
+import { taskEventBlock } from "@/lib/tasks/ics";
+import { taskKey } from "@/lib/tasks/logic";
+import { taskPath } from "@/lib/tasks/notifyTasks";
+import { absoluteUrl } from "@/lib/siteUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +46,12 @@ export async function GET(req: Request) {
     };
 
     const events = await Event.find(filter).sort({ startTime: 1 }).lean();
-    const body = buildICS(events as any[]);
+    const taskBlocks = await taskBlocksFor(memberId).catch((err) => {
+      // Tasks are extra; a failure here must not cost the member their events.
+      logger.warn({ err }, "Calendar feed skipped tasks");
+      return [] as string[][];
+    });
+    const body = buildICS(events as any[], undefined, taskBlocks);
 
     return new NextResponse(body, {
       status: 200,
@@ -53,4 +65,36 @@ export async function GET(req: Request) {
     logger.error({ err }, "Failed to build calendar feed");
     return new NextResponse("Failed to build calendar feed", { status: 500 });
   }
+}
+
+/// Open tasks assigned to this member that have a due date.
+async function taskBlocksFor(memberId: string): Promise<string[][]> {
+  const tasks = await Task.find({
+    assigneeIds: memberId,
+    status: { $in: OPEN_STATUSES },
+    archivedAt: null,
+    dueAt: { $ne: null },
+  })
+    .select("committeeId number code title dueAt dueAllDay updatedAt")
+    .lean<any[]>();
+  if (!tasks.length) return [];
+  const committees = await Committee.find({ _id: { $in: tasks.map((t) => t.committeeId) } })
+    .select("name taskPrefix isTechCommittee")
+    .lean<any[]>();
+  const byId = new Map(committees.map((c) => [String(c._id), c]));
+  return tasks.flatMap((t) => {
+    const committee = byId.get(String(t.committeeId));
+    if (!committee) return [];
+    return [
+      taskEventBlock({
+        id: String(t._id),
+        key: taskKey(t),
+        title: t.title,
+        dueAt: t.dueAt,
+        dueAllDay: t.dueAllDay !== false,
+        url: absoluteUrl(taskPath(t, committee)),
+        updatedAt: t.updatedAt,
+      }),
+    ];
+  });
 }

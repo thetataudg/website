@@ -39,6 +39,9 @@ const CATEGORY_COLOR: Record<string, number> = {
   event: 0x005f73,
   availability: 0x3f8f76,
   general: 0x7a0104,
+  // Brand gold for the task tracker, a muted red for bug reports.
+  tasks: 0xc9a227,
+  bugs: 0xa4443f,
 };
 
 function botToken(): string | null {

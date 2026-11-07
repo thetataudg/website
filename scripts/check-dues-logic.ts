@@ -345,6 +345,8 @@ for (const template of [
     availability: "Open your dues",
     general: "Open your dues",
     mail: "Open your dues",
+    tasks: "Open your dues",
+    bugs: "Open your dues",
   }[rendered.category]);
 }
 

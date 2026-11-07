@@ -64,3 +64,24 @@ export async function loadCommittee(id: string) {
     .populate("events", "name startTime endTime status")
     .lean();
 }
+
+/// The committee flagged `isTechCommittee`, or null. Never matched by name.
+export async function getTechCommittee() {
+  return Committee.findOne({ isTechCommittee: true }).lean<any>();
+}
+
+/// The committee flagged `isRushCommittee`, or null. Never matched by name.
+export async function getRushCommittee() {
+  return Committee.findOne({ isRushCommittee: true }).lean<any>();
+}
+
+export type CommitteeFlag = "isTechCommittee" | "isRushCommittee";
+
+/// Turns `flag` on for one committee and off everywhere else, so at most one
+/// committee ever holds it.
+export async function claimCommitteeFlag(committeeId: unknown, flag: CommitteeFlag) {
+  await Committee.updateMany(
+    { _id: { $ne: committeeId }, [flag]: true },
+    { $set: { [flag]: false } }
+  );
+}

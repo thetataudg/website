@@ -51,12 +51,12 @@ export function verifyFeedToken(token: string): string | null {
 }
 
 /// RFC 5545 wants UTC stamps as `YYYYMMDDTHHMMSSZ`.
-function formatUTC(date: Date) {
+export function formatUTC(date: Date) {
   return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
 /// Long lines must be folded at 75 octets, continued with a leading space.
-function fold(line: string) {
+export function fold(line: string) {
   if (line.length <= 75) return line;
   const parts: string[] = [];
   let remaining = line;
@@ -69,10 +69,12 @@ function fold(line: string) {
   return parts.join("\r\n");
 }
 
-function escapeText(value: string) {
+/// RFC 5545 TEXT escaping. The semicolon replacement used to be `"\;"`,
+/// which in JavaScript is just ";", so semicolons went out unescaped.
+export function escapeText(value: string) {
   return String(value ?? "")
     .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\;")
+    .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
     .replace(/\r?\n/g, "\\n");
 }
@@ -89,7 +91,13 @@ export interface FeedEvent {
   updatedAt?: Date | string;
 }
 
-export function buildICS(events: FeedEvent[], calendarName = "Theta Tau ΔΓ") {
+/// `extraBlocks` are complete VEVENT line lists from other sources (task due
+/// dates, see lib/tasks/ics.ts), appended after the chapter's events.
+export function buildICS(
+  events: FeedEvent[],
+  calendarName = "Theta Tau ΔΓ",
+  extraBlocks: string[][] = []
+) {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -132,6 +140,8 @@ export function buildICS(events: FeedEvent[], calendarName = "Theta Tau ΔΓ") {
     }
     lines.push("END:VEVENT");
   }
+
+  for (const block of extraBlocks) lines.push(...block);
 
   lines.push("END:VCALENDAR");
   return lines.join("\r\n") + "\r\n";

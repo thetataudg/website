@@ -5,7 +5,16 @@
 // controls; everyone else on the roster gets the read + their own grid.
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarPlus, ClipboardList, Crown, Loader2, Pencil, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarPlus,
+  ClipboardList,
+  Crown,
+  History,
+  Loader2,
+  Pencil,
+  Users,
+} from "lucide-react";
 import { DateTime } from "luxon";
 
 import {
@@ -19,6 +28,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useEventManagement } from "../../events/useEventManagement";
 import CommitteeAttendance from "../CommitteeAttendance";
 import CommitteePolls from "../_polls/CommitteePolls";
+import CommitteeTasksCard from "../CommitteeTasksCard";
 
 interface MemberRef {
   _id?: string;
@@ -39,6 +49,8 @@ export default function CommitteeDashboardClient({
 }) {
   const [committee, setCommittee] = React.useState<any>(null);
   const [events, setEvents] = React.useState<any[]>([]);
+  const [pastEvents, setPastEvents] = React.useState<any[] | null>(null);
+  const [showPast, setShowPast] = React.useState(false);
   const [viewer, setViewer] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -48,6 +60,36 @@ export default function CommitteeDashboardClient({
     );
     if (res.ok) setEvents(await res.json());
   }, [committeeId]);
+
+  // Finished meetings, newest first, so a head can take or fix the roll
+  // without going through Events > Manage > Completed.
+  const loadPastEvents = React.useCallback(async () => {
+    const res = await fetch(
+      `/api/events?committeeId=${committeeId}&includePast=true`
+    );
+    if (!res.ok) {
+      setPastEvents([]);
+      return;
+    }
+    // Over and not cancelled, whether or not the lifecycle job has flipped it
+    // to "completed" yet.
+    const now = Date.now();
+    const rows: any[] = (await res.json()).filter(
+      (e: any) =>
+        e.status !== "cancelled" &&
+        new Date(e.endTime ?? e.startTime).getTime() < now
+    );
+    rows.sort(
+      (a, b) =>
+        new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+    setPastEvents(rows);
+  }, [committeeId]);
+
+  const reloadAll = React.useCallback(async () => {
+    await loadEvents();
+    if (pastEvents !== null) await loadPastEvents();
+  }, [loadEvents, loadPastEvents, pastEvents]);
 
   React.useEffect(() => {
     (async () => {
@@ -69,7 +111,7 @@ export default function CommitteeDashboardClient({
   // The dialogs for making, editing and taking the roll for this committee's
   // events. New events are pinned to this committee.
   const management = useEventManagement({
-    onChanged: loadEvents,
+    onChanged: reloadAll,
     fixedCommitteeId: committeeId,
   });
 
@@ -163,18 +205,48 @@ export default function CommitteeDashboardClient({
 
       <section>
         <SectionHeader
-          title="Upcoming meetings"
-          description="Committee events. Chapter-wide events still live under Events."
+          title={showPast ? "Past meetings" : "Upcoming meetings"}
+          description={
+            showPast
+              ? "Open one to take or fix its attendance."
+              : "Committee events. Chapter-wide events still live under Events."
+          }
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              aria-pressed={showPast}
+              onClick={() => {
+                const next = !showPast;
+                setShowPast(next);
+                if (next && pastEvents === null) void loadPastEvents();
+              }}
+            >
+              {showPast ? (
+                <>
+                  <CalendarPlus className="size-4" /> Upcoming
+                </>
+              ) : (
+                <>
+                  <History className="size-4" /> Past events
+                </>
+              )}
+            </Button>
+          }
         />
-        {events.length === 0 ? (
+        {showPast && pastEvents === null ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (showPast ? pastEvents ?? [] : events).length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              Nothing scheduled.
+              {showPast ? "No past meetings yet." : "Nothing scheduled."}
             </CardContent>
           </Card>
         ) : (
           <ul className="grid list-none gap-2 p-0">
-            {events.map((e) => (
+            {(showPast ? pastEvents ?? [] : events).map((e) => (
               <li key={e._id}>
                 <Card className="transition-colors hover:border-primary/50">
                   <CardContent className="flex items-center justify-between gap-3 p-4">
@@ -182,9 +254,13 @@ export default function CommitteeDashboardClient({
                       <div className="font-medium text-foreground">{e.name}</div>
                       <div className="text-sm text-muted-foreground">
                         {DateTime.fromISO(e.startTime).toFormat(
-                          "EEE LLL d, h:mm a"
+                          showPast ? "EEE LLL d, yyyy" : "EEE LLL d, h:mm a"
                         )}
-                        {e.location ? ` · ${e.location}` : ""}
+                        {showPast
+                          ? ` · ${(e.attendees || []).length} attended`
+                          : e.location
+                            ? ` · ${e.location}`
+                            : ""}
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -197,13 +273,15 @@ export default function CommitteeDashboardClient({
                           >
                             <ClipboardList className="size-4" /> Attendance
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void management.openEdit(e._id)}
-                          >
-                            <Pencil className="size-4" /> Edit
-                          </Button>
+                          {!showPast ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void management.openEdit(e._id)}
+                            >
+                              <Pencil className="size-4" /> Edit
+                            </Button>
+                          ) : null}
                         </>
                       ) : null}
                       <Button asChild variant="outline" size="sm">
@@ -217,6 +295,8 @@ export default function CommitteeDashboardClient({
           </ul>
         )}
       </section>
+
+      <CommitteeTasksCard committeeId={committeeId} />
 
       <CommitteePolls
         committeeId={committeeId}

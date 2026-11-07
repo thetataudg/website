@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Bungee } from "next/font/google";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
+import { Search, X } from "lucide-react";
 
 const bungee = Bungee({
   subsets: ["latin"],
@@ -58,10 +59,30 @@ export default function BrothersContent() {
     Record<string, string[]>
   >({});
   const [filter, setFilter] = useState<BrothersFilter>("Active");
-  const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     const queryFilter = searchParams.get("filter");
@@ -307,73 +328,83 @@ export default function BrothersContent() {
           className="object-cover object-[50%_60%]"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/60 to-[#120a0a]" />
-        <div className="relative z-10 flex min-h-[55vh] flex-col items-start justify-end px-6 pb-12 sm:px-12">
-          <p className="text-sm uppercase tracking-[0.35em] text-[#f5d79a]">
-            Delta Gamma Chapter
-          </p>
+        <div className="relative z-10 flex min-h-[55vh] flex-col items-start justify-end px-4 pb-12 sm:px-12">
+          <p className="tt-eyebrow">Delta Gamma Chapter</p>
           <h1 className={`${bungee.className} mt-3 text-4xl text-[#b3202a] sm:text-6xl`}>
             Brothers
           </h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/85">
+          <p className="mt-3 max-w-2xl text-base text-white/85 sm:text-lg">
             Meet the members of Theta Tau.
           </p>
         </div>
       </section>
 
-      <section className="mx-4 mt-12 rounded-[36px] bg-[#fbf6dc] px-8 py-12 text-[#1b0f0f] lg:mx-10 reveal">
-        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <h2 className={`${bungee.className} text-3xl text-[#7a0104]`}>
-              Chapter Directory
-            </h2>
-            <p className="mt-2 text-base text-[#1b0f0f]/75">
-              Browse active members, alumni, or chapter officers.
-            </p>
+      <section className="tt-card tt-on-cream mx-4 mt-10 lg:mx-10 reveal">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <h2 className={`${bungee.className} text-2xl text-[#7a0104] sm:text-3xl`}>
+            Chapter Directory
+          </h2>
+          <p className="text-[13px] text-[#1b0f0f]/65" aria-live="polite">
+            {loading ? "Loading..." : `${filteredMembers.length} brothers`}
+          </p>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div
+            role="group"
+            aria-label="Filter brothers"
+            className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {(["Active", "Alumni", "Officers"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={filter === option}
+                onClick={() => setFilter(option)}
+                className="tt-chip shrink-0"
+              >
+                {option}
+              </button>
+            ))}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-full bg-[#120a0a] p-1 text-xs uppercase tracking-[0.3em] text-[#f5d79a]">
-              {(["Active", "Alumni", "Officers"] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setFilter(option)}
-                  className={`rounded-full px-4 py-2 transition ${
-                    filter === option
-                      ? "bg-[#e2ab16] text-[#1b0f0f]"
-                      : "text-[#f5d79a] hover:bg-white/10"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#120a0a] bg-[#120a0a] px-4 py-2 text-xs uppercase tracking-[0.3em] text-[#f5d79a]">
+          <div className="tt-search w-full md:max-w-xs">
+            <Search aria-hidden="true" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="tt-input"
+              placeholder="Search by name or roll number"
+              aria-label="Search members"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setQuery("");
+                  e.currentTarget.blur();
+                }
+              }}
+            />
+            {query ? (
               <button
                 type="button"
-                className="rounded-full border border-[#e2ab16] bg-transparent px-3 py-1 text-[0.62rem] uppercase tracking-[0.28em] text-[#f5d79a] transition hover:bg-[#e2ab16] hover:text-[#120a0a]"
-                onClick={() => setShowSearch((v) => !v)}
+                aria-label="Clear search"
+                onClick={() => {
+                  setQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#1b0f0f]/60 hover:bg-black/5 hover:text-[#1b0f0f]"
               >
-                Search Members
+                <X size={16} aria-hidden="true" />
               </button>
-              {showSearch && (
-                <input
-                  className="w-36 bg-transparent text-xs uppercase tracking-[0.28em] text-[#f5d79a] outline-none placeholder:text-[#f5d79a]/70 sm:w-48"
-                  placeholder="Search names..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              )}
-            </div>
-            <div className="rounded-full bg-[#120a0a] px-6 py-3 text-sm uppercase tracking-[0.3em] text-[#f5d79a]">
-              {loading ? "Loading..." : `${filteredMembers.length} brothers`}
-            </div>
+            ) : (
+              <kbd className="tt-kbd hidden md:inline-flex !border-[#1b0f0f]/20">/</kbd>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto mt-10 w-full max-w-[1400px] px-6 reveal">
+      <section className="mx-auto mt-8 w-full max-w-[1400px] px-4 sm:px-6 reveal">
         {loading ? (
-          <div className="rounded-[28px] bg-[#1b0f0f] p-10 text-center text-white/80">
+          <div className="tt-card-dark text-center text-white/80">
             Loading brothers...
           </div>
         ) : (
@@ -381,15 +412,15 @@ export default function BrothersContent() {
             {filter === "Officers" ? (
               <div className="space-y-10">
                 <div>
-                  <div className="mb-5 flex items-center justify-between">
-                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h3 className={`${bungee.className} text-xl text-[#f5d79a] sm:text-[28px]`}>
                       Executive Board
                     </h3>
-                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                    <span className="text-[13px] text-white/60">
                       {officersEcouncil.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {officersEcouncil.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -400,7 +431,7 @@ export default function BrothersContent() {
                         className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
                         style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                        <div className="relative w-full overflow-hidden rounded-xl border border-white/10" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               loading="lazy"
@@ -421,16 +452,16 @@ export default function BrothersContent() {
                             </div>
                           )}
                         </div>
-                        <div className="mt-3">
-                          <h3 className="text-base font-semibold text-white">
+                        <div className="mt-2.5">
+                          <h3 className="text-[15px] font-semibold leading-tight text-white">
                             {member.fName} {member.lName}
                           </h3>
                           {member.ecouncilPosition && (
-                            <p className="mt-1 text-xs text-[#f5d79a]">
+                            <p className="mt-1 text-[13px] text-[#f5d79a]">
                               {member.ecouncilPosition}
                             </p>
                           )}
-                          <p className="mt-1 text-xs text-white/60">
+                          <p className="mt-0.5 text-[13px] text-white/60">
                             #{member.rollNo}
                           </p>
                           <div className="mt-2 flex items-center gap-3 text-white/50">
@@ -466,15 +497,15 @@ export default function BrothersContent() {
                 </div>
 
                 <div>
-                  <div className="mb-5 flex items-center justify-between">
-                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h3 className={`${bungee.className} text-xl text-[#f5d79a] sm:text-[28px]`}>
                       Committee Chairs
                     </h3>
-                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                    <span className="text-[13px] text-white/60">
                       {officersCommitteeHeads.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {officersCommitteeHeads.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -485,7 +516,7 @@ export default function BrothersContent() {
                         className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
                         style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                        <div className="relative w-full overflow-hidden rounded-xl border border-white/10" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               loading="lazy"
@@ -506,16 +537,16 @@ export default function BrothersContent() {
                             </div>
                           )}
                         </div>
-                        <div className="mt-3">
-                          <h3 className="text-base font-semibold text-white">
+                        <div className="mt-2.5">
+                          <h3 className="text-[15px] font-semibold leading-tight text-white">
                             {member.fName} {member.lName}
                           </h3>
                           {member.isCommitteeHead && (
-                            <p className="mt-1 text-xs text-[#f5d79a]">
+                            <p className="mt-1 text-[13px] text-[#f5d79a]">
                               Committee Chair
                             </p>
                           )}
-                          <p className="mt-1 text-xs text-white/60">
+                          <p className="mt-0.5 text-[13px] text-white/60">
                             #{member.rollNo}
                           </p>
                           <div className="mt-2 flex items-center gap-3 text-white/50">
@@ -553,15 +584,15 @@ export default function BrothersContent() {
             ) : filter === "Active" && executiveBoardMembers.length > 0 ? (
               <div className="space-y-10">
                 <div>
-                  <div className="mb-5 flex items-center justify-between">
-                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h3 className={`${bungee.className} text-xl text-[#f5d79a] sm:text-[28px]`}>
                       Executive Board
                     </h3>
-                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                    <span className="text-[13px] text-white/60">
                       {executiveBoardMembers.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {executiveBoardMembers.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -572,7 +603,7 @@ export default function BrothersContent() {
                         className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
                         style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                        <div className="relative w-full overflow-hidden rounded-xl border border-white/10" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               loading="lazy"
@@ -593,16 +624,16 @@ export default function BrothersContent() {
                             </div>
                           )}
                         </div>
-                        <div className="mt-3">
-                          <h3 className="text-base font-semibold text-white">
+                        <div className="mt-2.5">
+                          <h3 className="text-[15px] font-semibold leading-tight text-white">
                             {member.fName} {member.lName}
                           </h3>
                           {member.ecouncilPosition && (
-                            <p className="mt-1 text-xs text-[#f5d79a]">
+                            <p className="mt-1 text-[13px] text-[#f5d79a]">
                               {member.ecouncilPosition}
                             </p>
                           )}
-                          <p className="mt-1 text-xs text-white/60">
+                          <p className="mt-0.5 text-[13px] text-white/60">
                             #{member.rollNo}
                           </p>
                           <div className="mt-2 flex items-center gap-3 text-white/50">
@@ -638,15 +669,15 @@ export default function BrothersContent() {
                 </div>
 
                 <div>
-                  <div className="mb-5 flex items-center justify-between">
-                    <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h3 className={`${bungee.className} text-xl text-[#f5d79a] sm:text-[28px]`}>
                       Active Members
                     </h3>
-                    <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                    <span className="text-[13px] text-white/60">
                       {regularActiveMembers.length} members
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {regularActiveMembers.map((member, index) => (
                       <div
                         key={member.rollNo}
@@ -657,7 +688,7 @@ export default function BrothersContent() {
                         className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
                         style={{ transitionDelay: `${index * 40}ms` }}
                       >
-                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                        <div className="relative w-full overflow-hidden rounded-xl border border-white/10" style={{ aspectRatio: "3/4" }}>
                           {member.profilePicUrl ? (
                             <img
                               loading="lazy"
@@ -678,21 +709,21 @@ export default function BrothersContent() {
                             </div>
                           )}
                         </div>
-                        <div className="mt-3">
-                          <h3 className="text-base font-semibold text-white">
+                        <div className="mt-2.5">
+                          <h3 className="text-[15px] font-semibold leading-tight text-white">
                             {member.fName} {member.lName}
                           </h3>
                           {member.isECouncil && member.ecouncilPosition && (
-                            <p className="mt-1 text-xs text-[#f5d79a]">
+                            <p className="mt-1 text-[13px] text-[#f5d79a]">
                               {member.ecouncilPosition}
                             </p>
                           )}
                           {member.isCommitteeHead && !member.isECouncil && (
-                            <p className="mt-1 text-xs text-[#f5d79a]">
+                            <p className="mt-1 text-[13px] text-[#f5d79a]">
                               Committee Chair
                             </p>
                           )}
-                          <p className="mt-1 text-xs text-white/60">
+                          <p className="mt-0.5 text-[13px] text-white/60">
                             #{member.rollNo}
                           </p>
                           <div className="mt-2 flex items-center gap-3 text-white/50">
@@ -729,15 +760,15 @@ export default function BrothersContent() {
               </div>
             ) : (
               <div>
-                <div className="mb-5 flex items-center justify-between">
-                  <h3 className={`${bungee.className} text-2xl text-[#f5d79a]`}>
+                <div className="mb-4 flex items-baseline justify-between gap-3">
+                  <h3 className={`${bungee.className} text-xl text-[#f5d79a] sm:text-[28px]`}>
                     {filter === "Alumni" ? "Alumni Members" : "Active Members"}
                   </h3>
-                  <span className="rounded-full bg-[#1b0f0f] px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                  <span className="text-[13px] text-white/60">
                     {filteredMembers.length} members
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {filteredMembers.map((member, index) => (
                   <div
                     key={member.rollNo}
@@ -748,7 +779,7 @@ export default function BrothersContent() {
                     className="group reveal cursor-pointer text-white transition-opacity duration-200 hover:opacity-80"
                     style={{ transitionDelay: `${index * 40}ms` }}
                   >
-                    <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "3/4" }}>
+                    <div className="relative w-full overflow-hidden rounded-xl border border-white/10" style={{ aspectRatio: "3/4" }}>
                       {member.profilePicUrl ? (
                         <img
                           loading="lazy"
@@ -769,21 +800,21 @@ export default function BrothersContent() {
                         </div>
                       )}
                     </div>
-                    <div className="mt-3">
-                      <h3 className="text-base font-semibold text-white">
+                    <div className="mt-2.5">
+                      <h3 className="text-[15px] font-semibold leading-tight text-white">
                         {member.fName} {member.lName}
                       </h3>
                       {member.isECouncil && member.ecouncilPosition && (
-                        <p className="mt-1 text-xs text-[#f5d79a]">
+                        <p className="mt-1 text-[13px] text-[#f5d79a]">
                           {member.ecouncilPosition}
                         </p>
                       )}
                       {member.isCommitteeHead && !member.isECouncil && (
-                        <p className="mt-1 text-xs text-[#f5d79a]">
+                        <p className="mt-1 text-[13px] text-[#f5d79a]">
                           Committee Chair
                         </p>
                       )}
-                      <p className="mt-1 text-xs text-white/60">
+                      <p className="mt-0.5 text-[13px] text-white/60">
                         #{member.rollNo}
                       </p>
                       <div className="mt-2 flex items-center gap-3 text-white/50">
@@ -821,7 +852,7 @@ export default function BrothersContent() {
           </>
         )}
         {!loading && filteredMembers.length === 0 && (
-          <div className="mt-8 rounded-[28px] bg-[#1b0f0f] p-10 text-center text-white/70">
+          <div className="mt-8 tt-card-dark text-center text-white/70">
             {emptyCopy}
           </div>
         )}

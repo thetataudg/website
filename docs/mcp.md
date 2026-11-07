@@ -38,6 +38,8 @@ Every tool acts as the signed-in member and enforces the rules the website enfor
 | Dues | Your own: anyone. Anyone else's, and the chapter summary: admins and E-Council (`lib/duesAuth.ts`). Read-only. |
 | Announcements | Admins, the Regent and the Vice Regent (`lib/chapterTools.ts`). Sending needs `confirm: true`. |
 | Lifecycle sweep | Admins only. |
+| Tasks | A committee's roster, its head, admins and E-Council (`lib/tasks/permissions.ts`). Anyone on the roster can create and edit any task; only the head or an admin deletes tasks or manages tags. Others get "Not found". |
+| Bug reports | Triage tools: the tech committee (anyone who can see its tracker). |
 
 A refused call returns an error result that says which rule applied.
 
@@ -72,12 +74,23 @@ A refused call returns an error result that says which rule applied.
 - `list_announcements`: recent Notification Center sends.
 - `send_announcement`: push / in-app / email to an audience. Without `confirm: true` it sends nothing and reports how many people it would reach. `test: true` sends only to you.
 
-Creating or starting an event and sending an announcement notify members, exactly as the same actions do on the website.
+**Tasks** (default: the committee switched on as the Tech committee; pass `committee` for another)
+- `list_tasks`: filter by status, assignee, `mine`, priority, due window, search. Returns keys like `TTDG-7K2M` and the roster.
+- `get_task`: one task with its checklist and activity timeline.
+- `create_task`, `update_task`: assignees and tags by name; `dueDate` is `YYYY-MM-DD` in Arizona time.
+- `comment_on_task`: markdown comment; assignees and the creator are notified.
+
+**Bug reports** (tech committee only)
+- `list_bug_reports`: the triage queue (`view: new | open | all`), or one report with its full thread via `ref`.
+- `triage_bug_report`: `accept` (creates the linked task), `duplicate` (with `of`), `wont_fix`, `need_info` (message required; the reporter sees it).
+
+Creating or starting an event, sending an announcement, assigning a task and triaging a report notify members, exactly as the same actions do on the website.
 
 ## For maintainers
 
 - Code: `lib/mcp/` (auth, OAuth metadata, tool definitions), route at `app/api/mcp/route.ts`, metadata routes under `app/.well-known/oauth-protected-resource*` and `oauth-authorization-server`.
 - Token verification: `clerkMiddleware` verifies the Bearer token on every request; `lib/mcp/auth.ts` reads that result with `auth({ acceptsToken: "oauth_token" })`. OAuth tokens are rejected by every other route, because they use the default session-token mode.
+- Tasks and bug reports: `lib/tasks/*` and `lib/bugs/*` are the service layer for the website routes, these tools and the cron.
 - Shared logic that used to live in route handlers is now in `lib/events/{updateEvent,eventDetail,listEvents,attendance}.ts`, `lib/committeeQueries.ts`, `lib/duesRead.ts` and `lib/notify/sendBroadcast.ts`; the routes call those too.
 - Clerk dashboard: Configure > Agents > MCP servers must contain `https://ttdg.org/api/mcp` with "Allow public clients" on.
 - The metadata's `resource` and authorization server come from `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`; on production those must be `https://ttdg.org` and the live key.
