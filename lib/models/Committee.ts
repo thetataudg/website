@@ -12,6 +12,19 @@ const CommitteeSchema = new Schema(
     // works in its own appearance, so the same committee reads correctly in
     // light mode and in dark. See `lib/calendarColors.ts`.
     color: { type: String, enum: CALENDAR_COLORS, default: null },
+    // At most one committee holds each flag; the committee routes clear it on
+    // every other committee when one is switched on. Features look committees
+    // up by these flags, never by name.
+    isTechCommittee: { type: Boolean, default: false }, // owns the tracker and triages bug reports
+    isRushCommittee: { type: Boolean, default: false }, // its head edits /rush
+    // Task keys read `${taskPrefix}-${number}`. Unset means "derive from the
+    // name"; see `taskPrefixFor` in lib/tasks/keys.ts.
+    taskPrefix: { type: String, default: null },
+    // Atomically incremented to hand out per-committee task numbers.
+    taskCounter: { type: Number, default: 0 },
+    // When the weekly task digest last went to this committee's head, so the
+    // cron sends it once per Monday however often it runs.
+    taskDigestSentAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -5,7 +5,7 @@ import { CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import {
   Popover,
   PopoverContent,
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
  * A date and a time, as one field.
  *
  * Built from the same primitives as `DatePicker` — a `Calendar` in a `Popover`
- * beside a time field — rather than a native `datetime-local`, whose picker is
+ * beside a `TimePicker` — rather than a native `datetime-local`, whose picker is
  * the browser's and looks like the browser's: a blue Safari sheet in the
  * middle of a form that is otherwise entirely ours.
  *
@@ -56,7 +56,6 @@ export function DateTimePicker({
   value,
   onChange,
   disabled,
-  required,
   className,
   placeholder = "Pick a date",
 }: {
@@ -65,6 +64,7 @@ export function DateTimePicker({
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** Kept for callers; the time always has a value once a date is picked. */
   required?: boolean;
   className?: string;
   placeholder?: string;
@@ -123,16 +123,14 @@ export function DateTimePicker({
         </PopoverContent>
       </Popover>
 
-      <Input
-        type="time"
+      <TimePicker
         aria-label="Time"
-        className="w-[6.75rem] shrink-0 px-2"
+        className="w-[8.5rem] shrink-0 px-3"
         disabled={disabled}
-        required={required}
+        clearable={false}
+        placeholder="Time"
         value={timePart(value)}
-        onChange={(change) =>
-          write(selected ?? new Date(), change.target.value)
-        }
+        onChange={(time) => write(selected ?? new Date(), time)}
       />
     </div>
   );

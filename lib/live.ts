@@ -8,7 +8,7 @@
 // second server instance or a host that cuts long connections.
 import { EventEmitter } from "events";
 
-export type LiveTopic = "mail" | "notification";
+export type LiveTopic = "mail" | "notification" | "tasks";
 
 const globalBus = globalThis as unknown as { __liveBus?: EventEmitter };
 // Kept on globalThis so dev hot reloads don't split publishers and listeners

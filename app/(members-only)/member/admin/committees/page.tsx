@@ -75,6 +75,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 type Member = {
   _id: string;
@@ -90,6 +91,8 @@ type Committee = {
   description?: string;
   committeeHeadId?: string | { _id?: string; fName?: string; lName?: string };
   committeeMembers?: (string | { _id?: string; fName?: string; lName?: string })[];
+  isTechCommittee?: boolean;
+  isRushCommittee?: boolean;
 };
 
 export default function CommitteesPage() {
@@ -110,6 +113,8 @@ export default function CommitteesPage() {
     description: "",
     committeeHeadId: "",
     committeeMembers: [] as string[],
+    isTechCommittee: false,
+    isRushCommittee: false,
   });
 
   const [editForm, setEditForm] = useState({
@@ -117,6 +122,8 @@ export default function CommitteesPage() {
     description: "",
     committeeHeadId: "",
     committeeMembers: [] as string[],
+    isTechCommittee: false,
+    isRushCommittee: false,
   });
 
   const activeMembers = useMemo(
@@ -157,12 +164,21 @@ export default function CommitteesPage() {
       .catch(() => setCanPurge(false));
   }, []);
 
+  /// A switch turned on here was turned off on another committee by the
+  /// server, so the list is re-read rather than patched locally.
+  async function reloadCommittees() {
+    const res = await fetch("/api/committees");
+    if (res.ok) setCommittees(await res.json());
+  }
+
   function resetForm() {
     setForm({
       name: "",
       description: "",
       committeeHeadId: "",
       committeeMembers: [],
+      isTechCommittee: false,
+      isRushCommittee: false,
     });
   }
 
@@ -185,6 +201,8 @@ export default function CommitteesPage() {
       description: committee.description || "",
       committeeHeadId: headId,
       committeeMembers: memberIds.filter(Boolean),
+      isTechCommittee: Boolean(committee.isTechCommittee),
+      isRushCommittee: Boolean(committee.isRushCommittee),
     });
     setEditingId(committee._id);
     setShowEdit(true);
@@ -199,6 +217,8 @@ export default function CommitteesPage() {
       committeeMembers: form.committeeMembers.filter(
         (id) => id !== form.committeeHeadId
       ),
+      isTechCommittee: form.isTechCommittee,
+      isRushCommittee: form.isRushCommittee,
     };
 
     const res = await fetch("/api/committees", {
@@ -209,6 +229,7 @@ export default function CommitteesPage() {
     if (res.ok) {
       const created = await res.json();
       setCommittees((prev) => [created, ...prev]);
+      if (payload.isTechCommittee || payload.isRushCommittee) void reloadCommittees();
       resetForm();
       setShowCreate(false);
     }
@@ -224,6 +245,8 @@ export default function CommitteesPage() {
       committeeMembers: editForm.committeeMembers.filter(
         (id) => id !== editForm.committeeHeadId
       ),
+      isTechCommittee: editForm.isTechCommittee,
+      isRushCommittee: editForm.isRushCommittee,
     };
     const res = await fetch(`/api/committees/${editingId}`, {
       method: "PATCH",
@@ -235,6 +258,7 @@ export default function CommitteesPage() {
       setCommittees((prev) =>
         prev.map((c) => (c._id === editingId ? updated : c))
       );
+      if (payload.isTechCommittee || payload.isRushCommittee) void reloadCommittees();
       setEditingId(null);
       setShowEdit(false);
       setEditForm({
@@ -242,6 +266,8 @@ export default function CommitteesPage() {
         description: "",
         committeeHeadId: "",
         committeeMembers: [],
+        isTechCommittee: false,
+        isRushCommittee: false,
       });
     }
   }
@@ -262,6 +288,8 @@ export default function CommitteesPage() {
           description: "",
           committeeHeadId: "",
           committeeMembers: [],
+          isTechCommittee: false,
+          isRushCommittee: false,
         });
       }
     }
@@ -279,6 +307,8 @@ export default function CommitteesPage() {
       description: "",
       committeeHeadId: "",
       committeeMembers: [],
+      isTechCommittee: false,
+      isRushCommittee: false,
     });
   };
 
@@ -453,6 +483,8 @@ export default function CommitteesPage() {
         form={form}
         setForm={setForm}
         onSubmit={saveCommittee}
+        committees={committees}
+        selfId={null}
       />
 
       <CommitteeFormDialog
@@ -468,6 +500,8 @@ export default function CommitteesPage() {
         form={editForm}
         setForm={setEditForm}
         onSubmit={saveEdit}
+        committees={committees}
+        selfId={editingId}
       />
 
       <AlertDialog
@@ -504,6 +538,8 @@ type CommitteeForm = {
   description: string;
   committeeHeadId: string;
   committeeMembers: string[];
+  isTechCommittee: boolean;
+  isRushCommittee: boolean;
 };
 
 /** Shared create/edit form. */
@@ -518,6 +554,8 @@ function CommitteeFormDialog({
   form,
   setForm,
   onSubmit,
+  committees,
+  selfId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -529,7 +567,16 @@ function CommitteeFormDialog({
   form: CommitteeForm;
   setForm: React.Dispatch<React.SetStateAction<CommitteeForm>>;
   onSubmit: (e: React.FormEvent) => void;
+  committees: Committee[];
+  selfId: string | null;
 }) {
+  /// The committee that holds `flag` today, other than the one being edited.
+  const holder = (flag: "isTechCommittee" | "isRushCommittee") =>
+    committees.find((c) => c._id !== selfId && c[flag])?.name;
+  const flags = [
+    { key: "isTechCommittee" as const, label: "Tech committee", noun: "tech committee" },
+    { key: "isRushCommittee" as const, label: "Rush committee", noun: "rush committee" },
+  ];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -602,6 +649,31 @@ function CommitteeFormDialog({
               }
               disabledIds={form.committeeHeadId ? [form.committeeHeadId] : []}
             />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {flags.map(({ key, label, noun }) => {
+              const current = holder(key);
+              return (
+                <div key={key} className="space-y-1.5 rounded-md border border-border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor={`committee-${key}`}>{label}</Label>
+                    <Switch
+                      id={`committee-${key}`}
+                      checked={form[key]}
+                      onCheckedChange={(checked) =>
+                        setForm((f) => ({ ...f, [key]: checked }))
+                      }
+                    />
+                  </div>
+                  {form[key] && current ? (
+                    <p className="text-xs text-muted-foreground">
+                      This replaces {current} as the {noun}.
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
 
           <DialogFooter className="gap-2">

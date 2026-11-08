@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Search, X } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -219,6 +220,27 @@ function FamilyTreeViewport({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const initialViewAppliedRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -353,14 +375,14 @@ function FamilyTreeViewport({
         <section
           className={
             embedded
-              ? "overflow-hidden rounded-[2rem] border border-[#d9b36a]/30 bg-[linear-gradient(180deg,rgba(251,246,220,0.98),rgba(255,251,242,0.96))] shadow-[0_24px_90px_rgba(20,13,13,0.18)]"
-              : "overflow-hidden rounded-[2rem] border border-[#d9b36a]/30 bg-[linear-gradient(180deg,rgba(251,246,220,0.98),rgba(255,251,242,0.96))] shadow-[0_24px_90px_rgba(20,13,13,0.18)]"
+              ? "tt-on-cream overflow-hidden rounded-2xl border border-[#d9b36a]/30 bg-[linear-gradient(180deg,rgba(251,246,220,0.98),rgba(255,251,242,0.96))] shadow-[0_8px_30px_rgba(20,13,13,0.10)]"
+              : "tt-on-cream overflow-hidden rounded-2xl border border-[#d9b36a]/30 bg-[linear-gradient(180deg,rgba(251,246,220,0.98),rgba(255,251,242,0.96))] shadow-[0_8px_30px_rgba(20,13,13,0.10)]"
           }
         >
           {!embedded && (
             <div className="border-b border-[#d9b36a]/30 px-6 py-6 sm:px-8">
               <>
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#7a0104]">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a0104]">
                   Theta Tau Family Tree
                 </p>
                 <div className="mt-3 max-w-2xl">
@@ -375,45 +397,53 @@ function FamilyTreeViewport({
             </div>
           )}
 
-          <div className="border-b border-[#d9b36a]/30 px-6 py-5 sm:px-8">
-            <label className="block max-w-2xl space-y-3">
-              <span className="text-xs font-semibold uppercase tracking-[0.35em] text-[#7a0104]">
-                Search members
-              </span>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="border-b border-[#d9b36a]/30 p-[18px] sm:p-6">
+            <div className="max-w-2xl">
+              <div className="tt-search">
+                <Search aria-hidden="true" />
                 <input
+                  ref={searchInputRef}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
                       cycleSearchResult();
+                    } else if (event.key === "Escape") {
+                      setSearchQuery("");
+                      event.currentTarget.blur();
                     }
                   }}
-                  placeholder="Type a name or roll number"
+                  placeholder="Search by name or roll number"
                   aria-label="Search family tree members"
-                  className="w-full rounded-2xl border border-[#d9b36a]/50 bg-white px-4 py-3 text-sm text-[#140d0d] outline-none transition focus:border-[#b3202a] focus:ring-2 focus:ring-[#b3202a]/20 sm:text-base"
+                  className="tt-input"
                 />
-                {searchQuery.trim() ? (
+                {searchQuery ? (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="rounded-2xl border border-[#d9b36a]/60 px-4 py-3 text-sm font-semibold text-[#7a0104] transition hover:border-[#b3202a] hover:text-[#b3202a]"
+                    aria-label="Clear search"
+                    onClick={() => {
+                      setSearchQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#1b0f0f]/60 hover:bg-black/5 hover:text-[#1b0f0f]"
                   >
-                    Clear
+                    <X size={16} aria-hidden="true" />
                   </button>
-                ) : null}
+                ) : (
+                  <kbd className="tt-kbd hidden md:inline-flex !border-[#1b0f0f]/20">/</kbd>
+                )}
               </div>
-              <p className="text-sm text-[#5c4532]">
-                {searchQuery.trim()
-                  ? searchMatches.length > 0
+              {searchQuery.trim() ? (
+                <p className="mt-2 text-[13px] text-[#5c4532]" aria-live="polite">
+                  {searchMatches.length > 0
                     ? searchMatches.length === 1
                       ? "1 match found."
                       : `Match ${activeMatchIndex + 1} of ${searchMatches.length}. Press Enter to cycle.`
-                    : "No matching members found."
-                  : "Search centers the first matching member and highlights their box."}
-              </p>
-            </label>
+                    : "No matching members found."}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className={embedded ? "h-[78vh] min-h-[42rem] w-full bg-[radial-gradient(circle_at_top,rgba(245,215,154,0.20),transparent_32%),linear-gradient(180deg,rgba(255,251,242,0.9),rgba(248,241,222,0.98))]" : "h-[78vh] min-h-[42rem] bg-[radial-gradient(circle_at_top,rgba(245,215,154,0.20),transparent_32%),linear-gradient(180deg,rgba(255,251,242,0.9),rgba(248,241,222,0.98))]"}>

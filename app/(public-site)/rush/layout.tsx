@@ -1,13 +1,4 @@
-import type { Metadata } from "next";
-import { pageMetadata } from "@/lib/seo";
-
-export const metadata: Metadata = pageMetadata({
-  title: "Rush",
-  description:
-    "Rush events and recruitment details for Theta Tau Delta Gamma.",
-  path: "/rush",
-});
-
+// Metadata lives on page.tsx now, so it can read the editable eyebrow.
 export default function RushLayout({
   children,
 }: {

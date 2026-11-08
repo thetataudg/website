@@ -109,7 +109,9 @@ h3 {
 }
 
 p {
-  font-size: 20px;
+  /* Was 20px; most "chunky" copy on the site came from this default. */
+  font-size: 17px;
+  line-height: 1.6;
   /* font-family: Arial, Helvetica, sans-serif */
 }
 
@@ -118,49 +120,219 @@ p {
   margin-left: auto;
 }
 
+/* ------------------------------------------------------------------
+ * Public site controls: bold, not chunky.
+ * Heavy display type (Bungee) stays for one or two headings per page;
+ * everything a visitor clicks or types into is compact: 40px tall,
+ * 14px/600, 8px radius, no wide letter-spacing. See docs/public-ui-brief.md.
+ * ------------------------------------------------------------------ */
+.tt-button-primary,
+.tt-button-secondary,
+.tt-button-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-family: var(--font-nunito-sans);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
 .tt-button-primary {
   color: #1a0f0f;
-  font-size: 17px;
-  font-style: normal;
-  transition: 0.2s ease-in-out;
-  font-family: var(--font-nunito-sans);
-  font-weight: 700;
-  line-height: normal;
-  padding: 12px 30px;
-  border-radius: 999px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-decoration: none;
   background-color: #e2ab16;
-  border: 2px solid #e2ab16;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+  border: 1px solid #e2ab16;
 }
 
 .tt-button-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.3);
+  background-color: #f0bd2e;
+  border-color: #f0bd2e;
 }
 
 .tt-button-secondary {
-  color: #e2ab16;
-  border: 2px solid #e2ab16;
-  font-size: 17px;
-  font-style: normal;
-  transition: 0.2s ease-in-out;
-  font-family: var(--font-nunito-sans);
-  font-weight: 700;
-  line-height: normal;
-  padding: 12px 30px;
-  border-radius: 999px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-decoration: none;
+  color: #f8ead4;
   background-color: transparent;
+  border: 1px solid rgba(245, 215, 154, 0.4);
 }
 
 .tt-button-secondary:hover {
-  background-color: #e2ab16;
-  color: #1a0f0f;
+  border-color: #e2ab16;
+  color: #f5d79a;
+}
+
+/* On cream cards the secondary button needs dark ink. */
+.tt-on-cream .tt-button-secondary {
+  color: #7a0104;
+  border-color: rgba(122, 1, 4, 0.3);
+}
+.tt-on-cream .tt-button-secondary:hover {
+  border-color: #7a0104;
+  color: #7a0104;
+}
+
+.tt-button-ghost {
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.tt-button-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tt-button-primary:focus-visible,
+.tt-button-secondary:focus-visible,
+.tt-button-ghost:focus-visible,
+.tt-input:focus-visible,
+.tt-chip:focus-visible {
+  outline: 2px solid #e2ab16;
+  outline-offset: 2px;
+}
+
+.tt-button-primary:disabled,
+.tt-button-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Bigger hero CTA: same shape, a touch more presence. */
+.tt-button-lg {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 15px;
+}
+
+/* Small uppercase label above a heading. Tight tracking, not 0.35em. */
+.tt-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f5d79a;
+}
+
+/* Text inputs, selects, textareas. Dark by default; .tt-on-cream flips them. */
+.tt-input {
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 246, 220, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8ead4;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.tt-input::placeholder { color: rgba(248, 234, 212, 0.45); }
+.tt-input:focus { outline: none; border-color: #e2ab16; box-shadow: 0 0 0 3px rgba(226, 171, 22, 0.2); }
+textarea.tt-input { height: auto; min-height: 112px; padding: 10px 12px; resize: vertical; }
+select.tt-input { padding-right: 32px; }
+
+.tt-on-cream .tt-input {
+  border-color: rgba(27, 15, 15, 0.16);
+  background: #fff;
+  color: #1b0f0f;
+}
+.tt-on-cream .tt-input::placeholder { color: rgba(27, 15, 15, 0.4); }
+.tt-on-cream .tt-input:focus { border-color: #7a0104; box-shadow: 0 0 0 3px rgba(122, 1, 4, 0.12); }
+
+.tt-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.tt-help { font-size: 12px; opacity: 0.65; margin-top: 4px; }
+
+/* Search: an input with a leading icon and an optional "/" hint. */
+.tt-search { position: relative; }
+.tt-search > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0.55; pointer-events: none; }
+.tt-search > .tt-input { padding-left: 36px; padding-right: 40px; }
+.tt-search > .tt-kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
+
+.tt-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(251, 246, 220, 0.2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* No keyboard on phones, so no keyboard hint. */
+@media (max-width: 767px), (hover: none) {
+  .tt-search > .tt-kbd { display: none; }
+  .tt-search > .tt-input { padding-right: 36px; }
+}
+
+/* Filter chips and segmented options. */
+.tt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 246, 220, 0.18);
+  background: transparent;
+  color: rgba(248, 234, 212, 0.85);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.tt-chip:hover { border-color: rgba(245, 215, 154, 0.5); color: #f8ead4; }
+.tt-chip[aria-pressed="true"], .tt-chip[aria-checked="true"], .tt-chip.is-active {
+  background: #e2ab16; border-color: #e2ab16; color: #1a0f0f;
+}
+.tt-on-cream .tt-chip { border-color: rgba(27, 15, 15, 0.16); color: #1b0f0f; background: #fff; }
+.tt-on-cream .tt-chip:hover { border-color: rgba(122, 1, 4, 0.45); }
+.tt-on-cream .tt-chip[aria-pressed="true"], .tt-on-cream .tt-chip[aria-checked="true"], .tt-on-cream .tt-chip.is-active {
+  background: #7a0104; border-color: #7a0104; color: #fbf6dc;
+}
+
+/* Cards. Cream for content, dark for panels on the dark page. */
+.tt-card {
+  border-radius: 16px;
+  background: #fbf6dc;
+  color: #1b0f0f;
+  padding: 24px;
+  border: 1px solid rgba(27, 15, 15, 0.06);
+}
+.tt-card-dark {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(251, 246, 220, 0.08);
+  color: #f8ead4;
+  padding: 20px;
+}
+@media (max-width: 640px) {
+  .tt-card { padding: 18px; border-radius: 14px; }
+  .tt-card-dark { padding: 16px; }
+}
+
+/* Small status pill. */
+.tt-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* The /mobile page reuses the site's button shapes but not the uppercase,
@@ -519,3 +691,12 @@ p {
     background-position: 50% 50%;
   }
 }
+
+/* Rendered markdown on /report (see lib/markdownSafe.ts). */
+.tt-md p { margin: 0; }
+.tt-md ul { list-style: disc; padding-left: 1.25rem; }
+.tt-md ol { list-style: decimal; padding-left: 1.25rem; }
+.tt-md a { color: #7a0104; text-decoration: underline; text-underline-offset: 2px; }
+.tt-md code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; background: rgba(27, 15, 15, 0.08); padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
+.tt-md pre { background: rgba(27, 15, 15, 0.08); padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; }
+.tt-md blockquote { border-left: 3px solid rgba(122, 1, 4, 0.3); padding-left: 0.75rem; }

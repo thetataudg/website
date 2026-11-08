@@ -124,9 +124,30 @@ export default function CommitteesClient({
     [viewer]
   );
 
+  /// Strictly the head of this committee (not "any officer"), so the
+  /// "You lead" marker and ordering mean what they say.
+  const isHeadOf = useCallback(
+    (committee: Committee) => {
+      if (!viewer?.memberId) return false;
+      const head = committee.committeeHeadId;
+      const headId =
+        typeof head === "string" ? head : (head as any)?._id?.toString?.();
+      return Boolean(headId && headId === viewer.memberId);
+    },
+    [viewer]
+  );
+
   const sortedCommittees = useMemo(() => {
     return [...committees].sort((a, b) => a.name.localeCompare(b.name));
   }, [committees]);
+
+  // On screen, the committees you head come first so a chair lands on theirs.
+  const displayCommittees = useMemo(() => {
+    const mine = sortedCommittees.filter(isHeadOf);
+    const rest = sortedCommittees.filter((c) => !isHeadOf(c));
+    return [...mine, ...rest];
+  }, [sortedCommittees, isHeadOf]);
+  const headsAny = displayCommittees.some(isHeadOf);
 
   const exportPdf = async () => {
     const { default: jsPDF } = await import("jspdf");
@@ -233,9 +254,11 @@ export default function CommitteesClient({
     <PageContainer className="space-y-6">
       <PageHeader
         title="Committees"
-        description={`${sortedCommittees.length} committee${
-          sortedCommittees.length === 1 ? "" : "s"
-        } this semester.`}
+        description={
+          headsAny
+            ? "Open your committee to manage meetings, polls and attendance."
+            : "Open a committee to see its members and meetings."
+        }
         actions={
           <>
             <Tabs
@@ -344,12 +367,13 @@ export default function CommitteesClient({
         </Card>
       ) : view === "cards" ? (
         <ul className="grid auto-rows-fr list-none items-stretch gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
-          {sortedCommittees.map((committee) => {
+          {displayCommittees.map((committee) => {
+            const mine = isHeadOf(committee);
             const headLabel = formatMember(committee.committeeHeadId);
             const members = listMembers(committee.committeeMembers);
             return (
               <li key={committee._id} className="h-full min-w-0">
-                <Card className="h-full transition-colors hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
+                <Card className={`h-full transition-colors hover:border-primary/50 ${mine ? "border-primary/60" : ""} focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background`}>
                   <CardContent className="h-full p-4">
                     <Link
                       href={`/member/committees/${committee._id}`}
@@ -362,10 +386,17 @@ export default function CommitteesClient({
                         <span className="min-w-0 text-lg font-semibold leading-snug text-foreground">
                           {committee.name}
                         </span>
-                        <Badge variant="muted" className="shrink-0">
-                          <Users aria-hidden="true" />
-                          {members.length} member{members.length === 1 ? "" : "s"}
-                        </Badge>
+                        {mine ? (
+                          <Badge className="shrink-0">
+                            <Crown aria-hidden="true" />
+                            Manage
+                          </Badge>
+                        ) : (
+                          <Badge variant="muted" className="shrink-0">
+                            <Users aria-hidden="true" />
+                            {members.length} member{members.length === 1 ? "" : "s"}
+                          </Badge>
+                        )}
                       </span>
 
                       {committee.description && (
@@ -396,14 +427,22 @@ export default function CommitteesClient({
       ) : (
         <Card>
           <CardContent className="divide-y divide-border p-0">
-            {sortedCommittees.map((committee) => {
+            {displayCommittees.map((committee) => {
               const headLabel = formatMember(committee.committeeHeadId);
               const members = listMembers(committee.committeeMembers);
               return (
                 <div key={committee._id} className="space-y-2 p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-base font-semibold text-foreground">
-                      {committee.name}
+                      <Link
+                        href={`/member/committees/${committee._id}`}
+                        className="hover:underline"
+                      >
+                        {committee.name}
+                      </Link>
+                      {isHeadOf(committee) ? (
+                        <Badge className="ml-2 align-middle">Manage</Badge>
+                      ) : null}
                     </h2>
                     <Badge variant="muted">
                       <Crown aria-hidden="true" />

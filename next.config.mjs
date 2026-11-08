@@ -82,6 +82,20 @@ const nextConfig = {
           { key: "Cache-Control", value: `public, max-age=${year}, immutable` },
         ],
       },
+      {
+        // Uploaded rush posters get a new key on every upload, so they can be
+        // pinned. Listed after the image rule above, which also matches .jpg.
+        source: "/api/rush/poster/:path*",
+        headers: [
+          { key: "Cache-Control", value: `public, max-age=${year}, immutable` },
+        ],
+      },
+      {
+        // Bug report screenshots are access-checked per request. The image
+        // rule above would otherwise mark them public for shared caches.
+        source: "/api/report/:path*",
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
+      },
     ];
   },
   async redirects() {
@@ -90,6 +104,12 @@ const nextConfig = {
         source: '/merch',
         destination: 'https://thetatau-dg.printify.me/',
         permanent: true,
+      },
+      {
+        // Short link for the committee task tracker.
+        source: '/tech',
+        destination: '/member/tech',
+        permanent: false,
       },
       {
         source: '/2dg4u',
