@@ -7,6 +7,7 @@ import { useAuth } from "@clerk/nextjs";
 import LoadingState from "./LoadingState";
 import MembershipRevokedState from "./MembershipRevokedState";
 import {
+  readStoredClerkId,
   useRevokeNotice,
   writeStoredClerkId,
 } from "@/components/auth/revokeNotice";
@@ -38,16 +39,24 @@ export default function MembersOnlyAccessGate({
   // admin action.
   useEffect(() => {
     if (!isLoaded || isSignedIn || !checkedRevoke) return;
-    const reason = revokeNotice ? "session-revoked" : "session-expired";
+    // "Expired" only for someone who was signed in on this browser. A
+    // first-time visitor gets the plain sign-in form, no warning.
+    const reason = revokeNotice
+      ? "session-revoked"
+      : readStoredClerkId()
+        ? "session-expired"
+        : null;
     // Carry the page they were opening (a notification link, a shared task
     // link) so sign-in lands them back on it. Same-origin paths only; the
     // sign-in page re-checks this before honouring it.
     const here = `${window.location.pathname}${window.location.search}`;
-    const params = new URLSearchParams({ logout: reason });
+    const params = new URLSearchParams();
+    if (reason) params.set("logout", reason);
     if (here.startsWith("/") && !here.startsWith("//") && here !== "/member") {
       params.set("redirect_url", here);
     }
-    router.replace(`/sign-in?${params.toString()}`);
+    const query = params.toString();
+    router.replace(query ? `/sign-in?${query}` : "/sign-in");
   }, [isLoaded, isSignedIn, checkedRevoke, revokeNotice, router]);
 
   // Membership status only matters for someone who is actually signed in.

@@ -55,6 +55,7 @@ import RemindModal from "./RemindModal";
 import MemberHistorySheet from "./MemberHistoryModal";
 import NewChargeSheet from "./NewChargeSheet";
 import { exportAuditPdf } from "./exportAudit";
+import { useAdminViewer } from "../useAdminViewer";
 
 type RosterRow = {
   memberId: string;
@@ -174,7 +175,12 @@ export default function DuesRosterPage() {
     null
   );
 
+  const { canSeeCardPayments } = useAdminViewer();
+
   useEffect(() => {
+    // Only the Treasurer and admins may see card payments; other E-Council
+    // would just get a 403.
+    if (!canSeeCardPayments) return;
     let cancelled = false;
     fetch("/api/terminal/payments?unassigned=true", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
@@ -193,7 +199,7 @@ export default function DuesRosterPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canSeeCardPayments]);
 
   useEffect(() => {
     if (user?.id) setDismissedSignature(readDismissed(user.id));

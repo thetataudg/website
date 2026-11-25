@@ -24,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAdminViewer } from "../useAdminViewer";
 
 export default function ClientInvitePanel() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -31,10 +32,12 @@ export default function ClientInvitePanel() {
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // initial load
+  const viewer = useAdminViewer();
+
+  // initial load; invitations are admin only, so E-Council never asks
   useEffect(() => {
-    loadInvites();
-  }, []);
+    if (viewer.isAdmin) loadInvites();
+  }, [viewer.isAdmin]);
 
   // load pending invites from our API
   async function loadInvites() {
@@ -76,6 +79,22 @@ export default function ClientInvitePanel() {
           </AlertDescription>
         </Alert>
         <RedirectToSignIn />
+      </PageContainer>
+    );
+  }
+
+  if (!viewer.ready) {
+    return <LoadingState message="Loading invitations..." />;
+  }
+
+  if (!viewer.isAdmin) {
+    return (
+      <PageContainer>
+        <Alert>
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Admins only</AlertTitle>
+          <AlertDescription>Only an admin can invite members.</AlertDescription>
+        </Alert>
       </PageContainer>
     );
   }

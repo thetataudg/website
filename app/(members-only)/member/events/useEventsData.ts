@@ -144,7 +144,7 @@ export type EventViewer = ReturnType<typeof useEventViewer>;
 
 export function useEventsData() {
   const viewer = useEventViewer();
-  const { me, committees, memberCommitteeIds, isAdmin } = viewer;
+  const { me, committees, memberCommitteeIds, isAdmin, canCreate } = viewer;
   const [events, setEvents] = React.useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -219,7 +219,8 @@ export function useEventsData() {
    */
   const canManage = React.useCallback((event: EventItem) => !!event.canManage, []);
 
-  const canForceSync = !!me && (isAdmin || me.isCommitteeHead);
+  // Matches the server: officers or the real head of a committee.
+  const canForceSync = !!me && canCreate;
 
   const fetchDetails = React.useCallback(async (eventId: string) => {
     const response = await fetch(`/api/events/${eventId}`);

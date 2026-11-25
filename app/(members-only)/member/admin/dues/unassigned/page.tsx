@@ -6,6 +6,7 @@ import { CircleCheck, HandCoins, TriangleAlert } from "lucide-react";
 import LoadingState from "../../../../components/LoadingState";
 import { PageContainer, PageHeader } from "../../../../components/shell/PageShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAdminViewer } from "../../useAdminViewer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,9 +89,11 @@ export default function UnassignedPage() {
     }
   }, []);
 
+  const viewer = useAdminViewer();
+
   useEffect(() => {
-    load();
-  }, [load]);
+    if (viewer.canSeeCardPayments) load();
+  }, [load, viewer.canSeeCardPayments]);
 
   async function assign(payment: Payment) {
     const memberId = choice[payment._id];
@@ -116,6 +119,27 @@ export default function UnassignedPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  if (!viewer.ready) return <LoadingState message="Loading unassigned payments..." />;
+
+  if (!viewer.canSeeCardPayments) {
+    return (
+      <PageContainer className="max-w-7xl space-y-6">
+        <PageHeader
+          title="Unassigned payments"
+          actions={
+            <Button variant="outline" asChild>
+              <a href="/member/admin/dues">Back to the roster</a>
+            </Button>
+          }
+        />
+        <Alert>
+          <TriangleAlert aria-hidden="true" />
+          <AlertDescription>Only the Treasurer or an admin can see card payments.</AlertDescription>
+        </Alert>
+      </PageContainer>
+    );
   }
 
   if (loading) return <LoadingState message="Loading unassigned payments..." />;
