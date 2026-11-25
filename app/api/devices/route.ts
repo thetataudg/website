@@ -33,7 +33,11 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const token = String(body?.token || "").trim();
-    const platform = body?.platform === "android" ? "android" : body?.platform === "ios" ? "ios" : null;
+    // A missing platform means iOS. The shipped iOS app predates the Android
+    // client and has never sent this field; rejecting it here silently stopped
+    // every iPhone from registering for push.
+    const rawPlatform = body?.platform == null || body?.platform === "" ? "ios" : body.platform;
+    const platform = rawPlatform === "android" ? "android" : rawPlatform === "ios" ? "ios" : null;
     if (!platform) return NextResponse.json({ error: "Invalid device platform" }, { status: 400 });
     const validToken = platform === "ios"
       ? /^[0-9a-fA-F]{32,200}$/.test(token)
