@@ -14,6 +14,7 @@ import {
   Loader2,
   Pencil,
   Users,
+  Wallet,
 } from "lucide-react";
 import { DateTime } from "luxon";
 
@@ -165,9 +166,16 @@ export default function CommitteeDashboardClient({
         description={committee.description || undefined}
         actions={
           canManage ? (
-            <Button onClick={management.openCreate}>
-              <CalendarPlus className="size-4" /> Schedule event
-            </Button>
+            <>
+              <Button asChild variant="outline">
+                <Link href={`${baseHref}/budget`}>
+                  <Wallet className="size-4" /> Budget
+                </Link>
+              </Button>
+              <Button onClick={management.openCreate}>
+                <CalendarPlus className="size-4" /> Schedule event
+              </Button>
+            </>
           ) : null
         }
       />

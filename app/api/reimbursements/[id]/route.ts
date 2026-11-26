@@ -48,6 +48,12 @@ export async function PATCH(
     if (!reimbursement) {
       return NextResponse.json({ error: "Reimbursement not found" }, { status: 404 });
     }
+    if (reimbursement.committeeId) {
+      return NextResponse.json(
+        { error: "This is a committee budget request. Review it from the committee queue." },
+        { status: 409 }
+      );
+    }
     if (reimbursement.status !== "pending") {
       return NextResponse.json(
         { error: `This claim was already ${reimbursement.status}` },

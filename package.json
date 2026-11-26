@@ -34,7 +34,9 @@
     "check:newsletters": "esbuild scripts/check-newsletters.ts --bundle --platform=node --format=cjs --outfile=.newsletters-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .newsletters-check.cjs; rc=$?; rm -f .newsletters-check.cjs; exit $rc",
     "check:rush": "esbuild scripts/check-rush.ts --bundle --platform=node --format=cjs --outfile=.rush-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .rush-check.cjs; rc=$?; rm -f .rush-check.cjs; exit $rc",
     "check:tasks": "esbuild scripts/check-tasks-logic.ts --bundle --platform=node --format=cjs --outfile=.tasks-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .tasks-check.cjs; rc=$?; rm -f .tasks-check.cjs; exit $rc",
-    "optimize:images": "node scripts/optimize-images.mjs"
+    "optimize:images": "node scripts/optimize-images.mjs",
+    "check:budgets": "esbuild scripts/check-budgets-logic.ts --bundle --platform=node --format=cjs --outfile=.budgets-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node .budgets-check.cjs; rc=$?; rm -f .budgets-check.cjs; exit $rc",
+    "check:budgets-db": "esbuild scripts/check-budgets-db.ts --bundle --platform=node --format=cjs --outfile=.budgets-db-check.cjs --tsconfig=tsconfig.json --log-level=error --external:mongoose && node -r dotenv/config .budgets-db-check.cjs dotenv_config_path=.env; rc=$?; rm -f .budgets-db-check.cjs; exit $rc"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

@@ -19,6 +19,7 @@ const ADMIN_TABS = [
   { href: "/member/admin/invite", label: "Invite" },
   { href: "/member/admin/pending", label: "Requests" },
   { href: "/member/admin/dues", label: "Dues" },
+  { href: "/member/admin/budgets", label: "Budgets" },
   { href: "/member/admin/donations", label: "Donations" },
   { href: "/member/admin/gem", label: "GEM" },
   { href: "/member/admin/lockdown", label: "Lockdown" },

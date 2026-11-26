@@ -324,6 +324,11 @@ export default function DuesRosterPage() {
               {exporting ? "Building…" : "Export"}
             </Button>
             <Button variant="outline" asChild>
+              <Link href="/member/admin/budgets" className="no-underline">
+                Budgets
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
               <Link href="/member/admin/dues/requests" className="no-underline">
                 Requests
                 {totals.pendingReviewCount > 0 && (
