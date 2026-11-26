@@ -45,6 +45,19 @@ const JOBS: Job[] = [
       }
     },
   },
+  {
+    // Committee budgets: finish any approval or log line a crash left
+    // half-written. See lib/budgetClose.ts.
+    name: "budgets-reconcile",
+    everyMs: 6 * 60 * 60 * 1000,
+    run: async () => {
+      const { reconcileBudgets } = await import("@/lib/budgetClose");
+      const report = await reconcileBudgets(new Date());
+      if (report.packagesFinished || report.reviewGaps || report.entryGaps) {
+        logger.warn({ report }, "Budget reconcile repaired something");
+      }
+    },
+  },
 ];
 
 const globalForScheduler = globalThis as unknown as {

@@ -41,7 +41,9 @@ export async function GET(req: Request) {
       if (!member) {
         return NextResponse.json({ error: "Profile not found" }, { status: 404 });
       }
-      const mine = await Reimbursement.find({ memberId: member._id })
+      // Committee claims live on the committee's budget page and are paid
+      // through a separate step; this list is general reimbursements only.
+      const mine = await Reimbursement.find({ memberId: member._id, committeeId: null })
         .sort({ createdAt: -1 })
         .lean<any[]>();
       return NextResponse.json(
@@ -56,7 +58,9 @@ export async function GET(req: Request) {
 
     await requireTreasury(req);
 
-    const filter: any = {};
+    // Committee budget requests have their own queue (/api/budgets/requests)
+    // and must never be approved here, where approval mints dues credit.
+    const filter: any = { committeeId: null };
     const status = searchParams.get("status") ?? "pending";
     if (status !== "all") filter.status = status;
 
